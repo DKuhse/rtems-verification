@@ -6,15 +6,15 @@
 # as documented in the README. Outputs per-function proof summaries.
 #
 # Usage:
-#   verify-wp-all.sh                  # default 10s prover timeout
-#   verify-wp-all.sh -wp-timeout 30   # 30s timeout (passes through to frama-c)
+#   verify-wp-all.sh                            # default 10s prover timeout
+#   verify-wp-all.sh -wp-model "Typed+Cast"     # recommended memory model
+#   verify-wp-all.sh -wp-timeout 30             # 30s timeout
 #
 set -e
 eval $(opam env)
 
-RTEMS_HOME="${RTEMS_HOME:-$HOME/RTEMS}"
-RTEMS_PREFIX="${RTEMS_HOME}/rtems_x86_64"
-RTEMS_SRC="${RTEMS_HOME}/src/rtems-5.1"
+RTEMS_SRC="${RTEMS_SRC:-/workspace/rtems/src/rtems-5.1}"
+RTEMS_PREFIX="${RTEMS_PREFIX:-/opt/rtems5}"
 
 cd "${RTEMS_SRC}/cpukit"
 

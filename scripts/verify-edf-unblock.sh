@@ -8,9 +8,8 @@ if [ "$1" = "--gui" ]; then
     shift
 fi
 
-RTEMS_HOME="${RTEMS_HOME:-$HOME/RTEMS}"
-RTEMS_PREFIX="${RTEMS_HOME}/rtems_x86_64"
-RTEMS_SRC="${RTEMS_HOME}/src/rtems-5.1"
+RTEMS_SRC="${RTEMS_SRC:-/workspace/rtems/src/rtems-5.1}"
+RTEMS_PREFIX="${RTEMS_PREFIX:-/opt/rtems5}"
 
 cd "${RTEMS_SRC}/cpukit"
 

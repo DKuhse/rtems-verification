@@ -1,23 +1,23 @@
 services:
-  # Headless batch verification — runs all targets via WP CLI
+  # Bare container for setup tasks (BSP build, etc.)
+  toolchain:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: rtems-edf-toolchain
+    volumes:
+      - ./rtems:/workspace/rtems
+
+  # Headless verification
   verify:
     build:
       context: .
       dockerfile: Dockerfile
-    image: rtems-edf-verification
-    container_name: rtems-edf-verify
-    working_dir: /root/RTEMS/src/rtems-5.1/cpukit
+    image: rtems-edf-toolchain
+    working_dir: /workspace/rtems/src/rtems-5.1/cpukit
     volumes:
-      # Mount verification files for live editing without rebuilding
-      - ./Formally-Verifying-Implementations-of-EDF-Scheduler-in-RTEMS/stubs.h:/root/RTEMS/src/rtems-5.1/cpukit/stubs.h
-      - ./Formally-Verifying-Implementations-of-EDF-Scheduler-in-RTEMS/release_cancel_stubs.h:/root/RTEMS/src/rtems-5.1/cpukit/release_cancel_stubs.h
-      - ./Formally-Verifying-Implementations-of-EDF-Scheduler-in-RTEMS/priorityimpl.h:/root/RTEMS/src/rtems-5.1/cpukit/include/rtems/score/priorityimpl.h
-      - ./Formally-Verifying-Implementations-of-EDF-Scheduler-in-RTEMS/scheduleredfimpl.h:/root/RTEMS/src/rtems-5.1/cpukit/include/rtems/score/scheduleredfimpl.h
-      - ./Formally-Verifying-Implementations-of-EDF-Scheduler-in-RTEMS/schedulerimpl.h:/root/RTEMS/src/rtems-5.1/cpukit/include/rtems/score/schedulerimpl.h
-      - ./Formally-Verifying-Implementations-of-EDF-Scheduler-in-RTEMS/scheduleredfchangepriority.c:/root/RTEMS/src/rtems-5.1/cpukit/score/src/scheduleredfchangepriority.c
-      - ./Formally-Verifying-Implementations-of-EDF-Scheduler-in-RTEMS/scheduleredfreleasejob.c:/root/RTEMS/src/rtems-5.1/cpukit/score/src/scheduleredfreleasejob.c
-      - ./Formally-Verifying-Implementations-of-EDF-Scheduler-in-RTEMS/scheduleredfunblock.c:/root/RTEMS/src/rtems-5.1/cpukit/score/src/scheduleredfunblock.c
-      - ./Formally-Verifying-Implementations-of-EDF-Scheduler-in-RTEMS/threadchangepriority.c:/root/RTEMS/src/rtems-5.1/cpukit/score/src/threadchangepriority.c
+      - ./rtems:/workspace/rtems
+      - ./scripts:/opt/scripts
     command: ["verify-all.sh"]
 
   # Interactive shell with X11 forwarding for frama-c-gui
@@ -26,22 +26,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: rtems-edf-verification
-    container_name: rtems-edf-gui
-    working_dir: /root/RTEMS/src/rtems-5.1/cpukit
+    image: rtems-edf-toolchain
+    working_dir: /workspace/rtems/src/rtems-5.1/cpukit
     environment:
       - DISPLAY=${DISPLAY}
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      - ./Formally-Verifying-Implementations-of-EDF-Scheduler-in-RTEMS/stubs.h:/root/RTEMS/src/rtems-5.1/cpukit/stubs.h
-      - ./Formally-Verifying-Implementations-of-EDF-Scheduler-in-RTEMS/release_cancel_stubs.h:/root/RTEMS/src/rtems-5.1/cpukit/release_cancel_stubs.h
-      - ./Formally-Verifying-Implementations-of-EDF-Scheduler-in-RTEMS/priorityimpl.h:/root/RTEMS/src/rtems-5.1/cpukit/include/rtems/score/priorityimpl.h
-      - ./Formally-Verifying-Implementations-of-EDF-Scheduler-in-RTEMS/scheduleredfimpl.h:/root/RTEMS/src/rtems-5.1/cpukit/include/rtems/score/scheduleredfimpl.h
-      - ./Formally-Verifying-Implementations-of-EDF-Scheduler-in-RTEMS/schedulerimpl.h:/root/RTEMS/src/rtems-5.1/cpukit/include/rtems/score/schedulerimpl.h
-      - ./Formally-Verifying-Implementations-of-EDF-Scheduler-in-RTEMS/scheduleredfchangepriority.c:/root/RTEMS/src/rtems-5.1/cpukit/score/src/scheduleredfchangepriority.c
-      - ./Formally-Verifying-Implementations-of-EDF-Scheduler-in-RTEMS/scheduleredfreleasejob.c:/root/RTEMS/src/rtems-5.1/cpukit/score/src/scheduleredfreleasejob.c
-      - ./Formally-Verifying-Implementations-of-EDF-Scheduler-in-RTEMS/scheduleredfunblock.c:/root/RTEMS/src/rtems-5.1/cpukit/score/src/scheduleredfunblock.c
-      - ./Formally-Verifying-Implementations-of-EDF-Scheduler-in-RTEMS/threadchangepriority.c:/root/RTEMS/src/rtems-5.1/cpukit/score/src/threadchangepriority.c
+      - ./rtems:/workspace/rtems
+      - ./scripts:/opt/scripts
     stdin_open: true
     tty: true
     command: ["/bin/bash"]

@@ -2,3 +2,5 @@
 .claude
 CLAUDE.md
 Formally-Verifying-Implementations-of-EDF-Scheduler-in-RTEMS/.git
+rtems/
+paper.pdf
