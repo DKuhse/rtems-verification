@@ -53,7 +53,7 @@ Priority_Node *_Helper_RBTree_Minimum( const RBTree_Control *tree );
 
 /*@
   requires \valid_read(tree);
-  assigns \nothing;
+  assigns \result \from tree, g_min_edf_node;
   ensures \result == g_min_edf_node;
 */
 Scheduler_EDF_Node *_Helper_RBTree_EDF_Minimum( const RBTree_Control *tree );
@@ -110,7 +110,7 @@ RTEMS_INLINE_ROUTINE Priority_Control _Scheduler_Node_get_priority(
 );
 
 /*@
-  assigns \nothing;
+  assigns \result \from thread;
  */
 RTEMS_INLINE_ROUTINE Per_CPU_Control *_Thread_Get_CPU(
   const Thread_Control *thread

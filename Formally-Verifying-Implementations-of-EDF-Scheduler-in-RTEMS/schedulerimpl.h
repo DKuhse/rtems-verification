@@ -1192,9 +1192,10 @@ RTEMS_INLINE_ROUTINE bool _Scheduler_Unblock_node(
  requires \separated(_Thread_Heir, _Per_CPU_Get());
  behavior new_h:
   assumes _Thread_Heir != new_heir && ( _Thread_Heir->is_preemptible || force_dispatch );
-  assigns _Thread_Heir, _Thread_Dispatch_necessary;
+  assigns _Thread_Heir \from new_heir;
+  assigns _Thread_Dispatch_necessary \from \nothing;
   ensures _Thread_Heir == new_heir;
-  //ensures _Thread_Dispatch_necessary == true;
+  //ensures _Thread_Dispatch_necessary == true; // unprovable: dispatch_necessary is volatile bool
  behavior no_new_h:
   assumes !(_Thread_Heir != new_heir && ( _Thread_Heir->is_preemptible || force_dispatch ));
   assigns \nothing;

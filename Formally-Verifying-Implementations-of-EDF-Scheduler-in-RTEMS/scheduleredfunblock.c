@@ -34,9 +34,12 @@
   );
   requires &((Scheduler_EDF_Node *) node)->Base == node;
   requires \separated(
-    the_thread, 
+    the_thread,
     _Per_CPU_Get()
     );
+  requires \separated(node + (..), (Per_CPU_Control_envelope *)_Per_CPU_Information + (..));
+  requires \separated(the_thread + (..), (Per_CPU_Control_envelope *)_Per_CPU_Information + (..));
+  requires \separated(scheduler + (..), (Per_CPU_Control_envelope *)_Per_CPU_Information + (..));
 
   behavior exec_update_new_h:
     assumes SCHEDULER_PRIORITY_PURIFY(((Scheduler_EDF_Node *) node)->Base.Priority.value)  < _Thread_Heir->Scheduler.nodes->Wait.Priority.Node.priority;

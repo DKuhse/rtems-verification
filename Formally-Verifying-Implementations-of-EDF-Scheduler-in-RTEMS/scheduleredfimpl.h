@@ -56,7 +56,7 @@ extern "C" {
   */
 /*@
   requires \valid_read(scheduler);
-  assigns \nothing;
+  assigns \result \from scheduler, g_edf_sched_context;
   ensures \result == g_edf_sched_context;
 */
 RTEMS_INLINE_ROUTINE Scheduler_EDF_Context *
@@ -93,7 +93,7 @@ RTEMS_INLINE_ROUTINE Scheduler_EDF_Node *_Scheduler_EDF_Thread_get_node(
  */
 /*@
   requires \valid(node);
-  assigns \nothing;
+  assigns \result \from node;
   ensures \result == (Scheduler_EDF_Node *) node;
 */
 RTEMS_INLINE_ROUTINE Scheduler_EDF_Node * _Scheduler_EDF_Node_downcast(
@@ -244,7 +244,7 @@ RTEMS_INLINE_ROUTINE void _Scheduler_EDF_Extract_body(
     assumes _Thread_Heir != g_min_edf_node->Base.owner && ( _Thread_Heir->is_preemptible || force_dispatch );
     assigns _Thread_Heir, _Thread_Dispatch_necessary;
     ensures _Thread_Heir == g_min_edf_node->Base.owner;
-    //ensures _Thread_Dispatch_necessary == true;
+    //ensures _Thread_Dispatch_necessary == true; // unprovable: dispatch_necessary is volatile bool
   behavior no_new_h:
     assumes !(_Thread_Heir != g_min_edf_node->Base.owner && ( _Thread_Heir->is_preemptible || force_dispatch ));
     assigns \nothing;

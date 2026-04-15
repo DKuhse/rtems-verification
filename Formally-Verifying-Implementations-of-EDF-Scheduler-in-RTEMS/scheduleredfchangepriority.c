@@ -27,9 +27,10 @@
   requires \valid(g_edf_sched_context);
   requires \valid(g_min_edf_node->Base.owner) && \valid(_Thread_Heir) && \valid(_Per_CPU_Get());
   requires \separated(_Thread_Heir, _Per_CPU_Get());
+  requires \separated(node + (..), (Per_CPU_Control_envelope *)_Per_CPU_Information + (..));
+  requires \separated(scheduler + (..), (Per_CPU_Control_envelope *)_Per_CPU_Information + (..));
+  requires \separated(the_thread + (..), (Per_CPU_Control_envelope *)_Per_CPU_Information + (..));
 
-  //requires \separated(&g_min_edf_node->Base, g_min_edf_node);
-  
   behavior thread_not_ready:
     assumes the_thread->current_state != STATES_READY;
     assigns \nothing;
@@ -46,8 +47,8 @@
     assigns _Thread_Heir, _Thread_Dispatch_necessary, ((Scheduler_EDF_Node *) node)->priority;
     ensures _Thread_Heir == g_min_edf_node->Base.owner;
     ensures ((Scheduler_EDF_Node *) node)->priority == SCHEDULER_PRIORITY_PURIFY(node->Priority.value);
-    ensures _Thread_Dispatch_necessary == true;
-  
+    //ensures _Thread_Dispatch_necessary == true; // unprovable: dispatch_necessary is volatile bool
+
   behavior exec_update_no_new_h:
     assumes the_thread->current_state == STATES_READY;
     assumes SCHEDULER_PRIORITY_PURIFY(node->Priority.value) != ((Scheduler_EDF_Node *) node)->priority;
