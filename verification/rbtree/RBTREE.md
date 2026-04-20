@@ -122,14 +122,42 @@ a real inductive predicate.
 | BST order / minimum-is-the-minimum | not claimed | not claimed (future probe) |
 | `RTEMS_RB_LEFT` / `RTEMS_RB_ROOT` macro semantics | trusted | trusted (unchanged) |
 
-## What's left for probe 3
+## Probe 3 result (BST invariant + leftmost claim)
 
-- **BST ordering.** Extend `wf_node` to carry a comparator and assert
-  `\forall l \in left_subtree; less(l, n)`. Prove that the final
-  `parent` of the left-walk is the BST minimum under that ordering.
-- **Minimum is the minimum.** Follow from the BST-order extension plus
-  a helper lemma "no left subtree ⇒ node is minimum of its subtree."
-- **Tree construction.** Right now `wf_node(root, g_tree_depth)` is a
-  precondition — nobody builds a tree satisfying it. Later probes that
-  verify `_RBTree_Insert_with_parent` would need to prove that
-  insertion preserves `wf_node` (and the depth bound).
+Replaced `wf_node` with `bst_node(n, d, lo, hi)` that carries the BST
+ordering property (every key in the subtree strictly in `(lo, hi)`) as
+well as wellformedness. Added an uninterpreted logic function `key(n)`.
+
+**Total: 53/53 goals Valid.** Three lemmas (`bst_node_valid`,
+`bst_node_left`, `bst_node_key_in_bounds`) were all proved by
+Alt-Ergo. No Coq escalation needed.
+
+Strengthened ensures for `_RBTree_Minimum` (all proved):
+
+- `\result->Node.rbe_left == \null` — the returned node is structurally
+  leftmost.
+- `key(\result) < g_hi` — the result's key is strictly below the tree's
+  upper bound.
+- `key(\result) <= key(tree->rbh_root)` — the result's key is at most
+  the root's key (equal when the root itself is returned, strict
+  otherwise).
+
+The dynamic upper bound on the descending walk is expressed implicitly
+through `parent` rather than via a tracked ghost `hi`. The invariant
+splits on `parent == \null` and uses `key(parent)` as the tightening
+bound once the first step has been taken. This dodged a ghost-code
+restriction (logic functions can't be called from `ghost int x = ...`
+assignments).
+
+## What's left for probe 4
+
+- **Global minimum claim.** "`key(\result) <= key(n)` for every `n` in
+  the tree" requires quantifying over a set of nodes — an inductive
+  `in_subtree{L}(root, n)` or a `\set<RBTree_Node*>`-valued
+  `nodes_of(root)`. Not done here.
+- **Tree construction.** `bst_node(root, g_tree_depth, g_lo, g_hi)` is
+  still a precondition — nothing builds a tree that satisfies it. A
+  probe targeting `_RBTree_Insert_with_parent` would need to prove
+  insertion preserves `bst_node` (depth bound included).
+- **RB-balance / black-height.** Orthogonal to BST ordering; would
+  extend `bst_node` with a color/black-height component.
