@@ -18,8 +18,6 @@
 
 /*@
   requires \valid_read(tree);
-  requires g_tree_depth >= 0;
-  requires g_lo < g_hi;
   requires bst_node(tree->rbh_root, g_tree_depth, g_lo, g_hi);
   assigns  g_rbtree_min \from tree, tree->rbh_root;
   ensures  \result == g_rbtree_min;

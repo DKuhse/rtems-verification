@@ -542,8 +542,6 @@ static inline void _RBTree_Initialize_one(
  */
 /*@
   requires \valid_read(the_rbtree);
-  requires g_tree_depth >= 0;
-  requires g_lo < g_hi;
   requires bst_node(the_rbtree->rbh_root, g_tree_depth, g_lo, g_hi);
   assigns  g_rbtree_min \from the_rbtree, the_rbtree->rbh_root;
   ensures  \result == g_rbtree_min;
