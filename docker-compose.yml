@@ -20,6 +20,20 @@ services:
       - ./scripts:/opt/scripts
     command: ["verify-all.sh"]
 
+  # RBTree verification side experiment (reuses the EDF image,
+  # annotated sources live under ./verification/rbtree/).
+  verify-rbtree:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: rtems-edf-toolchain
+    working_dir: /workspace/verification/rbtree
+    volumes:
+      - ./rtems:/workspace/rtems
+      - ./scripts:/opt/scripts
+      - ./verification:/workspace/verification
+    command: ["/opt/scripts/rbtree/verify-rbtree-min.sh"]
+
   # Interactive shell with X11 forwarding for frama-c-gui
   # Usage: xhost +local:docker && docker compose run gui
   gui:
@@ -34,6 +48,7 @@ services:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - ./rtems:/workspace/rtems
       - ./scripts:/opt/scripts
+      - ./verification:/workspace/verification
     stdin_open: true
     tty: true
     command: ["/bin/bash"]
