@@ -88,35 +88,63 @@ typedef RTEMS_RB_HEAD(RBTree_Control, RBTree_Node) RBTree_Control;
 /*@ ghost extern int g_hi; */
 
 /*@
-  // Abstract key for a node — uninterpreted logic function. Callers
-  // supply the BST invariant as `bst_node(root, depth, lo, hi)` which
-  // implicitly defines the ordering via this `key`.
+  // Abstract key for a node — uninterpreted logic function. The BST
+  // ordering is defined in terms of this key.
   logic integer key{L}(RBTree_Node *n);
 
-  inductive bst_node{L}(RBTree_Node *n, integer d, integer lo, integer hi) {
-    case bst_null{L}:
-      \forall integer d, lo, hi; d >= 0 ==> bst_node(\null, d, lo, hi);
-    case bst_step{L}:
-      \forall RBTree_Node *n, integer d, lo, hi;
+  // Layer 1: shape / wellformedness. Depth-bounded, independent of any
+  // key ordering. Any function that only needs "pointers are valid" can
+  // require this alone.
+  inductive wf_node{L}(RBTree_Node *n, integer d) {
+    case wf_null{L}:
+      \forall integer d; d >= 0 ==> wf_node(\null, d);
+    case wf_step{L}:
+      \forall RBTree_Node *n, integer d;
         d > 0 && n != \null && \valid_read(n)
-        && lo < key(n) < hi
-        && bst_node(n->Node.rbe_left,  d - 1, lo, key(n))
-        && bst_node(n->Node.rbe_right, d - 1, key(n), hi)
-        ==> bst_node(n, d, lo, hi);
+        && wf_node(n->Node.rbe_left,  d - 1)
+        && wf_node(n->Node.rbe_right, d - 1)
+        ==> wf_node(n, d);
   }
 
-  lemma bst_node_valid{L}:
-    \forall RBTree_Node *n, integer d, lo, hi;
-      n != \null && bst_node(n, d, lo, hi) ==> \valid_read(n);
+  lemma wf_node_valid{L}:
+    \forall RBTree_Node *n, integer d;
+      n != \null && wf_node(n, d) ==> \valid_read(n);
 
-  lemma bst_node_left{L}:
-    \forall RBTree_Node *n, integer d, lo, hi;
-      n != \null && d > 0 && bst_node(n, d, lo, hi)
-      ==> bst_node(n->Node.rbe_left, d - 1, lo, key(n));
+  lemma wf_node_left{L}:
+    \forall RBTree_Node *n, integer d;
+      n != \null && d > 0 && wf_node(n, d)
+      ==> wf_node(n->Node.rbe_left, d - 1);
 
-  lemma bst_node_key_in_bounds{L}:
-    \forall RBTree_Node *n, integer d, lo, hi;
-      n != \null && bst_node(n, d, lo, hi) ==> lo < key(n) < hi;
+  lemma wf_node_depth_positive{L}:
+    \forall RBTree_Node *n, integer d;
+      n != \null && wf_node(n, d) ==> d > 0;
+
+  // Layer 2: BST ordering. Every key in the subtree strictly in (lo, hi).
+  // Orthogonal to shape — composition happens in `bst_node` below.
+  inductive bst_order{L}(RBTree_Node *n, integer lo, integer hi) {
+    case bst_order_null{L}:
+      \forall integer lo, hi; bst_order(\null, lo, hi);
+    case bst_order_step{L}:
+      \forall RBTree_Node *n, integer lo, hi;
+        n != \null && lo < key(n) < hi
+        && bst_order(n->Node.rbe_left,  lo, key(n))
+        && bst_order(n->Node.rbe_right, key(n), hi)
+        ==> bst_order(n, lo, hi);
+  }
+
+  lemma bst_order_key_in_bounds{L}:
+    \forall RBTree_Node *n, integer lo, hi;
+      n != \null && bst_order(n, lo, hi) ==> lo < key(n) < hi;
+
+  lemma bst_order_left{L}:
+    \forall RBTree_Node *n, integer lo, hi;
+      n != \null && bst_order(n, lo, hi)
+      ==> bst_order(n->Node.rbe_left, lo, key(n));
+
+  // Composed predicate — shorthand for "wellformed BST subtree." Use
+  // this in contracts that need both shape and order.
+  predicate bst_node{L}(RBTree_Node *n, integer d, integer lo, integer hi) =
+    wf_node(n, d) && bst_order(n, lo, hi);
  */
 
 /**

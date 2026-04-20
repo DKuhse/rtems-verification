@@ -124,13 +124,28 @@ a real inductive predicate.
 
 ## Probe 3 result (BST invariant + leftmost claim)
 
-Replaced `wf_node` with `bst_node(n, d, lo, hi)` that carries the BST
-ordering property (every key in the subtree strictly in `(lo, hi)`) as
-well as wellformedness. Added an uninterpreted logic function `key(n)`.
+Added an uninterpreted logic function `key(n)` and a BST ordering
+predicate. The invariants are **layered** rather than monolithic:
 
-**Total: 53/53 goals Valid.** Three lemmas (`bst_node_valid`,
-`bst_node_left`, `bst_node_key_in_bounds`) were all proved by
-Alt-Ergo. No Coq escalation needed.
+- `wf_node(n, d)` — pure shape / wellformedness (unchanged from probe 2).
+- `bst_order(n, lo, hi)` — pure BST ordering; every key in the subtree
+  strictly in `(lo, hi)`. Independent of shape.
+- `bst_node(n, d, lo, hi) := wf_node(n, d) && bst_order(n, lo, hi)` —
+  composed predicate for contracts that need both. Functions that only
+  need shape can require `wf_node` alone.
+
+**Total: 55/55 goals Valid.** Five supporting lemmas, all proved by
+Alt-Ergo:
+
+- `wf_node_valid` — non-null wellformed ⇒ valid_read.
+- `wf_node_left` — left child of wellformed is wellformed (lesser depth).
+- `wf_node_depth_positive` — non-null wellformed ⇒ depth > 0. Needed
+  because with the layered definition Alt-Ergo has to unfold
+  `bst_node` and invert `wf_node` to discharge `d >= 0` preservation.
+- `bst_order_key_in_bounds` — non-null ordered ⇒ `lo < key(n) < hi`.
+- `bst_order_left` — left child is ordered with tightened `hi` bound.
+
+No Coq escalation needed.
 
 Strengthened ensures for `_RBTree_Minimum` (all proved):
 
