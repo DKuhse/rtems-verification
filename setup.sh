@@ -14,9 +14,12 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 RTEMS_DIR="${SCRIPT_DIR}/rtems"
 RTEMS_SRC="${RTEMS_DIR}/src/rtems-5.1"
+RTEMS_SRC_PRISTINE="${RTEMS_DIR}/src/rtems-5.1-pristine"
 RTEMS_BUILD="${RTEMS_DIR}/build/amd64"
 RTEMS_TARBALL="${RTEMS_DIR}/rtems-5.1.tar.xz"
 RTEMS_URL="https://ftp.rtems.org/pub/rtems/releases/5/5.1/sources/rtems-5.1.tar.xz"
+RTEMS62_SRC_PRISTINE="${RTEMS_DIR}/src/rtems-6.2-pristine"
+RTEMS62_TARBALL="${RTEMS_DIR}/rtems-6.2.tar.xz"
 VERIFY_DIR="${SCRIPT_DIR}/Formally-Verifying-Implementations-of-EDF-Scheduler-in-RTEMS"
 
 # ── Step 1: Download RTEMS source ──────────────────────────────────
@@ -36,6 +39,25 @@ if [ ! -d "${RTEMS_SRC}/cpukit" ]; then
 else
     echo "RTEMS 5.1 source already extracted."
 fi
+
+# Pristine copies (untouched by patches/overwrites) for reference/diffing.
+extract_pristine() {
+    local tarball="$1" dest="$2" top="$3"
+    if [ ! -f "${tarball}" ]; then return 0; fi
+    if [ -d "${dest}/cpukit" ]; then
+        echo "Pristine ${top} source already extracted."
+        return 0
+    fi
+    echo "Extracting pristine ${top} source to $(basename "${dest}")/..."
+    local tmpdir
+    tmpdir="$(mktemp -d -p "${RTEMS_DIR}/src")"
+    tar xJf "${tarball}" -C "${tmpdir}"
+    mv "${tmpdir}/${top}" "${dest}"
+    rmdir "${tmpdir}"
+}
+
+extract_pristine "${RTEMS_TARBALL}"   "${RTEMS_SRC_PRISTINE}"   "rtems-5.1"
+extract_pristine "${RTEMS62_TARBALL}" "${RTEMS62_SRC_PRISTINE}" "rtems-6.2"
 
 # ── Step 3: Build BSP via Docker (before patching) ────────────────
 # The BSP build needs the original unpatched source. Patches and
@@ -96,7 +118,14 @@ echo "Verification files copied."
 
 # ── Done ──────────────────────────────────────────────────────────
 echo ""
-echo "Setup complete. RTEMS source is at: rtems/src/rtems-5.1/"
+echo "Setup complete."
+echo "  Modified (annotated)   source: rtems/src/rtems-5.1/"
+echo "  Pristine (unmodified)  source: rtems/src/rtems-5.1-pristine/"
+if [ -d "${RTEMS62_SRC_PRISTINE}/cpukit" ]; then
+    echo "  Pristine RTEMS 6.2     source: rtems/src/rtems-6.2-pristine/"
+fi
+echo ""
+echo "  Diff modified vs pristine: diff -ruN rtems/src/rtems-5.1-pristine/ rtems/src/rtems-5.1/"
 echo ""
 echo "Usage:"
 echo "  docker compose run --rm verify verify-wp-all.sh -wp-model 'Typed+Cast'"
