@@ -253,15 +253,120 @@ from an earlier failed run kept reporting Timeout even after
 - Bumped `-wp-timeout 30` in both verify scripts.
 - If you suspect a stale cache, delete `wp-coq/cache/` and re-run.
 
-## What's left for probe 6+
+## Probe 5b result (`parent_linked` layer)
 
-- **Tree construction.** `bst_node(root, g_tree_depth, g_lo, g_hi)`
-  is still a precondition — nothing builds a tree that satisfies it.
-  `_RBTree_Insert_with_parent` would need to prove insertion
-  preserves `bst_node` (depth bound included). This is the real
-  frontier.
-- **`_RBTree_Successor` / `_RBTree_Predecessor`.** These walk via
-  parent pointers — different proof shape than the left/right-child
-  descent. Likely a full probe of its own.
-- **RB-balance / black-height.** Orthogonal to BST ordering; would
-  extend the invariant with a color/black-height layer.
+Added a third independent structural layer:
+
+```c
+inductive parent_linked{L}(RBTree_Node *n, RBTree_Node *expected_parent);
+```
+
+- `parent_linked(\null, _)` holds trivially.
+- `parent_linked(n, ep)` holds iff `n->rbe_parent == ep` and both
+  children are `parent_linked(_, n)`.
+- For a whole tree: `parent_linked(tree->rbh_root, \null)`.
+
+Three supporting lemmas, all proved by Alt-Ergo (no Coq needed):
+
+- `parent_linked_parent_matches` — non-null member's parent pointer
+  equals the expected parent.
+- `parent_linked_left`, `parent_linked_right` — descending preserves
+  linkage with the node itself as the new expected parent.
+
+**Regression: Minimum and Maximum both at 69/69** (up from 66/66;
+the three new lemma goals). Proof breakdown per run: 44 Qed, 22
+Alt-Ergo, 3 Coq (unchanged — parent_linked didn't need Coq for
+these easy lemmas).
+
+### Why this is layered separately, not folded into `wf_node`
+
+Keeps shape, ordering, and parent-linkage independent. Functions
+that only walk via children (Minimum, Maximum) require only
+`bst_node = wf_node && bst_order` — they don't need parent
+linkage at all. Functions that walk via parents (Successor,
+Insertion's color-fixup) will require the full
+`bst_node && parent_linked(root, \null)` composition. This is a
+cheap preparation.
+
+### Not yet proved, needed for Successor
+
+- `parent_linked_member_has_valid_parent` — for any non-root member
+  of a parent-linked tree, `rbe_parent` is `\valid_read`. Needs
+  structural induction on in_subtree — likely Coq.
+- Termination of the walk-up loop — needs a ghost measure like
+  "depth of node from root" or similar decreasing quantity.
+
+## Probe 6a result (`_RBTree_Successor` partial correctness)
+
+Annotated `_RBTree_Successor` via a hand-written `rbtreenext.c`
+(bypassing the `RTEMS_RB_NEXT` macro expansion) — the body embeds
+the standard successor algorithm with both branches (has-right-
+subtree → leftmost-of-right, and no-right-subtree → walk up until
+we came from a left child).
+
+**Result: 65/65 goals Valid** for Successor.
+**Regression: 72/72** on both Minimum and Maximum (up from 69 after
+earlier additions). Proof breakdown per Minimum/Maximum run: 44 Qed,
+23 Alt-Ergo, 5 Coq.
+
+Two new Coq lemmas added this probe (total Coq lemmas now **5**):
+
+- `wf_node_subtree_member_valid` — every member of a wellformed
+  tree is `\valid_read`. ~10 lines of Ltac.
+- `parent_linked_member_parent_in_tree` — for any non-root member
+  of a parent-linked tree, `rbe_parent` points to another tree
+  member. ~25 lines of Ltac with case-split via
+  `why_decidable_eq` (Why3's `WhyType` decidable equality, cleaner
+  than needing `Classical_Prop`).
+
+Other added pieces:
+
+- `g_root` ghost (the root of the tree containing `node`).
+- `wf_node_right` lemma (symmetric of `wf_node_left`) — Alt-Ergo.
+
+### Successor ensures proved
+
+```c
+ensures \result == \null || \valid_read(\result);
+ensures \result != \null ==> in_subtree(g_root, \result);
+```
+
+Partial correctness only — enough to show the return value is a
+legal tree pointer. Deferred claims:
+
+- `\result != \null ==> key(\result) > key(node)` — requires
+  propagating bst_order into node's right subtree and through the
+  walk-up case. Needs `bst_order_subtree_member_ordered`-style
+  lemma (dropped earlier as unnecessary for the minimal probe; it
+  was also a Coq-territory structural induction).
+- `\result == \null ==> node is the tree maximum` — requires
+  reasoning about ancestors.
+- Optimality (result is THE minimum key greater than node's) —
+  needs set-level reasoning.
+
+Termination still skipped (`-wp-prop="-@terminates"`).
+
+### Coq workflow notes from this probe
+
+- WP's `-wp-interactive=update` regenerates the stub from scratch,
+  **including the header imports**. Additions like
+  `Require Import Classical_Prop` get stripped. Use Why3's own
+  primitives (`why_decidable_eq`) instead of classical reasoning.
+- Use the host `Edit` tool on the `.v` files directly (they're
+  now UID-1000 owned after the compose `user` mapping). No more
+  Python-in-Docker heredocs.
+- Fast iteration: `docker compose run --rm rbtree-shell
+  /opt/scripts/rbtree/coq-check.sh <file.v>` for compile-only
+  feedback; only invoke the full `verify-rbtree-next.sh` once the
+  proof compiles clean.
+
+## What's left for probe 6b / 7+
+
+- **Successor full correctness** — add back `key(result) > key(node)`
+  and the null-means-maximum / optimality claims. Needs
+  `bst_order_subtree_member_ordered` (Coq) plus ancestor-chain
+  reasoning for the walk-up case.
+- **`_RBTree_Predecessor`** — mirror of Successor.
+- **Tree construction.** `_RBTree_Insert_with_parent` preserving
+  `bst_node && parent_linked`. The real frontier.
+- **RB-balance / black-height.** Orthogonal to BST ordering.

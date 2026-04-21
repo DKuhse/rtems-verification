@@ -84,6 +84,7 @@ typedef RTEMS_RB_HEAD(RBTree_Control, RBTree_Node) RBTree_Control;
 
 /*@ ghost extern RBTree_Node *g_rbtree_min; */
 /*@ ghost extern RBTree_Node *g_rbtree_max; */
+/*@ ghost extern RBTree_Node *g_root; */
 /*@ ghost extern int g_tree_depth; */
 /*@ ghost extern int g_lo; */
 /*@ ghost extern int g_hi; */
@@ -115,6 +116,11 @@ typedef RTEMS_RB_HEAD(RBTree_Control, RBTree_Node) RBTree_Control;
     \forall RBTree_Node *n, integer d;
       n != \null && d > 0 && wf_node(n, d)
       ==> wf_node(n->Node.rbe_left, d - 1);
+
+  lemma wf_node_right{L}:
+    \forall RBTree_Node *n, integer d;
+      n != \null && d > 0 && wf_node(n, d)
+      ==> wf_node(n->Node.rbe_right, d - 1);
 
   lemma wf_node_depth_positive{L}:
     \forall RBTree_Node *n, integer d;
@@ -151,6 +157,41 @@ typedef RTEMS_RB_HEAD(RBTree_Control, RBTree_Node) RBTree_Control;
   // this in contracts that need both shape and order.
   predicate bst_node{L}(RBTree_Node *n, integer d, integer lo, integer hi) =
     wf_node(n, d) && bst_order(n, lo, hi);
+
+  // Layer 3: parent-pointer linkage. `parent_linked(n, ep)` holds iff
+  // every non-null node in the subtree rooted at `n` has rbe_parent
+  // correctly set, with `n`'s own parent equal to `ep`. For a whole
+  // tree, callers use `parent_linked(tree->rbh_root, \null)` — the
+  // root's parent is null.
+  //
+  // Orthogonal to wf_node (shape) and bst_order (keys). Functions
+  // that only walk via left/right children don't need this; parent-
+  // walking functions like `_RBTree_Successor` do.
+  inductive parent_linked{L}(RBTree_Node *n, RBTree_Node *expected_parent) {
+    case pl_null{L}:
+      \forall RBTree_Node *ep; parent_linked(\null, ep);
+    case pl_step{L}:
+      \forall RBTree_Node *n, *ep;
+        n != \null
+        && n->Node.rbe_parent == ep
+        && parent_linked(n->Node.rbe_left,  n)
+        && parent_linked(n->Node.rbe_right, n)
+        ==> parent_linked(n, ep);
+  }
+
+  lemma parent_linked_parent_matches{L}:
+    \forall RBTree_Node *n, *ep;
+      n != \null && parent_linked(n, ep) ==> n->Node.rbe_parent == ep;
+
+  lemma parent_linked_left{L}:
+    \forall RBTree_Node *n, *ep;
+      n != \null && parent_linked(n, ep)
+      ==> parent_linked(n->Node.rbe_left, n);
+
+  lemma parent_linked_right{L}:
+    \forall RBTree_Node *n, *ep;
+      n != \null && parent_linked(n, ep)
+      ==> parent_linked(n->Node.rbe_right, n);
 
   // Layer 3: membership. `in_subtree(root, n)` holds iff `n` appears
   // somewhere in the tree rooted at `root` (as root, or recursively in
@@ -193,6 +234,26 @@ typedef RTEMS_RB_HEAD(RBTree_Control, RBTree_Node) RBTree_Control;
     \forall RBTree_Node *root, *n;
       in_subtree(root, n) && n != \null && n->Node.rbe_right != \null
       ==> in_subtree(root, n->Node.rbe_right);
+
+  // For any non-root member of a parent-linked tree, the rbe_parent
+  // pointer is itself a tree member. Combined with
+  // wf_node_subtree_member_valid, callers also get \valid_read on
+  // the parent pointer. Structural induction — needs Coq.
+  //
+  // Stated with a generic `ep` so the induction hypothesis can carry
+  // it through recursive calls. Callers will typically instantiate
+  // `ep = \null` for whole-tree use.
+  lemma parent_linked_member_parent_in_tree{L}:
+    \forall RBTree_Node *root, *n, *ep;
+      parent_linked(root, ep) && in_subtree(root, n) && n != root
+      ==> in_subtree(root, n->Node.rbe_parent);
+
+  // Any member of a wellformed tree is \valid_read. Structural
+  // induction on in_subtree + inversion on wf_node step case — Coq.
+  lemma wf_node_subtree_member_valid{L}:
+    \forall RBTree_Node *root, *n, integer d;
+      wf_node(root, d) && in_subtree(root, n)
+      ==> \valid_read(n);
 
   // The crux lemma: membership in a BST-ordered subtree puts the key
   // strictly within the subtree's bounds. Needs structural induction
