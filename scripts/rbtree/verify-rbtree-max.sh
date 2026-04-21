@@ -12,11 +12,7 @@ RTEMS_SRC="${RTEMS_SRC:-/workspace/rtems/src/rtems-6.2-pristine}"
 RTEMS_PREFIX="${RTEMS_PREFIX:-/opt/rtems5}"
 RBTREE_DIR="${RBTREE_DIR:-/workspace/verification/rbtree}"
 
-echo "=== RBTree Minimum (RTEMS 6.2) ==="
-# Verify both _RBTree_Minimum and the structural lemmas (wf_node_valid,
-# wf_node_left). The function proof depends on the lemmas; running them
-# in the same invocation keeps the "everything was actually proved"
-# claim honest.
+echo "=== RBTree Maximum (RTEMS 6.2) ==="
 ${FRAMA_C_CMD} \
     -cpp-command "${RTEMS_PREFIX}/bin/x86_64-rtems5-gcc -C -E \
         -I${RBTREE_DIR}/include \
@@ -32,5 +28,5 @@ ${FRAMA_C_CMD} \
     -wp-session "${RBTREE_DIR}/wp-coq" \
     -wp-prop="-@terminates,-@exits" \
     -wp-timeout 30 \
-    "${RBTREE_DIR}/rbtreemin.c" \
+    "${RBTREE_DIR}/rbtreemax.c" \
     "$@"

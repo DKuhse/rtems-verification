@@ -83,6 +83,7 @@ typedef struct RBTree_Node {
 typedef RTEMS_RB_HEAD(RBTree_Control, RBTree_Node) RBTree_Control;
 
 /*@ ghost extern RBTree_Node *g_rbtree_min; */
+/*@ ghost extern RBTree_Node *g_rbtree_max; */
 /*@ ghost extern int g_tree_depth; */
 /*@ ghost extern int g_lo; */
 /*@ ghost extern int g_hi; */
@@ -180,12 +181,18 @@ typedef RTEMS_RB_HEAD(RBTree_Control, RBTree_Node) RBTree_Control;
 
   // Transitivity of in_subtree over a single left step. Direct form
   // — requires structural induction on the `in_subtree(root, n)`
-  // hypothesis, which Alt-Ergo 2.4.2 does not automate. Kept as an
-  // unproved lemma; Coq escalation needed.
+  // hypothesis, which Alt-Ergo 2.4.2 does not automate. Discharged
+  // via Coq (see wp-coq/interactive/).
   lemma in_subtree_descend_left{L}:
     \forall RBTree_Node *root, *n;
       in_subtree(root, n) && n != \null && n->Node.rbe_left != \null
       ==> in_subtree(root, n->Node.rbe_left);
+
+  // Mirror for the right descent — needed for _RBTree_Maximum.
+  lemma in_subtree_descend_right{L}:
+    \forall RBTree_Node *root, *n;
+      in_subtree(root, n) && n != \null && n->Node.rbe_right != \null
+      ==> in_subtree(root, n->Node.rbe_right);
 
   // The crux lemma: membership in a BST-ordered subtree puts the key
   // strictly within the subtree's bounds. Needs structural induction
@@ -486,6 +493,11 @@ static inline RBTree_Node **_RBTree_Left_reference(
  *
  * @return This method returns the right node on the rbtree.
  */
+/*@
+  requires \valid_read(the_node);
+  assigns  \result \from the_node, the_node->Node.rbe_right;
+  ensures  \result == the_node->Node.rbe_right;
+ */
 static inline RBTree_Node *_RBTree_Right(
   const RBTree_Node *the_node
 )
@@ -614,6 +626,22 @@ RBTree_Node *_RBTree_Minimum( const RBTree_Control *the_rbtree );
  *
  * @retval node The maximum node.
  * @retval NULL The red-black tree is empty.
+ */
+/*@
+  requires \valid_read(the_rbtree);
+  requires bst_node(the_rbtree->rbh_root, g_tree_depth, g_lo, g_hi);
+  assigns  g_rbtree_max \from the_rbtree, the_rbtree->rbh_root;
+  ensures  \result == g_rbtree_max;
+  ensures  the_rbtree->rbh_root == \null ==> \result == \null;
+  ensures  the_rbtree->rbh_root != \null ==> \result != \null;
+  ensures  \result != \null ==> \valid_read(\result);
+  ensures  \result != \null ==> \result->Node.rbe_right == \null;
+  ensures  \result != \null ==> key(\result) > g_lo;
+  ensures  \result != \null && the_rbtree->rbh_root != \null
+           ==> key(\result) >= key(the_rbtree->rbh_root);
+  ensures  \result != \null ==>
+             \forall RBTree_Node *n;
+               in_subtree(the_rbtree->rbh_root, n) ==> key(\result) >= key(n);
  */
 RBTree_Node *_RBTree_Maximum( const RBTree_Control *the_rbtree );
 

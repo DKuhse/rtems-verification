@@ -219,15 +219,49 @@ Both proofs compile cleanly with `coqc -Q /root/.opam/4.14.1/lib/why3/coq Why3 <
   (`wf_node_valid`, `wf_node_left`, `wf_node_depth_positive`), all
   Alt-Ergo.
 
-## What's left for probe 5
+## Probe 5a result (`_RBTree_Maximum` — infrastructure regression)
 
-- **Discharge the two trusted lemmas in Coq.** Install Coq in the
-  Docker image and close `bst_order_bounds_subtree` and
-  `in_subtree_descend_left`. Probe 4's headline claim becomes
-  axiom-free.
+Added `_RBTree_Maximum` as a direct mirror of `_RBTree_Minimum`:
+walks `rbe_right`, tightens `lo` bound instead of `hi` on each step,
+symmetric ensures about global maximum.
+
+**Total: 66/66 goals Valid.** Minimum also at 66/66 (the additions
+increased the lemma count it can pull in). Proof breakdown per run:
+
+- ~44 via Qed.
+- ~19 via Alt-Ergo.
+- **3** via Coq:
+  - `bst_order_bounds_subtree` (probe 4)
+  - `in_subtree_descend_left` (probe 4)
+  - `in_subtree_descend_right` (probe 5a) — direct mirror of
+    descend_left, ~7 lines of Ltac.
+
+### What worked
+
+Every predicate, ghost, and contract generalized. Only new
+artifacts: `_RBTree_Right` accessor contract, `g_rbtree_max` ghost,
+one symmetric lemma, and a new `rbtreemax.c` / `verify-rbtree-max.sh`.
+The infrastructure from probes 2–4 holds.
+
+### Small snag: Alt-Ergo 10s timeout
+
+The quantified-invariant preservation for Maximum needed ~2.9s of
+Alt-Ergo (vs ~1s for the Minimum equivalent). With the default 10s
+WP timeout this closed fine first try; the WP session cache hit
+from an earlier failed run kept reporting Timeout even after
+`in_subtree_descend_right` was proved. Fix:
+- Bumped `-wp-timeout 30` in both verify scripts.
+- If you suspect a stale cache, delete `wp-coq/cache/` and re-run.
+
+## What's left for probe 6+
+
 - **Tree construction.** `bst_node(root, g_tree_depth, g_lo, g_hi)`
   is still a precondition — nothing builds a tree that satisfies it.
   `_RBTree_Insert_with_parent` would need to prove insertion
-  preserves `bst_node` (depth bound included).
+  preserves `bst_node` (depth bound included). This is the real
+  frontier.
+- **`_RBTree_Successor` / `_RBTree_Predecessor`.** These walk via
+  parent pointers — different proof shape than the left/right-child
+  descent. Likely a full probe of its own.
 - **RB-balance / black-height.** Orthogonal to BST ordering; would
   extend the invariant with a color/black-height layer.
