@@ -20,13 +20,14 @@ services:
       - ./scripts:/opt/scripts
     command: ["verify-all.sh"]
 
-  # RBTree verification side experiment (reuses the EDF image,
-  # annotated sources live under ./verification/rbtree/).
+  # RBTree verification side experiment. Layers Coq on top of the EDF
+  # image (via Dockerfile.rbtree) so Frama-C can discharge structural-
+  # induction lemmas Alt-Ergo 2.4.2 times out on.
   verify-rbtree:
     build:
       context: .
-      dockerfile: Dockerfile
-    image: rtems-edf-toolchain
+      dockerfile: Dockerfile.rbtree
+    image: rtems-rbtree-toolchain
     working_dir: /workspace/verification/rbtree
     volumes:
       - ./rtems:/workspace/rtems

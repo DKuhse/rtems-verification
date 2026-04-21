@@ -141,10 +141,64 @@ typedef RTEMS_RB_HEAD(RBTree_Control, RBTree_Node) RBTree_Control;
       n != \null && bst_order(n, lo, hi)
       ==> bst_order(n->Node.rbe_left, lo, key(n));
 
+  lemma bst_order_right{L}:
+    \forall RBTree_Node *n, integer lo, hi;
+      n != \null && bst_order(n, lo, hi)
+      ==> bst_order(n->Node.rbe_right, key(n), hi);
+
   // Composed predicate — shorthand for "wellformed BST subtree." Use
   // this in contracts that need both shape and order.
   predicate bst_node{L}(RBTree_Node *n, integer d, integer lo, integer hi) =
     wf_node(n, d) && bst_order(n, lo, hi);
+
+  // Layer 3: membership. `in_subtree(root, n)` holds iff `n` appears
+  // somewhere in the tree rooted at `root` (as root, or recursively in
+  // left or right subtree). Used to quantify the global-minimum claim.
+  inductive in_subtree{L}(RBTree_Node *root, RBTree_Node *n) {
+    case in_here{L}:
+      \forall RBTree_Node *root;
+        root != \null ==> in_subtree(root, root);
+    case in_left{L}:
+      \forall RBTree_Node *root, *n;
+        root != \null && in_subtree(root->Node.rbe_left, n)
+        ==> in_subtree(root, n);
+    case in_right{L}:
+      \forall RBTree_Node *root, *n;
+        root != \null && in_subtree(root->Node.rbe_right, n)
+        ==> in_subtree(root, n);
+  }
+
+  lemma in_subtree_root_non_null{L}:
+    \forall RBTree_Node *root, *n;
+      in_subtree(root, n) ==> root != \null;
+
+  lemma in_subtree_split{L}:
+    \forall RBTree_Node *root, *m;
+      root != \null && in_subtree(root, m) && m != root
+      ==> in_subtree(root->Node.rbe_left,  m)
+       || in_subtree(root->Node.rbe_right, m);
+
+  // Transitivity of in_subtree over a single left step. Direct form
+  // — requires structural induction on the `in_subtree(root, n)`
+  // hypothesis, which Alt-Ergo 2.4.2 does not automate. Kept as an
+  // unproved lemma; Coq escalation needed.
+  lemma in_subtree_descend_left{L}:
+    \forall RBTree_Node *root, *n;
+      in_subtree(root, n) && n != \null && n->Node.rbe_left != \null
+      ==> in_subtree(root, n->Node.rbe_left);
+
+  // The crux lemma: membership in a BST-ordered subtree puts the key
+  // strictly within the subtree's bounds. Needs structural induction
+  // on `in_subtree` with inversion on `bst_order` at each case.
+  //
+  // Alt-Ergo 2.4.2 times out on this (it cannot synthesize the elim
+  // principle for in_subtree). Kept as an unproved lemma: downstream
+  // goals use it as a hypothesis. Coq escalation is the right fix;
+  // Coq is not yet installed in the verify-rbtree image.
+  lemma bst_order_bounds_subtree{L}:
+    \forall RBTree_Node *root, *n, integer lo, hi;
+      bst_order(root, lo, hi) && in_subtree(root, n)
+      ==> lo < key(n) < hi;
  */
 
 /**

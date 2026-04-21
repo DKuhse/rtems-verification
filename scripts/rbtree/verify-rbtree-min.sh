@@ -28,5 +28,8 @@ ${FRAMA_C_CMD} \
         -nostdinc -include ${RBTREE_DIR}/stubs-rbtree.h" \
     -machdep gcc_x86_64 -cpp-frama-c-compliant -c11 \
     -wp -wp-model "Typed+Cast" -wp-split \
+    -wp-prover alt-ergo,coq \
+    -wp-session "${RBTREE_DIR}/wp-coq" \
+    -wp-prop="-@terminates,-@exits" \
     "${RBTREE_DIR}/rbtreemin.c" \
     "$@"

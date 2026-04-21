@@ -1,0 +1,21 @@
+# Dockerfile.rbtree
+#
+# Derives from rtems-edf-toolchain; adds Coq so Frama-C/WP can discharge
+# structural-induction lemmas on ACSL inductive predicates that Alt-Ergo
+# 2.4.2 cannot automate.
+#
+# The EDF verification image is untouched — this is an additive layer
+# only. RBTree verification scripts can invoke
+#   frama-c ... -wp-prover alt-ergo,coq
+# to fall back to Coq for lemmas Alt-Ergo times out on.
+
+FROM rtems-edf-toolchain AS rbtree
+
+# Install Coq and re-run Why3 detection so WP picks up the new prover.
+# Coq 8.13.2 is a widely compatible choice for Frama-C 25 / Why3 1.5.
+RUN eval $(opam env) \
+    && opam install coq.8.13.2 why3-coq -y \
+    && eval $(opam env) \
+    && why3 config detect
+
+CMD ["/bin/bash"]

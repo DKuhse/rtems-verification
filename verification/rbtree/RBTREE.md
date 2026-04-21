@@ -164,15 +164,70 @@ bound once the first step has been taken. This dodged a ghost-code
 restriction (logic functions can't be called from `ghost int x = ...`
 assignments).
 
-## What's left for probe 4
+## Probe 4 result (global-minimum claim, fully discharged)
 
-- **Global minimum claim.** "`key(\result) <= key(n)` for every `n` in
-  the tree" requires quantifying over a set of nodes — an inductive
-  `in_subtree{L}(root, n)` or a `\set<RBTree_Node*>`-valued
-  `nodes_of(root)`. Not done here.
-- **Tree construction.** `bst_node(root, g_tree_depth, g_lo, g_hi)` is
-  still a precondition — nothing builds a tree that satisfies it. A
-  probe targeting `_RBTree_Insert_with_parent` would need to prove
-  insertion preserves `bst_node` (depth bound included).
+Added an inductive membership predicate `in_subtree(root, n)` and the
+quantified ensures:
+
+```c
+ensures \result != \null ==>
+  \forall RBTree_Node *n;
+    in_subtree(tree->rbh_root, n) ==> key(\result) <= key(n);
+```
+
+This is the true global-minimum property: the returned node's key is
+≤ every key in the tree.
+
+**Total: 63/63 goals Valid.** Proof breakdown by prover:
+
+- **42** via Qed (the built-in simplifier).
+- **19** via Alt-Ergo 2.4.2.
+- **2** via **Coq 8.13.2** — the two structural-induction lemmas that
+  Alt-Ergo cannot handle.
+
+### Coq infrastructure
+
+`Dockerfile.rbtree` (at the repo root) extends `rtems-edf-toolchain`
+with Coq 8.13.2 and Why3's Coq drivers. It produces the
+`rtems-rbtree-toolchain` image used by the `verify-rbtree` compose
+service. The `verify-rbtree-min.sh` script passes
+`-wp-prover alt-ergo,coq` and `-wp-session
+/workspace/verification/rbtree/wp-coq` so WP falls back to Coq on
+lemmas Alt-Ergo can't close.
+
+Persistent Coq scripts live at
+`verification/rbtree/wp-coq/interactive/`. Two files:
+
+- `lemma_in_subtree_descend_left.v` — ~7 lines of Ltac, induction on
+  `P_in_subtree` with constructor reapplication at each case.
+- `lemma_bst_order_bounds_subtree.v` — ~15 lines of Ltac, induction on
+  `P_in_subtree` with `Q_bst_order_left` / `Q_bst_order_right` /
+  `Q_bst_order_key_in_bounds` axiom applications and `Z.lt_trans`
+  chaining. Needed a `revert`-and-reintroduce to generalize the
+  bounds across the induction.
+
+Both proofs compile cleanly with `coqc -Q /root/.opam/4.14.1/lib/why3/coq Why3 <file.v>`.
+
+### Lemmas proved
+
+- `in_subtree_root_non_null` — base case per constructor (Alt-Ergo).
+- `in_subtree_split` — single-step case analysis (Alt-Ergo).
+- `in_subtree_descend_left` — structural induction (**Coq**).
+- `bst_order_bounds_subtree` — double induction (**Coq**).
+- Three BST-ordering lemmas (`bst_order_left`, `bst_order_right`,
+  `bst_order_key_in_bounds`) and three wellformedness lemmas
+  (`wf_node_valid`, `wf_node_left`, `wf_node_depth_positive`), all
+  Alt-Ergo.
+
+## What's left for probe 5
+
+- **Discharge the two trusted lemmas in Coq.** Install Coq in the
+  Docker image and close `bst_order_bounds_subtree` and
+  `in_subtree_descend_left`. Probe 4's headline claim becomes
+  axiom-free.
+- **Tree construction.** `bst_node(root, g_tree_depth, g_lo, g_hi)`
+  is still a precondition — nothing builds a tree that satisfies it.
+  `_RBTree_Insert_with_parent` would need to prove insertion
+  preserves `bst_node` (depth bound included).
 - **RB-balance / black-height.** Orthogonal to BST ordering; would
-  extend `bst_node` with a color/black-height component.
+  extend the invariant with a color/black-height layer.

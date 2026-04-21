@@ -28,6 +28,9 @@
   ensures  \result != \null ==> key(\result) < g_hi;
   ensures  \result != \null && tree->rbh_root != \null
            ==> key(\result) <= key(tree->rbh_root);
+  ensures  \result != \null ==>
+             \forall RBTree_Node *n;
+               in_subtree(tree->rbh_root, n) ==> key(\result) <= key(n);
  */
 RBTree_Node *_RBTree_Minimum( const RBTree_Control *tree )
 {
@@ -49,6 +52,12 @@ RBTree_Node *_RBTree_Minimum( const RBTree_Control *tree )
                    ==> key(parent) <= key(tree->rbh_root);
     loop invariant parent == \null ==> node == tree->rbh_root;
     loop invariant tree->rbh_root == \null ==> parent == \null;
+    loop invariant parent != \null ==> in_subtree(tree->rbh_root, parent);
+    loop invariant node   != \null ==> in_subtree(tree->rbh_root, node);
+    loop invariant \forall RBTree_Node *m;
+      in_subtree(tree->rbh_root, m) ==>
+           (node != \null && in_subtree(node, m))
+        || (parent != \null && key(parent) <= key(m));
     loop assigns parent, node, d;
     loop variant d;
    */
