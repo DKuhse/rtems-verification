@@ -146,15 +146,21 @@ Goal: all functions verified with `-wp-model "Typed+Cast"`.
   - Install Z3 in the Docker image as an additional prover
   - Accept ~89% and document remaining as known timeouts
   - Investigate specific failing goals for contract improvements
-- [x] `_Scheduler_EDF_Update_priority` — **96/98** on 6.2 (was 99/99 on 5.1)
-      2 remaining: 1 requires (callback through deeper inline chain),
-      1 assigns_normal (no \from on _Thread_Heir pointer assignment in
-      inlined _Scheduler_uniprocessor_Update_heir — same root cause as
-      5.1's volatile _Thread_Dispatch_necessary issue).
-- [x] `_Scheduler_EDF_Unblock` — **74/75** on 6.2 (was 69/69 on 5.1)
-      1 remaining: assigns_normal (same \from / Per_CPU issue as above).
-      Also fixed: CPU_STRUCTURE_ALIGNMENT attribute position in percpu.h
-      needed to be moved from type to variable for WP type matching.
+- [x] `_Scheduler_EDF_Update_priority` — **97/97** on 6.2 (was 99/99 on 5.1)
+- [x] `_Scheduler_EDF_Unblock` — **74/74** on 6.2 (was 69/69 on 5.1)
+
+      Fixes that got us to 100%:
+      1. Added `_Thread_Dispatch_necessary` to `assigns` clause of
+         `exec_update_new_h` — the inlined `_Scheduler_uniprocessor_Update_heir`
+         writes to it, so the outer contract must list it (even though
+         the `ensures` about its value is unprovable due to volatile).
+      2. Added explicit `requires \valid(g_min_edf_node)` — the
+         `_Scheduler_EDF_Get_highest_ready` callback's precondition
+         wasn't implied by the existing `\valid(g_min_edf_node->Base.owner)`
+         in WP's strict checking.
+      3. Moved `CPU_STRUCTURE_ALIGNMENT` attribute position in percpu.h
+         from type to variable (so WP type matching works with our
+         `\separated` clauses).
 
 ## Blocking Issue: Excessive inline function visibility in 6.2
 

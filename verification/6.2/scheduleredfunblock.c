@@ -66,8 +66,7 @@
   behavior exec_update_new_h:
     assumes SCHEDULER_PRIORITY_PURIFY(((Scheduler_EDF_Node *) node)->Base.Priority.value) < _Thread_Heir->Scheduler.nodes->Wait.Priority.Node.priority;
     assumes (_Thread_Heir != the_thread && _Thread_Heir->is_preemptible);
-    assigns _Thread_Heir, ((Scheduler_EDF_Node *) node)->priority;
-    //assigns _Thread_Dispatch_necessary; // volatile — unprovable
+    assigns _Thread_Heir, _Thread_Dispatch_necessary, ((Scheduler_EDF_Node *) node)->priority;
     ensures _Thread_Heir == the_thread;
     ensures ((Scheduler_EDF_Node *) node)->priority == SCHEDULER_PRIORITY_PURIFY(node->Priority.value);
     //ensures _Thread_Dispatch_necessary == true; // volatile — unprovable
