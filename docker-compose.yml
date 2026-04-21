@@ -28,12 +28,37 @@ services:
       context: .
       dockerfile: Dockerfile.rbtree
     image: rtems-rbtree-toolchain
+    user: "1000:1000"
+    environment:
+      - HOME=/root
     working_dir: /workspace/verification/rbtree
     volumes:
       - ./rtems:/workspace/rtems
       - ./scripts:/opt/scripts
       - ./verification:/workspace/verification
     command: ["/opt/scripts/rbtree/verify-rbtree-min.sh"]
+
+  # Persistent interactive shell for Coq proof development. Keeps one
+  # container alive across proof iterations — ~3s container startup is
+  # painful when iterating on Ltac. Use as:
+  #   docker compose run --rm rbtree-shell
+  # then inside: coq-check.sh <file.v>, frama-c ..., edit, repeat.
+  rbtree-shell:
+    build:
+      context: .
+      dockerfile: Dockerfile.rbtree
+    image: rtems-rbtree-toolchain
+    user: "1000:1000"
+    environment:
+      - HOME=/root
+    working_dir: /workspace/verification/rbtree
+    volumes:
+      - ./rtems:/workspace/rtems
+      - ./scripts:/opt/scripts
+      - ./verification:/workspace/verification
+    stdin_open: true
+    tty: true
+    command: ["/bin/bash"]
 
   # Interactive shell with X11 forwarding for frama-c-gui
   # Usage: xhost +local:docker && docker compose run gui

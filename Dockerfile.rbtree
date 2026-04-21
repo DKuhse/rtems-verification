@@ -18,4 +18,9 @@ RUN eval $(opam env) \
     && eval $(opam env) \
     && why3 config detect
 
+# Make /root and its opam switch traversable+readable by non-root users
+# so the compose services can run as UID 1000 and still find frama-c,
+# coqc, etc. without copying the whole opam switch.
+RUN chmod -R go+rX /root
+
 CMD ["/bin/bash"]

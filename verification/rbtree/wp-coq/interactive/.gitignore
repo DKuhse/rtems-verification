@@ -1,0 +1,7 @@
+# Keep the Coq proof scripts (*.v), ignore build artifacts.
+*.vo
+*.vos
+*.vok
+*.glob
+*.aux
+.*.aux
