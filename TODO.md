@@ -3,12 +3,13 @@
 ## Infrastructure
 - [x] Docker toolchain image (cross-compiler + Frama-C 25)
 - [x] RTEMS 6.2 source downloaded and extracted to `rtems/src/rtems-6.2/`
-- [x] Frama-C patches applied (limits.h, Per_CPU_Information[1U], thread.h flexible arrays)
+- [x] Frama-C patches applied (limits.h, Per_CPU_Information[1U] + CPU_STRUCTURE_ALIGNMENT, thread.h flexible arrays)
 - [x] 5.1 cross-compiler confirmed working for 6.2 preprocessing
 - [x] Basic verification working (Map/Unmap: 4/4)
-- [ ] Update `setup.sh` to handle 6.2 (patches + file copy)
-- [ ] Create `scripts/6.2/verify-wp-all.sh` headless verification script
-- [ ] Create per-target `scripts/6.2/verify-*.sh` scripts
+- [x] Update `setup.sh` to handle 6.2 (patches + file copy)
+- [x] Create `scripts/6.2/verify-wp-all.sh` headless verification script
+- [x] Create per-target `scripts/6.2/verify-*.sh` scripts (`verify-edf-update-priority.sh`, `verify-edf-unblock.sh`, `verify-thread-priority.sh`; `verify-edf-release-cancel.sh` already existed)
+- [x] `verify-6.2` service in docker-compose.yml
 
 ## Annotated Headers
 These replace the originals in the 6.2 source tree. Required because
@@ -108,10 +109,10 @@ defined in these headers.
 ## Verification Targets
 Goal: all functions verified with `-wp-model "Typed+Cast"`.
 
-- [ ] `_Scheduler_EDF_Map_priority` — 2/2 on 5.1, verified 4/4 with Unmap on 6.2
-- [ ] `_Scheduler_EDF_Unmap_priority` — 2/2 on 5.1, verified 4/4 with Map on 6.2
-- [ ] `_Scheduler_EDF_Cancel_job` — 33/33 on 5.1
-- [ ] `_Scheduler_EDF_Release_job` — 40/40 on 5.1
+- [x] `_Scheduler_EDF_Map_priority` — **2/2** on 6.2
+- [x] `_Scheduler_EDF_Unmap_priority` — **2/2** on 6.2
+- [x] `_Scheduler_EDF_Cancel_job` — **33/33** on 6.2
+- [x] `_Scheduler_EDF_Release_job` — **40/40** on 6.2
 - [x] `_Thread_Set_scheduler_node_priority` — **16/16** on 6.2
 - [x] `_Thread_Priority_action_change` — **15/15** on 6.2
 - [x] `_Thread_Priority_do_perform_actions` — **993/993** on 6.2
