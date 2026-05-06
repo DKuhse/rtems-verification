@@ -510,6 +510,15 @@ UBaseType_t uxListRemove( ListItem_t * const pxItemToRemove ) PRIVILEGED_FUNCTIO
 /*@
   axiomatic FreeRTOS_List_Contents {
     logic \list<struct xLIST_ITEM *> list_contents{L}(struct xLIST *pxList);
+
+    // Bridge axioms: connect the list_contents logic function to the actual list structure 
+
+    axiom list_contents_length{L}: \forall struct xLIST *pxList;
+      \length(list_contents(pxList)) == pxList->uxNumberOfItems;
+
+    axiom list_contents_head{L}: \forall struct xLIST *pxList;
+      pxList->uxNumberOfItems > 0 ==>
+        \nth(list_contents(pxList), 0) == pxList->xListEnd.pxNext;
   }
 
   predicate in_list(struct xLIST_ITEM *pxItem, struct xLIST *pxList) =
@@ -517,6 +526,10 @@ UBaseType_t uxListRemove( ListItem_t * const pxItemToRemove ) PRIVILEGED_FUNCTIO
 
   predicate min(struct xLIST *pxList, TickType_t x) =
     \forall integer i; 0 <= i < \length(list_contents(pxList)) ==> \nth(list_contents(pxList), i)->xItemValue >= x;
+
+  predicate sorted(struct xLIST *pxList) =
+    \forall integer i, j; 0 <= i < j < \length(list_contents(pxList)) ==> \nth(list_contents(pxList), i)->xItemValue <= \nth(list_contents(pxList), j)->xItemValue;
+
 */
 
 /* *INDENT-OFF* */
