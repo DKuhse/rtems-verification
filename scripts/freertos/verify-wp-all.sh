@@ -26,6 +26,8 @@ MACHDEP="gcc_x86_16"
 
 CPP_CMD="gcc -C -E \
     -D__LARGE_DATA_MODEL__ \
+    -D__FRAMAC__ \
+    -DEDF_SCHEDULER=1 \
     -I${OVERLAY}/overlay/include \
     -I${OVERLAY}/stubs \
     -I${FREERTOS_SRC}/include \
@@ -95,13 +97,13 @@ echo " Headless WP Verification (FreeRTOS)"
 echo "========================================"
 echo ""
 
-# ── List (overlay/list.c) ────────────────────────────────────────
-echo "== List (overlay/list.c) =="
+# ── Tasks (overlay/tasks.c) ──────────────────────────────────────
+echo "== Tasks (overlay/tasks.c) =="
 echo ""
 
-run_wp "vListInsert" \
-    "${OVERLAY}/overlay/include/list.h" \
-    "vListInsert" \
+run_wp "vTaskSwitchContext" \
+    "${OVERLAY}/overlay/tasks.c" \
+    "vTaskSwitchContext" \
     -wp-model "Typed+Cast" ${EXTRA_ARGS}
 
 echo ""

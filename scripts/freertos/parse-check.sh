@@ -27,6 +27,8 @@ EOF
 
 CPP_CMD="gcc -C -E \
     -D__LARGE_DATA_MODEL__ \
+    -D__FRAMAC__ \
+    -DEDF_SCHEDULER=1 \
     -I${OVERLAY}/overlay/include \
     -I${OVERLAY}/stubs \
     -I${FREERTOS_SRC}/include \

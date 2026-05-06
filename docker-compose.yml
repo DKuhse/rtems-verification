@@ -55,6 +55,28 @@ services:
       - ./verification:/workspace/verification
     command: ["/opt/scripts/freertos/verify-wp-all.sh", "-wp-timeout", "30"]
 
+  # frama-c-gui on the FreeRTOS EDF port (X11 forwarded).
+  # Usage:
+  #   xhost +local:docker
+  #   docker compose run --rm gui-freertos              # default: overlay/tasks.c
+  #   docker compose run --rm gui-freertos -wp-fct foo /workspace/.../x.c
+  gui-freertos:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: rtems-edf-toolchain
+    working_dir: /workspace/source/freertos-edf-msp430
+    environment:
+      - DISPLAY=${DISPLAY}
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ./source:/workspace/source
+      - ./scripts:/opt/scripts
+      - ./verification:/workspace/verification
+    stdin_open: true
+    tty: true
+    entrypoint: ["/opt/scripts/freertos/gui-wp.sh"]
+
   # Interactive shell with X11 forwarding for frama-c-gui
   # Usage: xhost +local:docker && docker compose run gui
   gui:
