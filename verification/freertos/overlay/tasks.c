@@ -41,6 +41,11 @@
 #include "task.h"
 #include "timers.h"
 
+#ifdef __FRAMAC__
+    /* Verification-only: EDF correctness predicate. */
+    #include "edf.h"
+#endif
+
 /* The default definitions are only available for non-MPU ports. The
  * reason is that the stack alignment requirements vary for different
  * architectures.*/
@@ -4738,6 +4743,8 @@ BaseType_t xTaskCallApplicationTaskHook(TaskHandle_t xTask,
 /*@
   requires xReadyTasksList.uxNumberOfItems > 0;
   requires \valid_read( xReadyTasksList.xListEnd.pxNext );
+  // System invariant: ready list is sorted
+  requires sorted( &xReadyTasksList );
 
   assigns pxCurrentTCB, xYieldPendings[ 0 ];
 
@@ -4751,8 +4758,11 @@ BaseType_t xTaskCallApplicationTaskHook(TaskHandle_t xTask,
     assumes uxSchedulerSuspended == (UBaseType_t)0U;
     assigns pxCurrentTCB, xYieldPendings[ 0 ];
     ensures xYieldPendings[0] == pdFALSE;
+    // Structural:
     ensures (void*) pxCurrentTCB ==
               \nth( list_contents( &xReadyTasksList ), 0 )->pvOwner;
+    // EDF correctness:
+    ensures edf_property( &xReadyTasksList, pxCurrentTCB );
 
   complete behaviors suspended, running;
   disjoint behaviors suspended, running;

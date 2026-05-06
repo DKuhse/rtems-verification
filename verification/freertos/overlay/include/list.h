@@ -529,7 +529,6 @@ UBaseType_t uxListRemove( ListItem_t * const pxItemToRemove ) PRIVILEGED_FUNCTIO
 
   predicate sorted(struct xLIST *pxList) =
     \forall integer i, j; 0 <= i < j < \length(list_contents(pxList)) ==> \nth(list_contents(pxList), i)->xItemValue <= \nth(list_contents(pxList), j)->xItemValue;
-
 */
 
 /* *INDENT-OFF* */

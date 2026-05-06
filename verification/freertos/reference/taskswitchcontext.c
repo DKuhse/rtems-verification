@@ -1,6 +1,7 @@
 #define MPU_WRAPPERS_INCLUDED_FROM_API_FILE
 #include "FreeRTOS.h"
 #include "list.h"
+#include "edf.h"
 #undef MPU_WRAPPERS_INCLUDED_FROM_API_FILE
 
 struct tskTaskControlBlock;
@@ -19,13 +20,14 @@ typedef struct tskTaskControlBlock TCB_t;
     volatile BaseType_t xYieldPendings[1];
 #endif
 
-/* From tasks.c:188 */
 #define taskSELECT_HIGHEST_PRIORITY_TASK() \
     pxCurrentTCB = listGET_OWNER_OF_HEAD_ENTRY( &xReadyTasksList )
 
 /*@
   requires xReadyTasksList.uxNumberOfItems > 0;
   requires \valid_read( xReadyTasksList.xListEnd.pxNext );
+  // System invariant: ready list is sorted
+  requires sorted( &xReadyTasksList );
 
   assigns pxCurrentTCB, xYieldPendings[ 0 ];
 
@@ -39,8 +41,11 @@ typedef struct tskTaskControlBlock TCB_t;
     assumes uxSchedulerSuspended == (UBaseType_t)0U;
     assigns pxCurrentTCB, xYieldPendings[ 0 ];
     ensures xYieldPendings[0] == pdFALSE;
+    // Structural: pxCurrentTCB owns the head item.
     ensures (void*) pxCurrentTCB ==
               \nth( list_contents( &xReadyTasksList ), 0 )->pvOwner;
+    // EDF correctness:
+    ensures edf_property( &xReadyTasksList, pxCurrentTCB );
 
   complete behaviors suspended, running;
   disjoint behaviors suspended, running;
