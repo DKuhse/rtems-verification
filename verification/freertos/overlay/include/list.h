@@ -502,22 +502,9 @@ void vListInsertEnd( List_t * const pxList,
  */
 UBaseType_t uxListRemove( ListItem_t * const pxItemToRemove ) PRIVILEGED_FUNCTION;
 
-/* ============================================================
- * Verification overlay: ACSL axiomatic specification
- * ============================================================
- *
- * FreeRTOS lists are circular doubly linked, with xListEnd as a
- * sentinel marking the boundary. `list_contents(L)` is the abstract
- * \list<ListItem_t*> of items in `L`, in pxNext order, with the
- * xListEnd sentinel excluded.
- *
- * The function is left uninterpreted on purpose: list operations
- * (vListInsert, uxListRemove, ...) are treated as black boxes whose
- * contracts dictate how list_contents evolves. The implementation
- * inside list.c is not verified against this model.
- *
- * Other projections (item values, owners) are derived from
- * list_contents using ACSL's \list operators (\nth, \length, ...).
+/* 
+ * Verification
+ * List representation
  */
 
 /*@
