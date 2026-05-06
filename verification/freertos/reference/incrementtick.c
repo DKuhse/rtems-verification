@@ -101,9 +101,7 @@ static void prvResetNextTaskUnblockTime(void);
   behavior suspended:
     assumes uxSchedulerSuspended != (UBaseType_t)0U;
     assigns xPendedTicks;
-    // Note the modular form: `xPendedTicks += 1U` on a uint16_t wraps.
-    // The wrap is harmless in practice (xTaskResumeAll resets the
-    // counter), so we don't add a no-overflow precondition.
+    // casting to account for wrapping
     ensures xPendedTicks == (TickType_t)( \old(xPendedTicks) + 1U );
     ensures \result == pdFALSE;
     ensures pxCurrentTCB == \old(pxCurrentTCB);
@@ -111,11 +109,7 @@ static void prvResetNextTaskUnblockTime(void);
 
   behavior running:
     assumes uxSchedulerSuspended == (UBaseType_t)0U;
-    // Substantive postconditions deferred — see file header.
-    // The pxCurrentTCB-unchanged claim is currently unprovable
-    // because vListInsert (called via prvAddTaskToReadyList) has no
-    // assigns clause and WP defaults to `assigns \everything`. A
-    // contract on vListInsert (in list.h overlay) would close this.
+    // Substantive postconditions deferred.
 
   complete behaviors suspended, running;
   disjoint behaviors suspended, running;

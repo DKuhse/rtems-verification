@@ -438,6 +438,9 @@ typedef struct xLIST
  * \page vListInitialise vListInitialise
  * \ingroup LinkedList
  */
+/*@
+  assigns *pxList;
+*/
 void vListInitialise( List_t * const pxList ) PRIVILEGED_FUNCTION;
 
 /*
@@ -449,6 +452,9 @@ void vListInitialise( List_t * const pxList ) PRIVILEGED_FUNCTION;
  * \page vListInitialiseItem vListInitialiseItem
  * \ingroup LinkedList
  */
+/*@
+  assigns pxItem->pxContainer;
+*/
 void vListInitialiseItem( ListItem_t * const pxItem ) PRIVILEGED_FUNCTION;
 
 /*
@@ -462,6 +468,12 @@ void vListInitialiseItem( ListItem_t * const pxItem ) PRIVILEGED_FUNCTION;
  * \page vListInsert vListInsert
  * \ingroup LinkedList
  */
+/*@
+  assigns *pxList,
+          *pxNewListItem,
+          { item->pxNext     | struct xLIST_ITEM *item; \valid( item ) },
+          { item->pxPrevious | struct xLIST_ITEM *item; \valid( item ) };
+*/
 void vListInsert( List_t * const pxList,
                   ListItem_t * const pxNewListItem ) PRIVILEGED_FUNCTION;
 
@@ -484,6 +496,12 @@ void vListInsert( List_t * const pxList,
  * \page vListInsertEnd vListInsertEnd
  * \ingroup LinkedList
  */
+/*@
+  assigns *pxList,
+          *pxNewListItem,
+          { item->pxNext     | struct xLIST_ITEM *item; \valid( item ) },
+          { item->pxPrevious | struct xLIST_ITEM *item; \valid( item ) };
+*/
 void vListInsertEnd( List_t * const pxList,
                      ListItem_t * const pxNewListItem ) PRIVILEGED_FUNCTION;
 
@@ -500,6 +518,12 @@ void vListInsertEnd( List_t * const pxList,
  * \page uxListRemove uxListRemove
  * \ingroup LinkedList
  */
+/*@
+  assigns *pxItemToRemove->pxContainer,
+          *pxItemToRemove,
+          { item->pxNext     | struct xLIST_ITEM *item; \valid( item ) },
+          { item->pxPrevious | struct xLIST_ITEM *item; \valid( item ) };
+*/
 UBaseType_t uxListRemove( ListItem_t * const pxItemToRemove ) PRIVILEGED_FUNCTION;
 
 /* 
