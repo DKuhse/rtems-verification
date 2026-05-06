@@ -1,22 +1,18 @@
 # EDF Scheduler Verification
 
-Formal verification of the RTEMS EDF scheduler with Frama-C/WP, ported
-from RTEMS 5.1 to RTEMS 6.2.
+scripts/ has scripts to verify individual functions.
+verification/ includes the annotated source code that is overlayed on top of the original source code.
+original source code needs to be obtained separately (see setup.sh).
 
-Both versions verify at 100% (5.1: 3,963/3,963; 6.2: 4,804/4,804) using
-the `Typed+Cast` memory model with Alt-Ergo 2.4.2.
-
-Builds on the original
-[Formally-Verifying-Implementations-of-EDF-Scheduler-in-RTEMS](Formally-Verifying-Implementations-of-EDF-Scheduler-in-RTEMS/)
-work.
 
 ## Reproduce
 
 ```sh
-docker compose build               # Frama-C 25 + RSB cross-toolchain
-./setup.sh                         # download/extract sources, build BSP, apply 5.1 patches
-docker compose run --rm verify     # RTEMS 5.1 — runs verify-wp-all.sh
-docker compose run --rm verify-6.2 # RTEMS 6.2 — runs verify-wp-all.sh -wp-timeout 30
+docker compose build                    # Frama-C 25 + RSB cross-toolchain
+./setup.sh                              # download/extract sources, build BSP, apply 5.1 patches
+docker compose run --rm verify          # RTEMS 5.1 — runs verify-wp-all.sh
+docker compose run --rm verify-6.2      # RTEMS 6.2 — runs verify-wp-all.sh -wp-timeout 30
+docker compose run --rm verify-freertos # FreeRTOS EDF (MSP430) — smoke test only for now
 ```
 
 Run a single function:
@@ -31,4 +27,14 @@ GUI (frama-c-gui via X11):
 
 ```sh
 xhost +local:docker && docker compose run --rm gui
+```
+
+
+## Shell
+
+Want to play around with the code and Frama-C? Get a shell in the container:
+
+```sh
+docker compose run --rm --entrypoint bash verify-6.2
+docker compose run --rm --entrypoint bash verify-freertos
 ```
