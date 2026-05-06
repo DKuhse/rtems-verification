@@ -26,6 +26,7 @@ MACHDEP="gcc_x86_16"
 
 CPP_CMD="gcc -C -E \
     -D__LARGE_DATA_MODEL__ \
+    -I${OVERLAY}/overlay/include \
     -I${OVERLAY}/stubs \
     -I${FREERTOS_SRC}/include \
     -nostdinc \
@@ -40,13 +41,11 @@ FAIL=0
 
 run_wp() {
     local label="$1"
-    local source_relpath="$2"
+    local source_path="$2"
     local fcts="$3"
     shift 3
 
-    local source="${FREERTOS_SRC}/${source_relpath}"
-
-    [ -f "${source}" ] || { echo "  ERROR: missing source ${source}"; FAIL=$((FAIL + 1)); return; }
+    [ -f "${source_path}" ] || { echo "  ERROR: missing source ${source_path}"; FAIL=$((FAIL + 1)); return; }
 
     echo "--- ${label} ---"
 
@@ -60,7 +59,7 @@ run_wp() {
         ${COMMON} \
         -wp ${fct_flag} \
         "$@" \
-        "${source}" 2>&1)
+        "${source_path}" 2>&1)
 
     summary=$(echo "${output}" | grep '^\[wp\] Proved goals:' || true)
     if [ -z "${summary}" ]; then
@@ -96,15 +95,14 @@ echo " Headless WP Verification (FreeRTOS)"
 echo "========================================"
 echo ""
 
-# ── Smoke test: list.c ───────────────────────────────────────────
-# Confirms preprocessor + Frama-C toolchain wiring. No ACSL contracts yet.
-echo "== List (list.c) =="
+# ── List (overlay/list.c) ────────────────────────────────────────
+echo "== List (overlay/list.c) =="
 echo ""
 
-run_wp "list.c (smoke test)" \
-    "list.c" \
-    "" \
-    ${EXTRA_ARGS}
+run_wp "vListInsert" \
+    "${OVERLAY}/overlay/include/list.h" \
+    "vListInsert" \
+    -wp-model "Typed+Cast" ${EXTRA_ARGS}
 
 echo ""
 echo "========================================"
