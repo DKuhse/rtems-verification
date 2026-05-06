@@ -18,12 +18,14 @@ eval $(opam env)
 
 RTEMS_SRC="${RTEMS_SRC:-/workspace/rtems/src/rtems-6.2}"
 RTEMS_PREFIX="${RTEMS_PREFIX:-/opt/rtems5}"
-
-cd "${RTEMS_SRC}/cpukit"
+OVERLAY="${OVERLAY:-/workspace/verification/6.2}"
 
 CPP_CMD="${RTEMS_PREFIX}/bin/x86_64-rtems5-gcc -C -E \
-    -I./include -I./score/cpu/x86_64/include/ \
-    -I/workspace/rtems/build/amd64/x86_64-rtems5/c/amd64/include/ \
+    -I${OVERLAY}/overlay/cpukit/include \
+    -I${OVERLAY}/stubs \
+    -I${RTEMS_SRC}/cpukit/include \
+    -I${RTEMS_SRC}/cpukit/score/cpu/x86_64/include \
+    -I/workspace/rtems/build/amd64/x86_64-rtems5/c/amd64/include \
     -I${RTEMS_PREFIX}/x86_64-rtems5/include \
     -I${RTEMS_PREFIX}/lib/gcc/x86_64-rtems5/9.3.0/include \
     -I${RTEMS_SRC}/bsps/include \
@@ -36,14 +38,23 @@ COMMON="-machdep gcc_x86_64 -cpp-frama-c-compliant -c11"
 PASS=0
 FAIL=0
 
+# Resolve stub basename to overlay path, source relpath to overlay path.
+# Keeps call sites short (basename + cpukit-relative path) while
+# guaranteeing absolute resolution.
 run_wp() {
     local label="$1"
-    local stubs="$2"
-    local source="$3"
+    local stub_basename="$2"
+    local source_relpath="$3"
     local inlines="$4"
     local fcts="$5"
     shift 5
     # remaining args are extra flags (e.g. -wp-split, -wp-timeout)
+
+    local stub="${OVERLAY}/stubs/${stub_basename}"
+    local source="${OVERLAY}/overlay/cpukit/${source_relpath}"
+
+    [ -f "${stub}" ]   || { echo "  ERROR: missing stub ${stub}";   FAIL=$((FAIL + 1)); return; }
+    [ -f "${source}" ] || { echo "  ERROR: missing source ${source}"; FAIL=$((FAIL + 1)); return; }
 
     echo "--- ${label} ---"
 
@@ -53,7 +64,7 @@ run_wp() {
     fi
 
     output=$(frama-c \
-        -cpp-command "${CPP_CMD} -include ${stubs}" \
+        -cpp-command "${CPP_CMD} -include ${stub}" \
         ${COMMON} \
         ${INLINE_FLAG} \
         -wp -wp-fct "${fcts}" \

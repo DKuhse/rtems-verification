@@ -18,6 +18,7 @@ services:
     volumes:
       - ./rtems:/workspace/rtems
       - ./scripts:/opt/scripts
+      - ./verification:/workspace/verification
     command: ["verify-all.sh"]
 
   # Headless verification (RTEMS 6.2). Default invocation matches the
@@ -35,6 +36,7 @@ services:
     volumes:
       - ./rtems:/workspace/rtems
       - ./scripts:/opt/scripts
+      - ./verification:/workspace/verification
     command: ["/opt/scripts/6.2/verify-wp-all.sh", "-wp-model", "Typed+Cast", "-wp-timeout", "30"]
 
   # Interactive shell with X11 forwarding for frama-c-gui

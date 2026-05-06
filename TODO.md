@@ -16,95 +16,95 @@ These replace the originals in the 6.2 source tree. Required because
 inline functions need ACSL contracts, and the stubs reference types
 defined in these headers.
 
-- [ ] `priorityimpl.h` — mechanical bool→enum changes throughout:
-  - [ ] Ghost variables (`g_new_minimum`, `g_min_priority_node`)
-  - [ ] `_Priority_Actions_initialize_empty` — unchanged
-  - [ ] `_Priority_Actions_initialize_one` — unchanged
-  - [ ] `_Priority_Actions_is_empty` — unchanged
-  - [ ] `_Priority_Actions_is_valid` — REMOVED in 6.2 (delete contract)
-  - [ ] `_Priority_Actions_move` — unchanged
-  - [ ] `_Priority_Actions_add` — unchanged
-  - [ ] `_Priority_Node_set_priority` — unchanged
-  - [ ] `_Priority_Node_set_inactive` — unchanged
-  - [ ] `_Priority_Node_is_active` — unchanged
-  - [ ] `_Priority_Get_priority` — unchanged
-  - [ ] `_Priority_Get_minimum_node` — unchanged (uses ghost `g_min_priority_node`)
-  - [ ] `_Priority_Set_action_node` — unchanged
-  - [ ] `_Priority_Set_action_type` — unchanged
-  - [ ] `_Priority_Set_action` — unchanged
-  - [ ] `_Priority_Get_next_action` — unchanged
-  - [ ] `_Priority_Plain_insert` — unchanged (uses ghost `g_new_minimum`)
-  - [ ] `_Priority_Plain_extract` — unchanged
-  - [ ] `_Priority_Plain_changed` — unchanged
-  - [ ] `_Priority_Change_nothing` — bool→`Priority_Group_order`
-  - [ ] `_Priority_Remove_nothing` — unchanged
-  - [ ] `_Priority_Non_empty_insert` — `false`→`PRIORITY_GROUP_LAST` in callback
-  - [ ] `_Priority_Extract_non_empty` — `true`→`PRIORITY_GROUP_FIRST` in callback
-  - [ ] `_Priority_Changed` — `bool prepend_it`→`Priority_Group_order group_order`
-  - [ ] `_Priority_Replace` — unchanged
-  - [ ] Typedef changes: `Priority_Change_handler` uses `Priority_Group_order`
+- [x] `priorityimpl.h` — mechanical bool→enum changes throughout:
+  - [x] Ghost variables (`g_new_minimum`, `g_min_priority_node`)
+  - [x] `_Priority_Actions_initialize_empty` — unchanged
+  - [x] `_Priority_Actions_initialize_one` — unchanged
+  - [x] `_Priority_Actions_is_empty` — unchanged
+  - [x] `_Priority_Actions_is_valid` — REMOVED in 6.2 (delete contract)
+  - [x] `_Priority_Actions_move` — unchanged
+  - [x] `_Priority_Actions_add` — unchanged
+  - [x] `_Priority_Node_set_priority` — unchanged
+  - [x] `_Priority_Node_set_inactive` — unchanged
+  - [x] `_Priority_Node_is_active` — unchanged
+  - [x] `_Priority_Get_priority` — unchanged
+  - [x] `_Priority_Get_minimum_node` — unchanged (uses ghost `g_min_priority_node`)
+  - [x] `_Priority_Set_action_node` — unchanged
+  - [x] `_Priority_Set_action_type` — unchanged
+  - [x] `_Priority_Set_action` — unchanged
+  - [ ] `_Priority_Get_next_action` — unchanged (no contract in file, not used by verified functions)
+  - [x] `_Priority_Plain_insert` — unchanged (uses ghost `g_new_minimum`)
+  - [x] `_Priority_Plain_extract` — unchanged
+  - [x] `_Priority_Plain_changed` — unchanged
+  - [x] `_Priority_Change_nothing` — bool→`Priority_Group_order`
+  - [x] `_Priority_Remove_nothing` — unchanged
+  - [x] `_Priority_Non_empty_insert` — `false`→`PRIORITY_GROUP_LAST` in callback
+  - [x] `_Priority_Extract_non_empty` — `true`→`PRIORITY_GROUP_FIRST` in callback
+  - [x] `_Priority_Changed` — `bool prepend_it`→`Priority_Group_order group_order`
+  - [ ] `_Priority_Replace` — unchanged (no contract in file, not used by verified functions)
+  - [x] Typedef changes: `Priority_Change_handler` uses `Priority_Group_order`
 
-- [ ] `scheduleredfimpl.h`:
-  - [ ] Ghost variable `g_edf_sched_context`
-  - [ ] `_Scheduler_EDF_Get_context` — add `\from` clause
-  - [ ] `_Scheduler_EDF_Thread_get_node` — unchanged
-  - [ ] `_Scheduler_EDF_Node_downcast` — add `\from` clause
-  - [ ] `_Scheduler_EDF_Enqueue` — `assigns \nothing`
-  - [ ] `_Scheduler_EDF_Extract` — `assigns \nothing`
-  - [ ] `_Scheduler_EDF_Get_highest_ready` — NEW: ghost `g_min_edf_node`, returns `g_min_edf_node->Base.owner`
+- [x] `scheduleredfimpl.h`:
+  - [x] Ghost variable `g_edf_sched_context`
+  - [x] `_Scheduler_EDF_Get_context` — add `\from` clause
+  - [ ] `_Scheduler_EDF_Thread_get_node` — unchanged (no contract in file, not used by verified functions)
+  - [x] `_Scheduler_EDF_Node_downcast` — add `\from` clause
+  - [x] `_Scheduler_EDF_Enqueue` — `assigns \nothing`
+  - [x] `_Scheduler_EDF_Extract` — `assigns \nothing`
+  - [x] `_Scheduler_EDF_Get_highest_ready` — NEW: ghost `g_min_edf_node`, returns `g_min_edf_node->Base.owner`
 
-- [ ] `schedulerimpl.h`:
+- [ ] `schedulerimpl.h` — not created; not needed for current verification targets
   - [ ] `_Scheduler_Get_context` — unchanged
   - [ ] Remove `_Scheduler_Update_heir` (moved to scheduleruniimpl.h)
   - [ ] Other functions as needed by include chain
 
 - [ ] `scheduleruniimpl.h` — NEW file, annotate for inlining:
-  - [ ] `_Scheduler_uniprocessor_Update_heir` — assigns `_Thread_Heir`, volatile `dispatch_necessary` limitation
-  - [ ] `_Scheduler_uniprocessor_Update_heir_if_necessary` — wraps above
-  - [ ] `_Scheduler_uniprocessor_Update_heir_if_preemptible` — wraps with preemptible check
-  - [ ] `_Scheduler_uniprocessor_Block` — extract + schedule callback
-  - [ ] `_Scheduler_uniprocessor_Unblock` — priority comparison + heir update
-  - [ ] `_Scheduler_uniprocessor_Schedule` — callback + heir update
-  - [ ] `_Scheduler_uniprocessor_Yield` — callback + unconditional heir update
+  - [x] `_Scheduler_uniprocessor_Update_heir` — assigns `_Thread_Heir`, volatile `dispatch_necessary` limitation
+  - [ ] `_Scheduler_uniprocessor_Update_heir_if_necessary` — wraps above (no contract, not used)
+  - [x] `_Scheduler_uniprocessor_Update_heir_if_preemptible` — wraps with preemptible check
+  - [ ] `_Scheduler_uniprocessor_Block` — extract + schedule callback (no contract, inlined as-is)
+  - [ ] `_Scheduler_uniprocessor_Unblock` — priority comparison + heir update (no contract, inlined as-is)
+  - [ ] `_Scheduler_uniprocessor_Schedule` — callback + heir update (no contract, inlined as-is)
+  - [ ] `_Scheduler_uniprocessor_Yield` — callback + unconditional heir update (no contract, not used)
 
 ## Stubs
 - [x] `release_cancel_stubs.h` — created, includes `priorityimpl.h` for type
-  - [ ] Finalize once annotated `priorityimpl.h` is in place (currently conflicts with unannotated original)
-- [ ] `stubs.h` — adapt from 5.1:
-  - [ ] Ghost variables (same as 5.1)
-  - [ ] `_Helper_RBTree_Minimum` — add `\from`
-  - [ ] `_Helper_RBTree_EDF_Minimum` — add `\from`
-  - [ ] `_Helper_SCHEDULER_NODE_OF_WAIT_PRIORITY_NODE` — add `\from`
-  - [ ] `_Thread_queue_Do_nothing_priority_actions` — unchanged
-  - [ ] `_Thread_queue_Context_add_priority_update` — unchanged
-  - [ ] `_Scheduler_Node_set_priority` — bool→`Priority_Group_order`
-  - [ ] `_Scheduler_Node_get_priority` — unchanged
-  - [ ] `_Thread_Get_CPU` — `assigns \result \from thread`
-  - [ ] `_Thread_Update_CPU_time_used` — unchanged
-  - [ ] `_States_Is_ready` / `_Thread_Is_ready` — unchanged
-  - [ ] `_Thread_Get_priority` — unchanged
-  - [ ] `_Thread_Scheduler_get_home_node` — add `\from`
-  - [ ] Remove `PRIORITY_PSEUDO_ISR` references (removed in 6.2)
+  - [x] Finalize once annotated `priorityimpl.h` is in place
+- [x] `stubs.h` — adapt from 5.1:
+  - [x] Ghost variables (same as 5.1)
+  - [x] `_Helper_RBTree_Minimum` — add `\from`
+  - [x] `_Helper_RBTree_EDF_Minimum` — add `\from`
+  - [x] `_Helper_SCHEDULER_NODE_OF_WAIT_PRIORITY_NODE` — add `\from`
+  - [x] `_Thread_queue_Do_nothing_priority_actions` — unchanged
+  - [x] `_Thread_queue_Context_add_priority_update` — unchanged
+  - [x] `_Scheduler_Node_set_priority` — bool→`Priority_Group_order`
+  - [x] `_Scheduler_Node_get_priority` — unchanged
+  - [x] `_Thread_Get_CPU` — `assigns \result \from thread`
+  - [x] `_Thread_Update_CPU_time_used` — unchanged
+  - [x] `_States_Is_ready` / `_Thread_Is_ready` — unchanged
+  - [x] `_Thread_Get_priority` — unchanged
+  - [x] `_Thread_Scheduler_get_home_node` — add `\from`
+  - [x] Remove `PRIORITY_PSEUDO_ISR` references (removed in 6.2)
 
 ## Annotated Source Files (.c)
 - [x] `scheduleredfreleasejob.c` — created, `false`→`PRIORITY_GROUP_LAST` in Release_job
-  - [ ] Verify once annotated headers are in place
-- [ ] `scheduleredfchangepriority.c`:
-  - [ ] Port outer contract for `_Scheduler_EDF_Update_priority`
-  - [ ] Update `-inline-calls` for uniprocessor layer chain
-  - [ ] Add `\separated` with `_Per_CPU_Information`
-- [ ] `scheduleredfunblock.c`:
-  - [ ] Port outer contract for `_Scheduler_EDF_Unblock`
-  - [ ] Update `-inline-calls` for uniprocessor layer
-  - [ ] Add `\separated` with `_Per_CPU_Information`
-- [ ] `threadchangepriority.c`:
-  - [ ] `_Thread_Set_scheduler_node_priority` — bool→enum
-  - [ ] `_Thread_Priority_action_change` — bool→enum
-  - [ ] `_Thread_Priority_do_perform_actions` — bool→enum, loop structure
-  - [ ] `_Thread_Priority_apply` — bool→enum, SMP path changes (non-SMP path similar)
-  - [ ] `_Thread_Priority_add` — `false`→`PRIORITY_GROUP_LAST`
-  - [ ] `_Thread_Priority_remove` — `true`→`PRIORITY_GROUP_FIRST`
-  - [ ] `_Thread_Priority_changed` — bool→enum
+  - [x] Verify once annotated headers are in place
+- [x] `scheduleredfchangepriority.c`:
+  - [x] Port outer contract for `_Scheduler_EDF_Update_priority`
+  - [x] Update `-inline-calls` for uniprocessor layer chain
+  - [x] Add `\separated` with `_Per_CPU_Information`
+- [x] `scheduleredfunblock.c`:
+  - [x] Port outer contract for `_Scheduler_EDF_Unblock`
+  - [x] Update `-inline-calls` for uniprocessor layer
+  - [x] Add `\separated` with `_Per_CPU_Information`
+- [x] `threadchangepriority.c`:
+  - [x] `_Thread_Set_scheduler_node_priority` — bool→enum
+  - [x] `_Thread_Priority_action_change` — bool→enum
+  - [x] `_Thread_Priority_do_perform_actions` — bool→enum, loop structure
+  - [x] `_Thread_Priority_apply` — bool→enum, SMP path changes (non-SMP path similar)
+  - [x] `_Thread_Priority_add` — `false`→`PRIORITY_GROUP_LAST`
+  - [x] `_Thread_Priority_remove` — `true`→`PRIORITY_GROUP_FIRST`
+  - [x] `_Thread_Priority_changed` — bool→enum
 
 ## Verification Targets
 Goal: all functions verified with `-wp-model "Typed+Cast"`.

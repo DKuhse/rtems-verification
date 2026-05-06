@@ -14,7 +14,7 @@ work.
 
 ```sh
 docker compose build               # Frama-C 25 + RSB cross-toolchain
-./setup.sh                         # download/extract sources, patch, copy overlay files
+./setup.sh                         # download/extract sources, build BSP, apply 5.1 patches
 docker compose run --rm verify     # RTEMS 5.1 — runs verify-wp-all.sh
 docker compose run --rm verify-6.2 # RTEMS 6.2 — runs verify-wp-all.sh -wp-timeout 30
 ```

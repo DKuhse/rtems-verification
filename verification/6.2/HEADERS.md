@@ -6,6 +6,21 @@ This directory contains **verification headers** — annotated or
 simplified versions of RTEMS 6.2 headers used during Frama-C/WP
 verification. There are two categories:
 
+## Layout
+
+The pristine RTEMS source under `rtems/src/rtems-6.2/` is left
+untouched. Verification picks up modified files via `-I` ordering:
+
+- `overlay/cpukit/include/rtems/score/` — annotated headers, mirroring
+  upstream paths so `#include <rtems/score/priorityimpl.h>` resolves
+  here when the overlay's include dir is first on `-I`.
+- `overlay/cpukit/score/src/` — annotated `.c` files; passed to
+  Frama-C directly as the source argument.
+- `stubs/` — stub headers pulled in via `-include` (e.g.
+  `release_cancel_stubs.h`, `stubs.h`).
+- `headers/` — reserve simplified headers, **not** wired into `-I`.
+  See "Simplified headers (kept in reserve)" below.
+
 ### Annotated headers (required)
 
 Headers where ACSL contracts are added to inline functions that get

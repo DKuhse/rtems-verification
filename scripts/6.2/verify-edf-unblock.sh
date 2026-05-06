@@ -18,21 +18,28 @@ fi
 
 RTEMS_SRC="${RTEMS_SRC:-/workspace/rtems/src/rtems-6.2}"
 RTEMS_PREFIX="${RTEMS_PREFIX:-/opt/rtems5}"
+OVERLAY="${OVERLAY:-/workspace/verification/6.2}"
 
-cd "${RTEMS_SRC}/cpukit"
+SRC="${OVERLAY}/overlay/cpukit/score/src/scheduleredfunblock.c"
+STUB="${OVERLAY}/stubs/stubs.h"
+[ -f "${SRC}" ]  || { echo "missing overlay source: ${SRC}" >&2; exit 1; }
+[ -f "${STUB}" ] || { echo "missing stub: ${STUB}" >&2; exit 1; }
 
 echo "=== EDF Unblock (RTEMS 6.2) ==="
 ${FRAMA_C_CMD} \
     -cpp-command "${RTEMS_PREFIX}/bin/x86_64-rtems5-gcc -C -E \
-        -I./include -I./score/cpu/x86_64/include/ \
-        -I/workspace/rtems/build/amd64/x86_64-rtems5/c/amd64/include/ \
+        -I${OVERLAY}/overlay/cpukit/include \
+        -I${OVERLAY}/stubs \
+        -I${RTEMS_SRC}/cpukit/include \
+        -I${RTEMS_SRC}/cpukit/score/cpu/x86_64/include \
+        -I/workspace/rtems/build/amd64/x86_64-rtems5/c/amd64/include \
         -I${RTEMS_PREFIX}/x86_64-rtems5/include \
         -I${RTEMS_PREFIX}/lib/gcc/x86_64-rtems5/9.3.0/include \
         -I${RTEMS_SRC}/bsps/include \
         -I${RTEMS_SRC}/bsps/x86_64/include \
         -I${RTEMS_SRC}/bsps/x86_64/amd64/include \
-        -nostdinc -include stubs.h" \
+        -nostdinc -include ${STUB}" \
     -machdep gcc_x86_64 -cpp-frama-c-compliant -c11 \
     -inline-calls "_Scheduler_uniprocessor_Unblock,_Scheduler_uniprocessor_Update_heir_if_preemptible,_Scheduler_uniprocessor_Update_heir" \
-    'score/src/scheduleredfunblock.c' \
+    "${SRC}" \
     "$@"
