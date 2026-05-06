@@ -1,11 +1,14 @@
 #define MPU_WRAPPERS_INCLUDED_FROM_API_FILE
 #include "FreeRTOS.h"
 #include "list.h"
-#include "edf.h"
 #undef MPU_WRAPPERS_INCLUDED_FROM_API_FILE
 
-struct tskTaskControlBlock;
+struct tskTaskControlBlock {
+    TickType_t xDeadline;
+};
 typedef struct tskTaskControlBlock TCB_t;
+
+#include "edf.h"
 
 /* Hack: Frama-C can't handle volatile */
 #ifdef __FRAMAC__
@@ -26,8 +29,9 @@ typedef struct tskTaskControlBlock TCB_t;
 /*@
   requires xReadyTasksList.uxNumberOfItems > 0;
   requires \valid_read( xReadyTasksList.xListEnd.pxNext );
-  // System invariant: ready list is sorted
+  // System invariant: ready list is sorted by deadline
   requires sorted( &xReadyTasksList );
+  requires xItemValue_matches_deadline( &xReadyTasksList );
 
   assigns pxCurrentTCB, xYieldPendings[ 0 ];
 

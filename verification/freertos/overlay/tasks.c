@@ -41,10 +41,6 @@
 #include "task.h"
 #include "timers.h"
 
-#ifdef __FRAMAC__
-    /* Verification-only: EDF correctness predicate. */
-    #include "edf.h"
-#endif
 
 /* The default definitions are only available for non-MPU ports. The
  * reason is that the stack alignment requirements vary for different
@@ -489,6 +485,10 @@ typedef struct tskTaskControlBlock /* The old naming convention is used to preve
 /* The old tskTCB name is maintained above then typedefed to the new TCB_t name
  * below to enable the use of older kernel aware debuggers. */
 typedef tskTCB TCB_t;
+
+#ifdef __FRAMAC__
+    #include "edf.h"
+#endif
 
 #if (configNUMBER_OF_CORES == 1)
 /* MISRA Ref 8.4.1 [Declaration shall be visible] */
@@ -4743,8 +4743,9 @@ BaseType_t xTaskCallApplicationTaskHook(TaskHandle_t xTask,
 /*@
   requires xReadyTasksList.uxNumberOfItems > 0;
   requires \valid_read( xReadyTasksList.xListEnd.pxNext );
-  // System invariant: ready list is sorted
+  // System invariant: ready list is sorted by deadline.
   requires sorted( &xReadyTasksList );
+  requires xItemValue_matches_deadline( &xReadyTasksList );
 
   assigns pxCurrentTCB, xYieldPendings[ 0 ];
 
