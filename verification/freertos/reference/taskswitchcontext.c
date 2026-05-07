@@ -29,7 +29,6 @@ typedef struct tskTaskControlBlock TCB_t;
 /*@
   requires xReadyTasksList.uxNumberOfItems > 0;
   requires \valid_read( xReadyTasksList.xListEnd.pxNext );
-  // System invariant: ready list is sorted by deadline
   requires sorted( &xReadyTasksList );
   requires xItemValue_matches_deadline( &xReadyTasksList );
 
@@ -45,10 +44,8 @@ typedef struct tskTaskControlBlock TCB_t;
     assumes uxSchedulerSuspended == (UBaseType_t)0U;
     assigns pxCurrentTCB, xYieldPendings[ 0 ];
     ensures xYieldPendings[0] == pdFALSE;
-    // Structural: pxCurrentTCB owns the head item.
     ensures (void*) pxCurrentTCB ==
               \nth( list_contents( &xReadyTasksList ), 0 )->pvOwner;
-    // EDF correctness:
     ensures edf_property( &xReadyTasksList, pxCurrentTCB );
 
   complete behaviors suspended, running;
@@ -57,11 +54,11 @@ typedef struct tskTaskControlBlock TCB_t;
 #if (configNUMBER_OF_CORES == 1)
 void vTaskSwitchContext(void) {
     traceENTER_vTaskSwitchContext();
-
     if (uxSchedulerSuspended != (UBaseType_t)0U) {
         /* The scheduler is currently suspended - do not allow a context
          * switch. */
         xYieldPendings[0] = pdTRUE;
+
     } else {
         xYieldPendings[0] = pdFALSE;
         traceTASK_SWITCHED_OUT();

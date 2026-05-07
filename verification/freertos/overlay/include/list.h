@@ -455,13 +455,7 @@ typedef struct xLIST
   predicate sorted(struct xLIST *pxList) =
     \forall integer i, j; 0 <= i < j < \length(list_contents(pxList)) ==> \nth(list_contents(pxList), i)->xItemValue <= \nth(list_contents(pxList), j)->xItemValue;
 
-  // System-invariant axiom: an item is in a list iff its pxContainer points at that list.
-  // Also shows disjointness of lists: an item cannot be in two lists at once. 
-  axiomatic Container_Uniqueness {
-    axiom container_iff_in_list{L}:
-      \forall struct xLIST_ITEM *item, struct xLIST *pxList;
-        in_list(item, pxList) <==> item->pxContainer == pxList;
-  }
+
 */
 
 /*

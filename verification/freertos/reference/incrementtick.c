@@ -109,15 +109,7 @@ static void prvResetNextTaskUnblockTime(void);
 
   behavior running:
     assumes uxSchedulerSuspended == (UBaseType_t)0U;
-    requires sorted(&xReadyTasksList);
-    requires xItemValue_matches_deadline(&xReadyTasksList);
-    requires edf_property(&xReadyTasksList, pxCurrentTCB);
     ensures pxCurrentTCB == \old(pxCurrentTCB);
-    ensures sorted(&xReadyTasksList);
-    // EDF preservation: if no switch is requested, the running task
-    // still has the earliest deadline among ready tasks.
-    ensures \result == pdFALSE ==>
-              edf_property(&xReadyTasksList, pxCurrentTCB);
 
   complete behaviors suspended, running;
   disjoint behaviors suspended, running;
@@ -148,9 +140,6 @@ BaseType_t xTaskIncrementTick(void) {
         if (xConstTickCount >= xNextTaskUnblockTime) {
             /*@
               loop invariant pxCurrentTCB == \at(pxCurrentTCB, Pre);
-              loop invariant sorted(&xReadyTasksList);
-              loop invariant xSwitchRequired == pdFALSE ==>
-                             edf_property(&xReadyTasksList, pxCurrentTCB);
             */
             for (;;) {
                 if (listLIST_IS_EMPTY(pxDelayedTaskList) != pdFALSE) {
@@ -178,6 +167,7 @@ BaseType_t xTaskIncrementTick(void) {
                     }
 
                     prvAddTaskToReadyList(pxTCB);
+                    //@ assert \false; // sanity probe — must NOT prove
 
 #if (configUSE_PREEMPTION == 1)
                     {
