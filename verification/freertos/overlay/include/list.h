@@ -428,6 +428,42 @@ typedef struct xLIST
  */
 #define listLIST_IS_INITIALISED( pxList )                ( ( pxList )->xListEnd.xItemValue == portMAX_DELAY )
 
+/* ============================================================
+ * Verification logic — list representation
+ * ============================================================ */
+
+/*@
+  axiomatic FreeRTOS_List_Contents {
+    logic \list<struct xLIST_ITEM *> list_contents{L}(struct xLIST *pxList);
+
+    // Bridge axioms: connect list_contents to the concrete list struct.
+
+    axiom list_contents_length{L}: \forall struct xLIST *pxList;
+      \length(list_contents(pxList)) == pxList->uxNumberOfItems;
+
+    axiom list_contents_head{L}: \forall struct xLIST *pxList;
+      pxList->uxNumberOfItems > 0 ==>
+        \nth(list_contents(pxList), 0) == pxList->xListEnd.pxNext;
+  }
+
+  predicate in_list(struct xLIST_ITEM *pxItem, struct xLIST *pxList) =
+    \exists integer i; 0 <= i < \length(list_contents(pxList)) && \nth(list_contents(pxList), i) == pxItem;
+
+  predicate min(struct xLIST *pxList, TickType_t x) =
+    \forall integer i; 0 <= i < \length(list_contents(pxList)) ==> \nth(list_contents(pxList), i)->xItemValue >= x;
+
+  predicate sorted(struct xLIST *pxList) =
+    \forall integer i, j; 0 <= i < j < \length(list_contents(pxList)) ==> \nth(list_contents(pxList), i)->xItemValue <= \nth(list_contents(pxList), j)->xItemValue;
+
+  // System-invariant axiom: an item is in a list iff its pxContainer points at that list.
+  // Also shows disjointness of lists: an item cannot be in two lists at once. 
+  axiomatic Container_Uniqueness {
+    axiom container_iff_in_list{L}:
+      \forall struct xLIST_ITEM *item, struct xLIST *pxList;
+        in_list(item, pxList) <==> item->pxContainer == pxList;
+  }
+*/
+
 /*
  * Must be called before a list is used!  This initialises all the members
  * of the list structure and inserts the xListEnd item into the list as a
@@ -469,10 +505,14 @@ void vListInitialiseItem( ListItem_t * const pxItem ) PRIVILEGED_FUNCTION;
  * \ingroup LinkedList
  */
 /*@
+  requires sorted( pxList );
+
   assigns *pxList,
           *pxNewListItem,
           { item->pxNext     | struct xLIST_ITEM *item; \valid( item ) },
           { item->pxPrevious | struct xLIST_ITEM *item; \valid( item ) };
+
+  ensures sorted( pxList );
 */
 void vListInsert( List_t * const pxList,
                   ListItem_t * const pxNewListItem ) PRIVILEGED_FUNCTION;
@@ -526,34 +566,8 @@ void vListInsertEnd( List_t * const pxList,
 */
 UBaseType_t uxListRemove( ListItem_t * const pxItemToRemove ) PRIVILEGED_FUNCTION;
 
-/* 
- * Verification
- * List representation
- */
-
-/*@
-  axiomatic FreeRTOS_List_Contents {
-    logic \list<struct xLIST_ITEM *> list_contents{L}(struct xLIST *pxList);
-
-    // Bridge axioms: connect the list_contents logic function to the actual list structure 
-
-    axiom list_contents_length{L}: \forall struct xLIST *pxList;
-      \length(list_contents(pxList)) == pxList->uxNumberOfItems;
-
-    axiom list_contents_head{L}: \forall struct xLIST *pxList;
-      pxList->uxNumberOfItems > 0 ==>
-        \nth(list_contents(pxList), 0) == pxList->xListEnd.pxNext;
-  }
-
-  predicate in_list(struct xLIST_ITEM *pxItem, struct xLIST *pxList) =
-    \exists integer i; 0 <= i < \length(list_contents(pxList)) && \nth(list_contents(pxList), i) == pxItem;
-
-  predicate min(struct xLIST *pxList, TickType_t x) =
-    \forall integer i; 0 <= i < \length(list_contents(pxList)) ==> \nth(list_contents(pxList), i)->xItemValue >= x;
-
-  predicate sorted(struct xLIST *pxList) =
-    \forall integer i, j; 0 <= i < j < \length(list_contents(pxList)) ==> \nth(list_contents(pxList), i)->xItemValue <= \nth(list_contents(pxList), j)->xItemValue;
-*/
+/* (List-representation predicates and axiomatic moved up earlier in
+ * this header so the function contracts above can reference them.) */
 
 /* *INDENT-OFF* */
 #ifdef __cplusplus
