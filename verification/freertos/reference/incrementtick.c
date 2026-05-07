@@ -109,7 +109,9 @@ static void prvResetNextTaskUnblockTime(void);
 
   behavior running:
     assumes uxSchedulerSuspended == (UBaseType_t)0U;
+    requires sorted(&xReadyTasksList);
     ensures pxCurrentTCB == \old(pxCurrentTCB);
+    ensures sorted(&xReadyTasksList);
 
   complete behaviors suspended, running;
   disjoint behaviors suspended, running;
@@ -140,6 +142,7 @@ BaseType_t xTaskIncrementTick(void) {
         if (xConstTickCount >= xNextTaskUnblockTime) {
             /*@
               loop invariant pxCurrentTCB == \at(pxCurrentTCB, Pre);
+              loop invariant sorted(&xReadyTasksList);
             */
             for (;;) {
                 if (listLIST_IS_EMPTY(pxDelayedTaskList) != pdFALSE) {

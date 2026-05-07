@@ -203,7 +203,17 @@ typedef struct xLIST
  * \page listSET_LIST_ITEM_VALUE listSET_LIST_ITEM_VALUE
  * \ingroup LinkedList
  */
-#define listSET_LIST_ITEM_VALUE( pxListItem, xValue )     ( ( pxListItem )->xItemValue = ( xValue ) )
+#ifdef __FRAMAC__
+    /* Verification override: route through a function with a
+     * sortedness-preservation contract. The macro is just a single
+     * field write; wrapping it lets us state that, when applied to
+     * an item that's not in any list, no list's sortedness changes.
+     * Function decl + contract live after the axiomatic block where
+     * `sorted` is defined. */
+    #define listSET_LIST_ITEM_VALUE( pxListItem, xValue )    vListItemSetValue( ( pxListItem ), ( xValue ) )
+#else
+    #define listSET_LIST_ITEM_VALUE( pxListItem, xValue )     ( ( pxListItem )->xItemValue = ( xValue ) )
+#endif
 
 /*
  * Access macro to retrieve the value of the list item.  The value can
@@ -319,6 +329,13 @@ typedef struct xLIST
  * \page listREMOVE_ITEM listREMOVE_ITEM
  * \ingroup LinkedList
  */
+#ifdef __FRAMAC__
+    /* Verification override: the production macro inlines the body of
+     * uxListRemove for performance. For verification we route to the
+     * function so its contract (with multi-list-separation ensures)
+     * applies at every call site. Semantically equivalent. */
+    #define listREMOVE_ITEM( pxItemToRemove )    ( ( void ) uxListRemove( ( pxItemToRemove ) ) )
+#else
 #define listREMOVE_ITEM( pxItemToRemove ) \
     do {                                  \
         /* The list item knows which list it is in.  Obtain the list from the list \
@@ -336,6 +353,7 @@ typedef struct xLIST
         ( pxItemToRemove )->pxContainer = NULL;                                                     \
         ( ( pxList )->uxNumberOfItems ) = ( UBaseType_t ) ( ( ( pxList )->uxNumberOfItems ) - 1U ); \
     } while( 0 )
+#endif /* __FRAMAC__ */
 
 /*
  * Inline version of vListInsertEnd() to provide slight optimisation for
@@ -434,18 +452,14 @@ typedef struct xLIST
 
 /*@
   axiomatic FreeRTOS_List_Contents {
+    logic \list<struct xLIST_ITEM *> list_contents{L}(struct xLIST *pxList);
 
-    logic \list<struct xLIST_ITEM *> list_from{L}(struct xLIST_ITEM *p, integer n) =
-      n <= 0 ? \Nil : (\Cons(p, list_from{L}(p->pxNext, n - 1)));
+    axiom list_contents_length{L}: \forall struct xLIST *pxList;
+      \length(list_contents(pxList)) == pxList->uxNumberOfItems;
 
-    logic \list<struct xLIST_ITEM *> list_contents{L}(struct xLIST *pxList) =
-      list_from{L}(pxList->xListEnd.pxNext, pxList->uxNumberOfItems);
-
-    axiom list_from_length{L}: \forall struct xLIST_ITEM *p, integer n;
-      n >= 0 ==> \length(list_from(p, n)) == n;
-
-    axiom list_from_head{L}: \forall struct xLIST_ITEM *p, integer n;
-      n > 0 ==> \nth(list_from(p, n), 0) == p;
+    axiom list_contents_head{L}: \forall struct xLIST *pxList;
+      pxList->uxNumberOfItems > 0 ==>
+        \nth(list_contents(pxList), 0) == pxList->xListEnd.pxNext;
   }
 
   predicate in_list(struct xLIST_ITEM *pxItem, struct xLIST *pxList) =
@@ -456,9 +470,17 @@ typedef struct xLIST
 
   predicate sorted(struct xLIST *pxList) =
     \forall integer i, j; 0 <= i < j < \length(list_contents(pxList)) ==> \nth(list_contents(pxList), i)->xItemValue <= \nth(list_contents(pxList), j)->xItemValue;
-
-
 */
+
+#ifdef __FRAMAC__
+/*@
+  assigns pxListItem->xItemValue;
+  ensures pxListItem->xItemValue == xValue;
+  ensures \old(pxListItem->pxContainer) == \null ==>
+    \forall struct xLIST *L; \old(sorted(L)) ==> sorted(L);
+*/
+void vListItemSetValue( ListItem_t * const pxListItem, TickType_t xValue );
+#endif
 
 /*
  * Must be called before a list is used!  This initialises all the members
@@ -508,7 +530,8 @@ void vListInitialiseItem( ListItem_t * const pxItem ) PRIVILEGED_FUNCTION;
           { item->pxNext     | struct xLIST_ITEM *item; \valid( item ) },
           { item->pxPrevious | struct xLIST_ITEM *item; \valid( item ) };
 
-  ensures sorted( pxList );
+  // Sortedness preservation, globally.
+  ensures \forall struct xLIST *L; \old(sorted(L)) ==> sorted(L);
 */
 void vListInsert( List_t * const pxList,
                   ListItem_t * const pxNewListItem ) PRIVILEGED_FUNCTION;
@@ -555,10 +578,20 @@ void vListInsertEnd( List_t * const pxList,
  * \ingroup LinkedList
  */
 /*@
-  assigns *pxItemToRemove->pxContainer,
-          *pxItemToRemove,
-          { item->pxNext     | struct xLIST_ITEM *item; \valid( item ) },
-          { item->pxPrevious | struct xLIST_ITEM *item; \valid( item ) };
+  assigns *pxItemToRemove,
+          *pxItemToRemove->pxContainer,
+          pxItemToRemove->pxNext->pxPrevious,
+          pxItemToRemove->pxPrevious->pxNext;
+
+  ensures pxItemToRemove->pxContainer == \null;
+
+  // Frame: pxContainer of any OTHER item is unchanged. 
+  ensures \forall struct xLIST_ITEM *otherItem;
+    otherItem != pxItemToRemove ==>
+      otherItem->pxContainer == \old(otherItem->pxContainer);
+
+  // Sortedness preservation, globally.
+  ensures \forall struct xLIST *L; \old(sorted(L)) ==> sorted(L);
 */
 UBaseType_t uxListRemove( ListItem_t * const pxItemToRemove ) PRIVILEGED_FUNCTION;
 
