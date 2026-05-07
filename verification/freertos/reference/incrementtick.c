@@ -167,7 +167,12 @@ BaseType_t xTaskIncrementTick(void) {
                     }
 
                     prvAddTaskToReadyList(pxTCB);
-                    //@ assert \false; // sanity probe — must NOT prove
+#ifdef SANITY_PROBE
+                    /* Sanity probe — must NOT prove. Checks that the
+                     * hypothesis set inside the unblock loop is not
+                     * vacuous. Enabled only by sanity-check.sh. */
+                    //@ assert \false;
+#endif
 
 #if (configUSE_PREEMPTION == 1)
                     {

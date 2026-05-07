@@ -104,6 +104,12 @@ void vTaskSwitchContext(void) {
         /* More details at: https://github.com/FreeRTOS/FreeRTOS-Kernel/blob/main/MISRA.md#rule-115 */
         /* coverity[misra_c_2012_rule_11_5_violation] */
         taskSELECT_HIGHEST_PRIORITY_TASK();
+#ifdef SANITY_PROBE
+        /* Sanity probe — must NOT prove. Checks that the hypothesis
+         * set at the point where edf_property must hold is not
+         * vacuous. Enabled only by sanity-check.sh. */
+        //@ assert \false;
+#endif
         traceTASK_SWITCHED_IN();
 
         /* Macro to inject port specific behaviour immediately after
