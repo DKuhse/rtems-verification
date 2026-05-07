@@ -434,16 +434,18 @@ typedef struct xLIST
 
 /*@
   axiomatic FreeRTOS_List_Contents {
-    logic \list<struct xLIST_ITEM *> list_contents{L}(struct xLIST *pxList);
 
-    // Bridge axioms: connect list_contents to the concrete list struct.
+    logic \list<struct xLIST_ITEM *> list_from{L}(struct xLIST_ITEM *p, integer n) =
+      n <= 0 ? \Nil : (\Cons(p, list_from{L}(p->pxNext, n - 1)));
 
-    axiom list_contents_length{L}: \forall struct xLIST *pxList;
-      \length(list_contents(pxList)) == pxList->uxNumberOfItems;
+    logic \list<struct xLIST_ITEM *> list_contents{L}(struct xLIST *pxList) =
+      list_from{L}(pxList->xListEnd.pxNext, pxList->uxNumberOfItems);
 
-    axiom list_contents_head{L}: \forall struct xLIST *pxList;
-      pxList->uxNumberOfItems > 0 ==>
-        \nth(list_contents(pxList), 0) == pxList->xListEnd.pxNext;
+    axiom list_from_length{L}: \forall struct xLIST_ITEM *p, integer n;
+      n >= 0 ==> \length(list_from(p, n)) == n;
+
+    axiom list_from_head{L}: \forall struct xLIST_ITEM *p, integer n;
+      n > 0 ==> \nth(list_from(p, n), 0) == p;
   }
 
   predicate in_list(struct xLIST_ITEM *pxItem, struct xLIST *pxList) =
