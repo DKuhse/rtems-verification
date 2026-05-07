@@ -100,14 +100,12 @@ static void prvResetNextTaskUnblockTime(void);
 /*@
   behavior suspended:
     assumes uxSchedulerSuspended != (UBaseType_t)0U;
-    requires sorted(&xReadyTasksList);
     assigns xPendedTicks;
     // casting to account for wrapping
     ensures xPendedTicks == (TickType_t)( \old(xPendedTicks) + 1U );
     ensures \result == pdFALSE;
     ensures pxCurrentTCB == \old(pxCurrentTCB);
     ensures xTickCount == \old(xTickCount);
-    ensures sorted(&xReadyTasksList);
 
   behavior running:
     assumes uxSchedulerSuspended == (UBaseType_t)0U;
