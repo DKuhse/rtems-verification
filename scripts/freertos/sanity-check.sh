@@ -122,9 +122,9 @@ check_probe "vTaskSwitchContext (reference/taskswitchcontext.c)" \
     "${OVERLAY}/reference/taskswitchcontext.c" \
     "vTaskSwitchContext"
 
-check_probe "xTaskIncrementTick (reference/incrementtick.c)" \
+check_probe "prvProcessUnblockedTask (reference/incrementtick.c)" \
     "${OVERLAY}/reference/incrementtick.c" \
-    "xTaskIncrementTick"
+    "prvProcessUnblockedTask"
 
 echo ""
 echo "========================================"

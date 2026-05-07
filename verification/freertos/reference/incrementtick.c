@@ -97,6 +97,53 @@ static void prvResetNextTaskUnblockTime(void);
         vListInsert(&(xReadyTasksList), &((pxTCB)->xStateListItem));        \
     } while (0)
 
+/* Per-iteration body of the unblock loop, factored out so the substantive
+ * proof obligation lives in a single helper contract instead of being
+ * spread across the loop's invariants. The caller has already established
+ * that pxTCB is at the head of pxDelayedTaskList and its deadline is
+ * past — the helper just performs the four mutations (remove from state
+ * list, optional event-list remove, add to ready list, optional
+ * preemption-flag bump) and gives back the updated xSwitchRequired. */
+/*@
+  requires \valid(pxTCB);
+  requires \valid(pxCurrentTCB);
+  requires sorted(&xReadyTasksList);
+
+  ensures sorted(&xReadyTasksList);
+  ensures pxCurrentTCB == \old(pxCurrentTCB);
+  ensures \valid(pxCurrentTCB);
+*/
+static BaseType_t prvProcessUnblockedTask(TCB_t *pxTCB,
+                                          BaseType_t xSwitchRequired) {
+    listREMOVE_ITEM(&(pxTCB->xStateListItem));
+
+    if (listLIST_ITEM_CONTAINER(&(pxTCB->xEventListItem)) != NULL) {
+        listREMOVE_ITEM(&(pxTCB->xEventListItem));
+    } else {
+        mtCOVERAGE_TEST_MARKER();
+    }
+
+    prvAddTaskToReadyList(pxTCB);
+#ifdef SANITY_PROBE
+    /* Sanity probe — must NOT prove. Checks that the hypothesis set
+     * inside the unblock helper is not vacuous. Enabled only by
+     * sanity-check.sh. */
+    //@ assert \false;
+#endif
+
+#if (configUSE_PREEMPTION == 1)
+    {
+        if (pxTCB->xDeadline < pxCurrentTCB->xDeadline) {
+            xSwitchRequired = pdTRUE;
+        } else {
+            mtCOVERAGE_TEST_MARKER();
+        }
+    }
+#endif /* configUSE_PREEMPTION */
+
+    return xSwitchRequired;
+}
+
 /*@
   behavior suspended:
     assumes uxSchedulerSuspended != (UBaseType_t)0U;
@@ -109,9 +156,12 @@ static void prvResetNextTaskUnblockTime(void);
 
   behavior running:
     assumes uxSchedulerSuspended == (UBaseType_t)0U;
+    requires \valid(pxCurrentTCB);
     requires sorted(&xReadyTasksList);
     ensures pxCurrentTCB == \old(pxCurrentTCB);
     ensures sorted(&xReadyTasksList);
+
+    // ensures \result == pdTRUE || edf_property(&xReadyTasksList, pxCurrentTCB);
 
   complete behaviors suspended, running;
   disjoint behaviors suspended, running;
@@ -142,6 +192,7 @@ BaseType_t xTaskIncrementTick(void) {
         if (xConstTickCount >= xNextTaskUnblockTime) {
             /*@
               loop invariant pxCurrentTCB == \at(pxCurrentTCB, Pre);
+              loop invariant \valid(pxCurrentTCB);
               loop invariant sorted(&xReadyTasksList);
             */
             for (;;) {
@@ -161,31 +212,7 @@ BaseType_t xTaskIncrementTick(void) {
                         mtCOVERAGE_TEST_MARKER();
                     }
 
-                    listREMOVE_ITEM(&(pxTCB->xStateListItem));
-
-                    if (listLIST_ITEM_CONTAINER(&(pxTCB->xEventListItem)) != NULL) {
-                        listREMOVE_ITEM(&(pxTCB->xEventListItem));
-                    } else {
-                        mtCOVERAGE_TEST_MARKER();
-                    }
-
-                    prvAddTaskToReadyList(pxTCB);
-#ifdef SANITY_PROBE
-                    /* Sanity probe — must NOT prove. Checks that the
-                     * hypothesis set inside the unblock loop is not
-                     * vacuous. Enabled only by sanity-check.sh. */
-                    //@ assert \false;
-#endif
-
-#if (configUSE_PREEMPTION == 1)
-                    {
-                        if (pxTCB->xDeadline < pxCurrentTCB->xDeadline) {
-                            xSwitchRequired = pdTRUE;
-                        } else {
-                            mtCOVERAGE_TEST_MARKER();
-                        }
-                    }
-#endif /* configUSE_PREEMPTION */
+                    xSwitchRequired = prvProcessUnblockedTask(pxTCB, xSwitchRequired);
                 }
             }
         }
