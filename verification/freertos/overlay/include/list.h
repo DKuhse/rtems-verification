@@ -491,10 +491,6 @@ typedef struct xLIST
   ensures pxListItem->xItemValue == xValue;
   ensures \old(pxListItem->pxContainer) == \null ==>
     \forall struct xLIST *L; \old(sorted(L)) ==> sorted(L);
-  // vListItemSetValue only writes xItemValue, so list membership is
-  // unchanged regardless of whether the item is in a list.
-  ensures \forall struct xLIST *L;
-    \old(consistent_membership(L)) ==> consistent_membership(L);
 */
 void vListItemSetValue( ListItem_t * const pxListItem, TickType_t xValue );
 #endif
@@ -542,7 +538,6 @@ void vListInitialiseItem( ListItem_t * const pxItem ) PRIVILEGED_FUNCTION;
 /*@
   requires sorted( pxList );
 
-  // overly conservative...
   assigns pxList->uxNumberOfItems,
           pxNewListItem->pxNext,
           pxNewListItem->pxPrevious,
@@ -553,9 +548,8 @@ void vListInitialiseItem( ListItem_t * const pxItem ) PRIVILEGED_FUNCTION;
   // Sortedness preservation, globally.
   ensures \forall struct xLIST *L; \valid(L) && \old(sorted(L)) ==> sorted(L);
 
-  // Membership-consistency preservation, globally.
-  ensures \forall struct xLIST *L;
-    \valid(L) && \old(consistent_membership(L)) ==> consistent_membership(L);
+  // (consistent_membership preservation omitted — unsound in
+  // Typed+Cast; see comment on uxListRemove.)
 
   // pvOwner of every item is preserved - Frame inference doesn't catch this
   ensures \forall struct xLIST_ITEM *i; \valid(i) ==>
@@ -611,7 +605,8 @@ void vListInsertEnd( List_t * const pxList,
  */
 /*@
   assigns pxItemToRemove->pxContainer,
-          *pxItemToRemove->pxContainer,
+          pxItemToRemove->pxContainer->uxNumberOfItems,
+          pxItemToRemove->pxContainer->pxIndex,
           pxItemToRemove->pxNext->pxPrevious,
           pxItemToRemove->pxPrevious->pxNext;
 

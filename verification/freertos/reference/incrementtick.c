@@ -48,16 +48,16 @@ typedef struct tskTaskControlBlock TCB_t;
     &((TCB_t *)(i->pvOwner))->xStateListItem == i;
 */
 
-/* List-level well-formedness: structural soundness (consistent_membership,
- * defined in list.h) plus owner-back-link consistency for every item.
- * Ownership uses in_list to align with edf_property and
- * xItemValue_matches_deadline, which also quantify over in_list. */
+/* List-level well-formedness. Uses pxContainer == L for membership
+ * (rather than in_list) — consistent_membership preservation as a
+ * mutator ensures is unsound in Typed+Cast (universal foralls over
+ * xLIST_ITEM* instantiate on xLIST* via type-confusion, conflicting
+ * with assigns writes). */
 /*@
   predicate well_formed_list(struct xLIST *L) =
     \valid(L) &&
-    consistent_membership(L) &&
     (\forall struct xLIST_ITEM *i;
-      \valid(i) && in_list(i, L) ==> well_formed_item_owner(i));
+      \valid(i) && i->pxContainer == L ==> well_formed_item_owner(i));
 */
 
 /* Hack: Frama-C can't handle volatile */
@@ -138,6 +138,34 @@ TCB_t * prvGetOwnerOfHeadEntry(List_t * pxList);
         vListInsert(&(xReadyTasksList), &((pxTCB)->xStateListItem));        \
     } while (0)
 
+/* ─── Soundness isolation test ─────────────────────────────────────────
+ *
+ * This isolates the consistent_membership preservation soundness issue.
+ * With two consistent_membership preconditions on different lists, after
+ * a single uxListRemove call, the post-state assert \false should NOT
+ * prove. If it does, the model is unsound (the contradiction is the
+ * source of vacuous "proofs" we observed in the helper).
+ */
+/*@
+  requires \valid(pxItem);
+  requires \valid(pxList);
+  requires \valid(pxList2);
+  requires \separated(pxItem, pxList);
+  requires \separated(pxItem, pxList2);
+  requires \separated(pxList, pxList2);
+  requires consistent_membership(pxList);
+  requires consistent_membership(pxList2);
+  requires pxItem->pxContainer == pxList;
+*/
+void __test_cons_mem_soundness(ListItem_t *pxItem,
+                                List_t *pxList,
+                                List_t *pxList2) {
+    (void) uxListRemove(pxItem);
+#ifdef SANITY_PROBE
+    //@ assert post_remove: \false;
+#endif
+}
+
 /* Per-iteration body of the unblock loop, factored out so the substantive
  * proof obligation lives in a single helper contract instead of being
  * spread across the loop's invariants. The caller has already established
@@ -152,12 +180,15 @@ TCB_t * prvGetOwnerOfHeadEntry(List_t * pxList);
   requires sorted(&xReadyTasksList);
   requires well_formed_item_owner(&pxTCB->xStateListItem);
   requires well_formed_list(pxDelayedTaskList);
+  requires well_formed_list(&xReadyTasksList);
+  requires xItemValue_matches_deadline(&xReadyTasksList);
+  requires pxTCB->xStateListItem.pxContainer == pxDelayedTaskList;
 
   // TODO: add an assigns clause. The four "unchanged"/\valid ensures
   // below (pxCurrentTCB, pxDelayedTaskList) are only here because
   // without an assigns clause WP conservatively assumes everything
   // can move
-  
+
   ensures sorted(&xReadyTasksList);
   ensures pxCurrentTCB == \old(pxCurrentTCB);
   ensures \valid(pxCurrentTCB);
@@ -166,6 +197,8 @@ TCB_t * prvGetOwnerOfHeadEntry(List_t * pxList);
   ensures xTickCount == \old(xTickCount);
   ensures well_formed_item_owner(&pxTCB->xStateListItem);
   ensures well_formed_list(pxDelayedTaskList);
+  ensures well_formed_list(&xReadyTasksList);
+  ensures xItemValue_matches_deadline(&xReadyTasksList);
 */
 static BaseType_t prvProcessUnblockedTask(TCB_t *pxTCB,
                                           BaseType_t xSwitchRequired) {
@@ -216,6 +249,8 @@ static BaseType_t prvProcessUnblockedTask(TCB_t *pxTCB,
     requires sorted(&xReadyTasksList);
     requires well_formed_list(pxDelayedTaskList);
     requires well_formed_list(pxOverflowDelayedTaskList);
+    requires well_formed_list(&xReadyTasksList);
+    requires xItemValue_matches_deadline(&xReadyTasksList);
     ensures pxCurrentTCB == \old(pxCurrentTCB);
     ensures sorted(&xReadyTasksList);
     // Tick advances by 1, modulo wrap.
@@ -256,6 +291,8 @@ BaseType_t xTaskIncrementTick(void) {
               loop invariant \valid(pxDelayedTaskList);
               loop invariant sorted(&xReadyTasksList);
               loop invariant well_formed_list(pxDelayedTaskList);
+              loop invariant well_formed_list(&xReadyTasksList);
+              loop invariant xItemValue_matches_deadline(&xReadyTasksList);
               loop invariant xTickCount == (TickType_t)(\at(xTickCount, Pre) + 1U);
             */
             for (;;) {
