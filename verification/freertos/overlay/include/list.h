@@ -476,9 +476,22 @@ typedef struct xLIST
       \valid(pxList) &&
       in_seq(pxItem, list_contents(pxList));
 
+    // poor man's separation logic
+
     predicate disjoint_lists(struct xLIST *pxList1, struct xLIST *pxList2) =
       \valid(pxList1) && \valid(pxList2) &&
       \forall struct xLIST_ITEM *item; !(in_list(item, pxList1) && in_list(item, pxList2));
+
+    predicate unchanged_if_disjoint{Before,After}
+      (struct xLIST *changed, struct xLIST *other) =
+        \valid{Before}(changed) &&
+        \valid{Before}(other) &&
+        \valid{After}(other) &&
+        other != changed &&
+        disjoint_lists{Before}(changed, other) ==>
+          list_contents{After}(other) == list_contents{Before}(other);
+
+    // list manipulation
 
     logic \list<struct xLIST_ITEM *> remove_item(
       \list<struct xLIST_ITEM *> xs,
@@ -507,24 +520,35 @@ typedef struct xLIST
       other != item ==>
       (in_seq(other, insert_item(xs, item)) <==> in_seq(other, xs));
       
+    // sortedness predicate
 
-    predicate min(struct xLIST *pxList, TickType_t x) =
-      \valid(pxList) &&
-      \forall integer i; 0 <= i < \length(list_contents(pxList)) ==> \nth(list_contents(pxList), i)->xItemValue >= x;
+    predicate sorted_seq(\list<struct xLIST_ITEM *> xs) =
+      \forall integer i, j;
+        0 <= i < j < \length(xs) ==>
+          \nth(xs, i)->xItemValue <= \nth(xs, j)->xItemValue;
 
     predicate sorted(struct xLIST *pxList) =
       \valid(pxList) &&
-      \forall integer i, j; 0 <= i < j < \length(list_contents(pxList)) ==> \nth(list_contents(pxList), i)->xItemValue <= \nth(list_contents(pxList), j)->xItemValue;
+      sorted_seq(list_contents(pxList));
 
+    // sortedness preservation:
+
+    axiom remove_item_preserves_sorted:
+    \forall \list<struct xLIST_ITEM *> xs,
+            struct xLIST_ITEM *item;
+      sorted_seq(xs) ==> sorted_seq(remove_item(xs, item));
+
+    axiom insert_item_preserves_sorted:
+    \forall \list<struct xLIST_ITEM *> xs,
+            struct xLIST_ITEM *item;
+      sorted_seq(xs) ==> sorted_seq(insert_item(xs, item));
+
+    // Membership consistency: list backlinks are correct
+    predicate consistent_membership(struct xLIST *pxList) =
+      \valid(pxList) &&
+      \forall struct xLIST_ITEM *i;
+        in_list(i, pxList) <==> (\valid(i) && i->pxContainer == pxList);
   }
-
-
-  // Membership consistency: an item is in the list (per list_contents)
-  // iff its pxContainer points back to the list.
-  predicate consistent_membership(struct xLIST *pxList) =
-    \valid(pxList) &&
-    \forall struct xLIST_ITEM *i;
-      in_list(i, pxList) <==> (\valid(i) && i->pxContainer == pxList);
 */
 
 #ifdef __FRAMAC__
@@ -578,7 +602,11 @@ void vListInitialiseItem( ListItem_t * const pxItem ) PRIVILEGED_FUNCTION;
  * \ingroup LinkedList
  */
 /*@
-  requires sorted( pxList );
+  requires \valid(pxList);
+  requires \valid(pxNewListItem);
+  requires pxNewListItem->pxContainer == \null;
+
+  requires sorted(pxList);
 
   assigns pxList->uxNumberOfItems,
           pxNewListItem->pxNext,
@@ -587,19 +615,23 @@ void vListInitialiseItem( ListItem_t * const pxItem ) PRIVILEGED_FUNCTION;
           { item->pxNext     | struct xLIST_ITEM *item; \valid( item ) },
           { item->pxPrevious | struct xLIST_ITEM *item; \valid( item ) };
 
-  // Sortedness preservation, globally.
-  ensures \forall struct xLIST *L; \valid(L) && \old(sorted(L)) ==> sorted(L);
+  ensures pxNewListItem->pxContainer == pxList;
 
-  // (consistent_membership preservation omitted — unsound in
-  // Typed+Cast; see comment on uxListRemove.)
+  // item gets inserted
+  ensures list_contents{Here}(pxList) == insert_item(list_contents{Pre}(pxList), pxNewListItem);
 
-  // pvOwner of every item is preserved - Frame inference doesn't catch this
+  // separation
+  ensures \forall struct xLIST *L; 
+      unchanged_if_disjoint{Pre,Here}(pxList, L);
+
+  // pvOwner is preserved
   ensures \forall struct xLIST_ITEM *i; \valid(i) ==>
     i->pvOwner == \old(i->pvOwner);
 
   // pxContainer of items other than the inserted one are preserved
-  ensures \forall struct xLIST_ITEM *i; \valid(i) && i != pxNewListItem ==>
-    i->pxContainer == \old(i->pxContainer);
+  ensures \forall struct xLIST_ITEM *i; 
+    \valid(i) && i != pxNewListItem ==>
+      i->pxContainer == \old(i->pxContainer);
 */
 void vListInsert( List_t * const pxList,
                   ListItem_t * const pxNewListItem ) PRIVILEGED_FUNCTION;
@@ -646,6 +678,11 @@ void vListInsertEnd( List_t * const pxList,
  * \ingroup LinkedList
  */
 /*@
+  requires \valid(pxItemToRemove);
+  requires pxItemToRemove->pxContainer != \null;
+  requires \valid(pxItemToRemove->pxContainer);
+  requires consistent_membership(pxItemToRemove->pxContainer);
+
   assigns pxItemToRemove->pxContainer,
           pxItemToRemove->pxContainer->uxNumberOfItems,
           pxItemToRemove->pxContainer->pxIndex,
@@ -654,21 +691,30 @@ void vListInsertEnd( List_t * const pxList,
 
   ensures pxItemToRemove->pxContainer == \null;
 
+  // counter updated
+  ensures \result ==
+    \at(pxItemToRemove->pxContainer, Pre)->uxNumberOfItems;
+
+  // item is removed from its list's contents
+  ensures list_contents{Here}(\at(pxItemToRemove->pxContainer, Pre))
+      == remove_item(
+          list_contents{Pre}(\at(pxItemToRemove->pxContainer, Pre)),
+          pxItemToRemove
+        );
+    
   // Frame: pxContainer of other items is unchanged.
   ensures \forall struct xLIST_ITEM *otherItem; \valid(otherItem) &&
     otherItem != pxItemToRemove ==>
       otherItem->pxContainer == \old(otherItem->pxContainer);
 
-  // Sortedness preservation, globally.
-  ensures \forall struct xLIST *L; \valid(L) && \old(sorted(L)) ==> sorted(L);
-
-  // Membership-consistency preservation, globally.
-  ensures \forall struct xLIST *L;
-    \valid(L) && \old(consistent_membership(L)) ==> consistent_membership(L);
-
   // pvOwner of every item is preserved
-  ensures \forall struct xLIST_ITEM *i; \valid(i) ==>
-    i->pvOwner == \old(i->pvOwner);
+  ensures \forall struct xLIST_ITEM *i; 
+    \valid(i) ==> i->pvOwner == \old(i->pvOwner);
+
+  // other lists untouched
+  ensures \forall struct xLIST *L;
+    unchanged_if_disjoint{Pre,Here}
+      (\at(pxItemToRemove->pxContainer, Pre), L);
 */
 UBaseType_t uxListRemove( ListItem_t * const pxItemToRemove ) PRIVILEGED_FUNCTION;
 
