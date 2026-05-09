@@ -223,6 +223,7 @@ typedef struct xLIST
  * \page listGET_LIST_ITEM_VALUE listGET_LIST_ITEM_VALUE
  * \ingroup LinkedList
  */
+
 #define listGET_LIST_ITEM_VALUE( pxListItem )             ( ( pxListItem )->xItemValue )
 
 /*
@@ -463,13 +464,25 @@ typedef struct xLIST
   }
 
   predicate in_list(struct xLIST_ITEM *pxItem, struct xLIST *pxList) =
+    \valid(pxList) &&
     \exists integer i; 0 <= i < \length(list_contents(pxList)) && \nth(list_contents(pxList), i) == pxItem;
 
   predicate min(struct xLIST *pxList, TickType_t x) =
+    \valid(pxList) &&
     \forall integer i; 0 <= i < \length(list_contents(pxList)) ==> \nth(list_contents(pxList), i)->xItemValue >= x;
 
   predicate sorted(struct xLIST *pxList) =
+    \valid(pxList) &&
     \forall integer i, j; 0 <= i < j < \length(list_contents(pxList)) ==> \nth(list_contents(pxList), i)->xItemValue <= \nth(list_contents(pxList), j)->xItemValue;
+
+  // Membership consistency: an item is in the list (per list_contents)
+  // iff its pxContainer points back to the list. Preserved by the
+  // mutators; lets predicates that use in_list (e.g., edf_property)
+  // talk to predicates that use pxContainer-equality (well_formed_list).
+  predicate consistent_membership(struct xLIST *pxList) =
+    \valid(pxList) &&
+    \forall struct xLIST_ITEM *i;
+      in_list(i, pxList) <==> (\valid(i) && i->pxContainer == pxList);
 */
 
 #ifdef __FRAMAC__
@@ -478,6 +491,10 @@ typedef struct xLIST
   ensures pxListItem->xItemValue == xValue;
   ensures \old(pxListItem->pxContainer) == \null ==>
     \forall struct xLIST *L; \old(sorted(L)) ==> sorted(L);
+  // vListItemSetValue only writes xItemValue, so list membership is
+  // unchanged regardless of whether the item is in a list.
+  ensures \forall struct xLIST *L;
+    \old(consistent_membership(L)) ==> consistent_membership(L);
 */
 void vListItemSetValue( ListItem_t * const pxListItem, TickType_t xValue );
 #endif
@@ -525,13 +542,28 @@ void vListInitialiseItem( ListItem_t * const pxItem ) PRIVILEGED_FUNCTION;
 /*@
   requires sorted( pxList );
 
-  assigns *pxList,
-          *pxNewListItem,
+  // overly conservative...
+  assigns pxList->uxNumberOfItems,
+          pxNewListItem->pxNext,
+          pxNewListItem->pxPrevious,
+          pxNewListItem->pxContainer,
           { item->pxNext     | struct xLIST_ITEM *item; \valid( item ) },
           { item->pxPrevious | struct xLIST_ITEM *item; \valid( item ) };
 
   // Sortedness preservation, globally.
-  ensures \forall struct xLIST *L; \old(sorted(L)) ==> sorted(L);
+  ensures \forall struct xLIST *L; \valid(L) && \old(sorted(L)) ==> sorted(L);
+
+  // Membership-consistency preservation, globally.
+  ensures \forall struct xLIST *L;
+    \valid(L) && \old(consistent_membership(L)) ==> consistent_membership(L);
+
+  // pvOwner of every item is preserved - Frame inference doesn't catch this
+  ensures \forall struct xLIST_ITEM *i; \valid(i) ==>
+    i->pvOwner == \old(i->pvOwner);
+
+  // pxContainer of items other than the inserted one are preserved
+  ensures \forall struct xLIST_ITEM *i; \valid(i) && i != pxNewListItem ==>
+    i->pxContainer == \old(i->pxContainer);
 */
 void vListInsert( List_t * const pxList,
                   ListItem_t * const pxNewListItem ) PRIVILEGED_FUNCTION;
@@ -578,20 +610,28 @@ void vListInsertEnd( List_t * const pxList,
  * \ingroup LinkedList
  */
 /*@
-  assigns *pxItemToRemove,
+  assigns pxItemToRemove->pxContainer,
           *pxItemToRemove->pxContainer,
           pxItemToRemove->pxNext->pxPrevious,
           pxItemToRemove->pxPrevious->pxNext;
 
   ensures pxItemToRemove->pxContainer == \null;
 
-  // Frame: pxContainer of any OTHER item is unchanged. 
-  ensures \forall struct xLIST_ITEM *otherItem;
+  // Frame: pxContainer of other items is unchanged.
+  ensures \forall struct xLIST_ITEM *otherItem; \valid(otherItem) &&
     otherItem != pxItemToRemove ==>
       otherItem->pxContainer == \old(otherItem->pxContainer);
 
   // Sortedness preservation, globally.
-  ensures \forall struct xLIST *L; \old(sorted(L)) ==> sorted(L);
+  ensures \forall struct xLIST *L; \valid(L) && \old(sorted(L)) ==> sorted(L);
+
+  // Membership-consistency preservation, globally.
+  ensures \forall struct xLIST *L;
+    \valid(L) && \old(consistent_membership(L)) ==> consistent_membership(L);
+
+  // pvOwner of every item is preserved
+  ensures \forall struct xLIST_ITEM *i; \valid(i) ==>
+    i->pvOwner == \old(i->pvOwner);
 */
 UBaseType_t uxListRemove( ListItem_t * const pxItemToRemove ) PRIVILEGED_FUNCTION;
 

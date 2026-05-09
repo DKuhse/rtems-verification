@@ -126,6 +126,10 @@ check_probe "prvProcessUnblockedTask (reference/incrementtick.c)" \
     "${OVERLAY}/reference/incrementtick.c" \
     "prvProcessUnblockedTask"
 
+check_probe "xTaskIncrementTick (reference/incrementtick.c)" \
+    "${OVERLAY}/reference/incrementtick.c" \
+    "xTaskIncrementTick"
+
 echo ""
 echo "========================================"
 echo " Summary: ${PASS} probe(s) consistent, ${FAIL} failed"

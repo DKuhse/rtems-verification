@@ -41,6 +41,25 @@ typedef struct tskTaskControlBlock TCB_t;
  * complete. */
 #include "edf.h"
 
+/* Owner well-formedness. */
+/*@
+  predicate well_formed_item_owner(struct xLIST_ITEM *i) =
+    i->pvOwner != \null &&
+    &((TCB_t *)(i->pvOwner))->xStateListItem == i;
+*/
+
+/* List-level well-formedness: structural soundness (consistent_membership,
+ * defined in list.h) plus owner-back-link consistency for every item.
+ * Ownership uses in_list to align with edf_property and
+ * xItemValue_matches_deadline, which also quantify over in_list. */
+/*@
+  predicate well_formed_list(struct xLIST *L) =
+    \valid(L) &&
+    consistent_membership(L) &&
+    (\forall struct xLIST_ITEM *i;
+      \valid(i) && in_list(i, L) ==> well_formed_item_owner(i));
+*/
+
 /* Hack: Frama-C can't handle volatile */
 #ifdef __FRAMAC__
     TCB_t *           pxCurrentTCB;
@@ -79,6 +98,28 @@ typedef struct tskTaskControlBlock TCB_t;
 */
 static void prvResetNextTaskUnblockTime(void);
 
+/* Verification-only wrapper around the macro listGET_OWNER_OF_HEAD_ENTRY. */
+/*@
+  requires \valid(pxList);
+  requires pxList->uxNumberOfItems != (UBaseType_t)0;
+  requires well_formed_list(pxList);
+
+  assigns \nothing;
+
+  ensures \valid(\result);
+  ensures well_formed_item_owner(&\result->xStateListItem);
+  ensures \result->xStateListItem.pxContainer == pxList;
+*/
+TCB_t * prvGetOwnerOfHeadEntry(List_t * pxList);
+
+/* Verification override of listGET_OWNER_OF_HEAD_ENTRY: route the
+ * macro through prvGetOwnerOfHeadEntry so its contract applies at
+ * every call site. Semantically equivalent to the production macro. */
+#ifdef __FRAMAC__
+    #undef  listGET_OWNER_OF_HEAD_ENTRY
+    #define listGET_OWNER_OF_HEAD_ENTRY( pxList )    prvGetOwnerOfHeadEntry( pxList )
+#endif
+
 /* From tasks.c:271. */
 #define taskSWITCH_DELAYED_LISTS()                                          \
     do {                                                                    \
@@ -107,11 +148,24 @@ static void prvResetNextTaskUnblockTime(void);
 /*@
   requires \valid(pxTCB);
   requires \valid(pxCurrentTCB);
+  requires \valid(pxDelayedTaskList);
   requires sorted(&xReadyTasksList);
+  requires well_formed_item_owner(&pxTCB->xStateListItem);
+  requires well_formed_list(pxDelayedTaskList);
 
+  // TODO: add an assigns clause. The four "unchanged"/\valid ensures
+  // below (pxCurrentTCB, pxDelayedTaskList) are only here because
+  // without an assigns clause WP conservatively assumes everything
+  // can move
+  
   ensures sorted(&xReadyTasksList);
   ensures pxCurrentTCB == \old(pxCurrentTCB);
   ensures \valid(pxCurrentTCB);
+  ensures pxDelayedTaskList == \old(pxDelayedTaskList);
+  ensures \valid(pxDelayedTaskList);
+  ensures xTickCount == \old(xTickCount);
+  ensures well_formed_item_owner(&pxTCB->xStateListItem);
+  ensures well_formed_list(pxDelayedTaskList);
 */
 static BaseType_t prvProcessUnblockedTask(TCB_t *pxTCB,
                                           BaseType_t xSwitchRequired) {
@@ -157,9 +211,15 @@ static BaseType_t prvProcessUnblockedTask(TCB_t *pxTCB,
   behavior running:
     assumes uxSchedulerSuspended == (UBaseType_t)0U;
     requires \valid(pxCurrentTCB);
+    requires \valid(pxDelayedTaskList);
+    requires \valid(pxOverflowDelayedTaskList);
     requires sorted(&xReadyTasksList);
+    requires well_formed_list(pxDelayedTaskList);
+    requires well_formed_list(pxOverflowDelayedTaskList);
     ensures pxCurrentTCB == \old(pxCurrentTCB);
     ensures sorted(&xReadyTasksList);
+    // Tick advances by 1, modulo wrap.
+    ensures xTickCount == (TickType_t)( \old(xTickCount) + 1U );
 
     // ensures \result == pdTRUE || edf_property(&xReadyTasksList, pxCurrentTCB);
 
@@ -193,7 +253,10 @@ BaseType_t xTaskIncrementTick(void) {
             /*@
               loop invariant pxCurrentTCB == \at(pxCurrentTCB, Pre);
               loop invariant \valid(pxCurrentTCB);
+              loop invariant \valid(pxDelayedTaskList);
               loop invariant sorted(&xReadyTasksList);
+              loop invariant well_formed_list(pxDelayedTaskList);
+              loop invariant xTickCount == (TickType_t)(\at(xTickCount, Pre) + 1U);
             */
             for (;;) {
                 if (listLIST_IS_EMPTY(pxDelayedTaskList) != pdFALSE) {
@@ -216,6 +279,15 @@ BaseType_t xTaskIncrementTick(void) {
                 }
             }
         }
+
+#ifdef SANITY_PROBE
+        /* Sanity probe — must NOT prove. Checks that the hypothesis set
+         * at the function level (after the unblock loop, before the
+         * yield-pending check) is not vacuous. Catches conflicts in
+         * xTaskIncrementTick's own contract that the helper's probe
+         * wouldn't see. */
+        //@ assert \false;
+#endif
 
 #if (configUSE_PREEMPTION == 1)
         {
