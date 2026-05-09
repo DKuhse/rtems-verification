@@ -453,32 +453,74 @@ typedef struct xLIST
 
 /*@
   axiomatic FreeRTOS_List_Contents {
-    logic \list<struct xLIST_ITEM *> list_contents{L}(struct xLIST *pxList);
+    logic \list<struct xLIST_ITEM *> list_contents{L}(struct xLIST *pxList) 
+    reads pxList->uxNumberOfItems,
+          pxList->xListEnd.pxNext,
+          pxList->xListEnd.pxPrevious,
+          { item->pxNext | struct xLIST_ITEM *item; \valid(item) },
+          { item->pxPrevious | struct xLIST_ITEM *item; \valid(item) };
 
     axiom list_contents_length{L}: \forall struct xLIST *pxList;
+      \valid(pxList) ==>
       \length(list_contents(pxList)) == pxList->uxNumberOfItems;
 
     axiom list_contents_head{L}: \forall struct xLIST *pxList;
+      \valid(pxList) &&
       pxList->uxNumberOfItems > 0 ==>
         \nth(list_contents(pxList), 0) == pxList->xListEnd.pxNext;
+
+    predicate in_seq(struct xLIST_ITEM *item, \list<struct xLIST_ITEM *> xs) =
+      \exists integer i; 0 <= i < \length(xs) && \nth(xs, i) == item;
+
+    predicate in_list(struct xLIST_ITEM *pxItem, struct xLIST *pxList) =
+      \valid(pxList) &&
+      in_seq(pxItem, list_contents(pxList));
+
+    predicate disjoint_lists(struct xLIST *pxList1, struct xLIST *pxList2) =
+      \valid(pxList1) && \valid(pxList2) &&
+      \forall struct xLIST_ITEM *item; !(in_list(item, pxList1) && in_list(item, pxList2));
+
+    logic \list<struct xLIST_ITEM *> remove_item(
+      \list<struct xLIST_ITEM *> xs,
+      struct xLIST_ITEM *item
+    );
+
+    logic \list<struct xLIST_ITEM *> insert_item(
+      \list<struct xLIST_ITEM *> xs,
+      struct xLIST_ITEM *item
+    );
+
+
+    // list manipulation axioms: remove_item removes the item, insert_item adds it, and otherwise they preserve membership
+
+    axiom remove_item_absent{L}: \forall \list<struct xLIST_ITEM *> xs, struct xLIST_ITEM *item;
+      !in_seq(item, remove_item(xs, item));
+
+    axiom remove_items_others{L}: \forall \list<struct xLIST_ITEM *> xs, struct xLIST_ITEM *item, struct xLIST_ITEM *other;
+      other != item ==>
+      (in_seq(other, remove_item(xs, item)) <==> in_seq(other, xs));
+
+    axiom insert_item_new{L}: \forall \list<struct xLIST_ITEM *> xs, struct xLIST_ITEM *item;
+      in_seq(item, insert_item(xs, item));
+
+    axiom insert_items_others{L}: \forall \list<struct xLIST_ITEM *> xs, struct xLIST_ITEM *item, struct xLIST_ITEM *other;
+      other != item ==>
+      (in_seq(other, insert_item(xs, item)) <==> in_seq(other, xs));
+      
+
+    predicate min(struct xLIST *pxList, TickType_t x) =
+      \valid(pxList) &&
+      \forall integer i; 0 <= i < \length(list_contents(pxList)) ==> \nth(list_contents(pxList), i)->xItemValue >= x;
+
+    predicate sorted(struct xLIST *pxList) =
+      \valid(pxList) &&
+      \forall integer i, j; 0 <= i < j < \length(list_contents(pxList)) ==> \nth(list_contents(pxList), i)->xItemValue <= \nth(list_contents(pxList), j)->xItemValue;
+
   }
 
-  predicate in_list(struct xLIST_ITEM *pxItem, struct xLIST *pxList) =
-    \valid(pxList) &&
-    \exists integer i; 0 <= i < \length(list_contents(pxList)) && \nth(list_contents(pxList), i) == pxItem;
-
-  predicate min(struct xLIST *pxList, TickType_t x) =
-    \valid(pxList) &&
-    \forall integer i; 0 <= i < \length(list_contents(pxList)) ==> \nth(list_contents(pxList), i)->xItemValue >= x;
-
-  predicate sorted(struct xLIST *pxList) =
-    \valid(pxList) &&
-    \forall integer i, j; 0 <= i < j < \length(list_contents(pxList)) ==> \nth(list_contents(pxList), i)->xItemValue <= \nth(list_contents(pxList), j)->xItemValue;
 
   // Membership consistency: an item is in the list (per list_contents)
-  // iff its pxContainer points back to the list. Preserved by the
-  // mutators; lets predicates that use in_list (e.g., edf_property)
-  // talk to predicates that use pxContainer-equality (well_formed_list).
+  // iff its pxContainer points back to the list.
   predicate consistent_membership(struct xLIST *pxList) =
     \valid(pxList) &&
     \forall struct xLIST_ITEM *i;
