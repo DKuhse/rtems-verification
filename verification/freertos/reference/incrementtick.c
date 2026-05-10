@@ -41,22 +41,6 @@ typedef struct tskTaskControlBlock TCB_t;
  * complete. */
 #include "edf.h"
 
-/* Owner well-formedness. */
-/*@
-  predicate well_formed_item_owner(struct xLIST_ITEM *i) =
-    i->pvOwner != \null &&
-    &((TCB_t *)(i->pvOwner))->xStateListItem == i;
-*/
-
-/* List-level owner-back-link consistency. Structural soundness lives
- * separately in valid_list_model (list.h). */
-/*@
-  predicate well_formed_list(struct xLIST *L) =
-    \valid(L) &&
-    (\forall struct xLIST_ITEM *i;
-      \valid(i) && in_list(i, L) ==> well_formed_item_owner(i));
-*/
-
 /* Hack: Frama-C can't handle volatile */
 #ifdef __FRAMAC__
     TCB_t *           pxCurrentTCB;
@@ -85,6 +69,48 @@ typedef struct tskTaskControlBlock TCB_t;
     List_t * volatile pxDelayedTaskList;
     List_t * volatile pxOverflowDelayedTaskList;
 #endif
+
+/*@
+  // Owner well-formedness.
+  predicate well_formed_item_owner(struct xLIST_ITEM *i) =
+    i->pvOwner != \null &&
+    &((TCB_t *)(i->pvOwner))->xStateListItem == i;
+
+
+  // List-level owner-back-link consistency. Structural soundness lives
+  // separately in valid_list_model (list.h).x
+
+  predicate well_formed_list(struct xLIST *L) =
+    \valid(L) &&
+    (\forall struct xLIST_ITEM *i;
+      \valid(i) && in_list(i, L) ==> well_formed_item_owner(i));
+
+  predicate task_list_model(struct xLIST *L) =
+    valid_list_model(L) &&
+    well_formed_list(L) &&
+    sorted(L);
+
+  predicate ready_list_model(struct xLIST *L) =
+    task_list_model(L) &&
+    xItemValue_matches_deadline(L);
+
+  predicate delayed_list_model(struct xLIST *L) =
+    task_list_model(L);
+
+  predicate tick_lists_model(struct xLIST *ready,
+                             struct xLIST *delayed,
+                             struct xLIST *overflow) =
+    ready != delayed &&
+    ready != overflow &&
+    delayed != overflow &&
+    ready_list_model(ready) &&
+    delayed_list_model(delayed) &&
+    delayed_list_model(overflow) &&
+    disjoint_lists(delayed, ready) &&
+    disjoint_lists(overflow, ready) &&
+    disjoint_lists(delayed, overflow);
+*/
+
 
 /* prvResetNextTaskUnblockTime is a static helper in tasks.c that
  * scans the delayed list and updates xNextTaskUnblockTime. We model
@@ -145,36 +171,18 @@ TCB_t * prvGetOwnerOfHeadEntry(List_t * pxList);
 /*@
   requires \valid(pxTCB);
   requires \valid(pxCurrentTCB);
-  requires \valid(pxDelayedTaskList);
-  requires sorted(&xReadyTasksList);
   requires well_formed_item_owner(&pxTCB->xStateListItem);
-  requires well_formed_list(pxDelayedTaskList);
-  requires well_formed_list(&xReadyTasksList);
-  requires valid_list_model(pxDelayedTaskList);
-  requires valid_list_model(&xReadyTasksList);
-  requires xItemValue_matches_deadline(&xReadyTasksList);
   requires pxTCB->xStateListItem.pxContainer == pxDelayedTaskList;
-  // Simplification: pxTCB's event list item is not attached.
+
+  // simplificaiton: event lists out of scope (for now? TODO)
   requires pxTCB->xEventListItem.pxContainer == \null;
-  requires disjoint_lists(pxDelayedTaskList, &xReadyTasksList);
+  
+  requires tick_lists_model(&xReadyTasksList, pxDelayedTaskList, pxOverflowDelayedTaskList);
 
-  // TODO: add an assigns clause. The four "unchanged"/\valid ensures
-  // below (pxCurrentTCB, pxDelayedTaskList) are only here because
-  // without an assigns clause WP conservatively assumes everything
-  // can move
-
-  ensures sorted(&xReadyTasksList);
-  ensures pxCurrentTCB == \old(pxCurrentTCB);
+  ensures \valid(pxTCB);
   ensures \valid(pxCurrentTCB);
-  ensures pxDelayedTaskList == \old(pxDelayedTaskList);
-  ensures \valid(pxDelayedTaskList);
-  ensures xTickCount == \old(xTickCount);
-  ensures well_formed_item_owner(&pxTCB->xStateListItem);
-  ensures well_formed_list(pxDelayedTaskList);
-  ensures well_formed_list(&xReadyTasksList);
-  ensures valid_list_model(pxDelayedTaskList);
-  ensures valid_list_model(&xReadyTasksList);
-  ensures xItemValue_matches_deadline(&xReadyTasksList);
+  ensures pxCurrentTCB == \old(pxCurrentTCB);
+
 */
 static BaseType_t prvProcessUnblockedTask(TCB_t *pxTCB,
                                           BaseType_t xSwitchRequired) {
@@ -220,33 +228,9 @@ static BaseType_t prvProcessUnblockedTask(TCB_t *pxTCB,
   behavior running:
     assumes uxSchedulerSuspended == (UBaseType_t)0U;
     requires \valid(pxCurrentTCB);
-    requires \valid(pxDelayedTaskList);
-    requires \valid(pxOverflowDelayedTaskList);
-    requires sorted(&xReadyTasksList);
-    requires well_formed_list(pxDelayedTaskList);
-    requires well_formed_list(pxOverflowDelayedTaskList);
-    requires well_formed_list(&xReadyTasksList);
-    requires valid_list_model(pxDelayedTaskList);
-    requires valid_list_model(pxOverflowDelayedTaskList);
-    requires valid_list_model(&xReadyTasksList);
-    requires xItemValue_matches_deadline(&xReadyTasksList);
-    requires disjoint_lists(pxDelayedTaskList, &xReadyTasksList);
-    requires disjoint_lists(pxOverflowDelayedTaskList, &xReadyTasksList);
-    requires disjoint_lists(pxDelayedTaskList, pxOverflowDelayedTaskList);
-    // Simplification: tasks in delayed lists don't have event list items
-    // attached. Covers the typical case where a task is just waiting on
-    // a delay (not a queue/semaphore with timeout). The general case
-    // requires more invariants on event-list well-behavedness.
-    requires
-      \forall struct xLIST_ITEM *i;
-        \valid(i) && in_list(i, pxDelayedTaskList) ==>
-          \valid((TCB_t *)i->pvOwner) &&
-          ((TCB_t *)i->pvOwner)->xEventListItem.pxContainer == \null;
-    requires
-      \forall struct xLIST_ITEM *i;
-        \valid(i) && in_list(i, pxOverflowDelayedTaskList) ==>
-          \valid((TCB_t *)i->pvOwner) &&
-          ((TCB_t *)i->pvOwner)->xEventListItem.pxContainer == \null;
+
+    requires tick_lists_model(&xReadyTasksList, pxDelayedTaskList, pxOverflowDelayedTaskList);
+
     ensures pxCurrentTCB == \old(pxCurrentTCB);
     ensures sorted(&xReadyTasksList);
     // Tick advances by 1, modulo wrap.
@@ -282,22 +266,19 @@ BaseType_t xTaskIncrementTick(void) {
 
         if (xConstTickCount >= xNextTaskUnblockTime) {
             /*@
-              loop invariant pxCurrentTCB == \at(pxCurrentTCB, Pre);
-              loop invariant \valid(pxCurrentTCB);
-              loop invariant \valid(pxDelayedTaskList);
-              loop invariant sorted(&xReadyTasksList);
-              loop invariant well_formed_list(pxDelayedTaskList);
-              loop invariant well_formed_list(&xReadyTasksList);
-              loop invariant valid_list_model(pxDelayedTaskList);
-              loop invariant valid_list_model(&xReadyTasksList);
-              loop invariant disjoint_lists(pxDelayedTaskList, &xReadyTasksList);
-              loop invariant xItemValue_matches_deadline(&xReadyTasksList);
-              loop invariant xTickCount == (TickType_t)(\at(xTickCount, Pre) + 1U);
-              loop invariant
-                \forall struct xLIST_ITEM *i;
-                  \valid(i) && in_list(i, pxDelayedTaskList) ==>
-                    \valid((TCB_t *)i->pvOwner) &&
-                    ((TCB_t *)i->pvOwner)->xEventListItem.pxContainer == \null;
+                loop invariant pxCurrentTCB == \at(pxCurrentTCB, Pre);
+                loop invariant \valid(pxCurrentTCB);
+
+                loop invariant \valid(pxDelayedTaskList);
+                loop invariant ready_list_model(&xReadyTasksList);
+                loop invariant delayed_list_model(pxDelayedTaskList);
+                loop invariant disjoint_lists(pxDelayedTaskList, &xReadyTasksList);
+
+                loop invariant xSwitchRequired == pdTRUE || xSwitchRequired == pdFALSE;
+                loop invariant xSwitchRequired == pdTRUE ||
+                    edf_property(&xReadyTasksList, pxCurrentTCB);
+
+                loop invariant xTickCount == (TickType_t)(\at(xTickCount, Pre) + 1U);
             */
             for (;;) {
                 if (listLIST_IS_EMPTY(pxDelayedTaskList) != pdFALSE) {
