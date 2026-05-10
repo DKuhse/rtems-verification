@@ -109,6 +109,15 @@ typedef struct tskTaskControlBlock TCB_t;
     disjoint_lists(delayed, ready) &&
     disjoint_lists(overflow, ready) &&
     disjoint_lists(delayed, overflow);
+
+  predicate state_item_value_separated_from_ready_deadlines(TCB_t *t,
+                                                            struct xLIST *ready) =
+    \valid(t) &&
+    (\forall struct xLIST_ITEM *i;
+      \valid(i) && in_list(i, ready) ==>
+        \valid((TCB_t *)i->pvOwner) &&
+        \separated(&(t->xStateListItem.xItemValue),
+                   &((TCB_t *)i->pvOwner)->xDeadline));
 */
 
 
@@ -141,34 +150,6 @@ TCB_t * prvGetOwnerOfHeadEntry(List_t * pxList);
 #ifdef __FRAMAC__
     #undef  listGET_OWNER_OF_HEAD_ENTRY
     #define listGET_OWNER_OF_HEAD_ENTRY( pxList )    prvGetOwnerOfHeadEntry( pxList )
-#endif
-
-/* Verification-only wrapper around the detached state-item value write in
- * prvAddTaskToReadyList. The raw macro is only a field assignment, but the
- * typed/cast memory model does not cheaply recover that existing list owners'
- * deadlines are unaffected by the write through a detached TCB item. */
-/*@
-  requires \valid(pxTCB);
-  requires pxTCB->xStateListItem.pxContainer == \null;
-  requires pxTCB->xStateListItem.pvOwner == pxTCB;
-  requires well_formed_item_owner(&pxTCB->xStateListItem);
-  requires tick_lists_model(&xReadyTasksList, pxDelayedTaskList, pxOverflowDelayedTaskList);
-
-  assigns pxTCB->xStateListItem.xItemValue;
-
-  ensures \valid(pxTCB);
-  ensures pxTCB->xStateListItem.xItemValue == pxTCB->xDeadline;
-  ensures pxTCB->xStateListItem.pxContainer == \null;
-  ensures pxTCB->xStateListItem.pvOwner == pxTCB;
-  ensures well_formed_item_owner(&pxTCB->xStateListItem);
-  ensures tick_lists_model(&xReadyTasksList, pxDelayedTaskList, pxOverflowDelayedTaskList);
-*/
-static void prvSetStateItemValueToDeadline(TCB_t *pxTCB);
-
-#ifndef __FRAMAC__
-static void prvSetStateItemValueToDeadline(TCB_t *pxTCB) {
-    listSET_LIST_ITEM_VALUE(&(pxTCB->xStateListItem), pxTCB->xDeadline);
-}
 #endif
 
 /* From tasks.c:271. */
@@ -206,6 +187,7 @@ static void prvSetStateItemValueToDeadline(TCB_t *pxTCB) {
   requires pxTCB->xEventListItem.pxContainer == \null;
   
   requires tick_lists_model(&xReadyTasksList, pxDelayedTaskList, pxOverflowDelayedTaskList);
+  requires state_item_value_separated_from_ready_deadlines(pxTCB, &xReadyTasksList);
 
   ensures \valid(pxTCB);
   ensures \valid(pxCurrentTCB);
@@ -239,7 +221,7 @@ static BaseType_t prvProcessUnblockedTask(TCB_t *pxTCB,
 
 BeforeSetValue:
     //@ assert xItemValue_matches_deadline(&xReadyTasksList);
-    prvSetStateItemValueToDeadline(pxTCB);
+    listSET_LIST_ITEM_VALUE(&(pxTCB->xStateListItem), pxTCB->xDeadline);
     //@ assert pxTCB->xStateListItem.pxContainer == \null;
     //@ assert pxTCB->xStateListItem.pvOwner == pxTCB;
     //@ assert well_formed_item_owner(&pxTCB->xStateListItem);
@@ -260,6 +242,17 @@ BeforeSetValue:
           \valid(i) &&
           in_list(i, &xReadyTasksList) ==>
             i->pvOwner != pxTCB;
+    */
+    /*@ assert \forall struct xLIST_ITEM *i;
+          \valid(i) &&
+          in_list(i, &xReadyTasksList) ==>
+            \separated(&(pxTCB->xStateListItem.xItemValue),
+                       &((TCB_t *)i->pvOwner)->xDeadline);
+    */
+    /*@ assert \forall struct xLIST_ITEM *i;
+          \valid(i) &&
+          in_list(i, &xReadyTasksList) ==>
+            i->xItemValue == ((TCB_t *)i->pvOwner)->xDeadline;
     */
     //@ assert disjoint_lists(&xReadyTasksList, pxDelayedTaskList);
     //@ assert disjoint_lists(&xReadyTasksList, pxOverflowDelayedTaskList);
