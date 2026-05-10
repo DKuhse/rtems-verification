@@ -476,12 +476,36 @@ typedef struct xLIST
       \valid(pxList) &&
       in_seq(pxItem, list_contents(pxList));
 
+    predicate consistent_membership(struct xLIST *pxList) =
+      \valid(pxList) &&
+      \forall struct xLIST_ITEM *i;
+        \valid(i) ==>
+          (i->pxContainer == pxList <==> in_list(i, pxList));
+
+    predicate valid_seq(\list<struct xLIST_ITEM *> xs) =
+      \forall integer i;
+        0 <= i < \length(xs) ==> \valid(\nth(xs, i));
+
+    predicate valid_list_model(struct xLIST *L) =
+      \valid(L) &&
+      valid_seq(list_contents(L)) &&
+      consistent_membership(L);
+
+    // Note: valid when viewed externally
+    // if one intends to prove list mutators correct, this would need to be
+    // strengthened to require further properties (e.g. link correctness)
+    predicate valid_list(struct xLIST *L) =
+      valid_list_model(L);
+
     // poor man's separation logic
 
     predicate disjoint_lists(struct xLIST *pxList1, struct xLIST *pxList2) =
       \valid(pxList1) && \valid(pxList2) &&
       \forall struct xLIST_ITEM *item; !(in_list(item, pxList1) && in_list(item, pxList2));
 
+    // Frame rule for list mutations
+    // intentionally includes valid_list so further strengthening
+    // becomes an explicit lists mutator obligation
     predicate unchanged_if_disjoint{Before,After}
       (struct xLIST *changed, struct xLIST *other) =
         \valid{Before}(changed) &&
@@ -489,7 +513,9 @@ typedef struct xLIST
         \valid{After}(other) &&
         other != changed &&
         disjoint_lists{Before}(changed, other) ==>
-          list_contents{After}(other) == list_contents{Before}(other);
+          list_contents{After}(other) == list_contents{Before}(other) &&
+          (valid_list{Before}(other) ==> valid_list{After}(other));
+
 
     // list manipulation
 
@@ -523,6 +549,7 @@ typedef struct xLIST
     // sortedness predicate
 
     predicate sorted_seq(\list<struct xLIST_ITEM *> xs) =
+      valid_seq(xs) &&
       \forall integer i, j;
         0 <= i < j < \length(xs) ==>
           \nth(xs, i)->xItemValue <= \nth(xs, j)->xItemValue;
@@ -543,11 +570,6 @@ typedef struct xLIST
             struct xLIST_ITEM *item;
       sorted_seq(xs) ==> sorted_seq(insert_item(xs, item));
 
-    // Membership consistency: list backlinks are correct
-    predicate consistent_membership(struct xLIST *pxList) =
-      \valid(pxList) &&
-      \forall struct xLIST_ITEM *i;
-        in_list(i, pxList) <==> (\valid(i) && i->pxContainer == pxList);
   }
 */
 
@@ -602,7 +624,7 @@ void vListInitialiseItem( ListItem_t * const pxItem ) PRIVILEGED_FUNCTION;
  * \ingroup LinkedList
  */
 /*@
-  requires \valid(pxList);
+  requires valid_list_model(pxList);
   requires \valid(pxNewListItem);
   requires pxNewListItem->pxContainer == \null;
 
@@ -680,8 +702,7 @@ void vListInsertEnd( List_t * const pxList,
 /*@
   requires \valid(pxItemToRemove);
   requires pxItemToRemove->pxContainer != \null;
-  requires \valid(pxItemToRemove->pxContainer);
-  requires consistent_membership(pxItemToRemove->pxContainer);
+  requires valid_list_model(pxItemToRemove->pxContainer);
 
   assigns pxItemToRemove->pxContainer,
           pxItemToRemove->pxContainer->uxNumberOfItems,
