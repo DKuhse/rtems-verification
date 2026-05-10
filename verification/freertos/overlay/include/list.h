@@ -650,6 +650,11 @@ void vListInitialiseItem( ListItem_t * const pxItem ) PRIVILEGED_FUNCTION;
   ensures \forall struct xLIST_ITEM *i; \valid(i) ==>
     i->pvOwner == \old(i->pvOwner);
 
+  // preserve item value
+  ensures \forall struct xLIST_ITEM *i; 
+    \valid(i) ==> i->xItemValue == \old(i->xItemValue);
+
+
   // pxContainer of items other than the inserted one are preserved
   ensures \forall struct xLIST_ITEM *i; 
     \valid(i) && i != pxNewListItem ==>
@@ -731,6 +736,10 @@ void vListInsertEnd( List_t * const pxList,
   // pvOwner of every item is preserved
   ensures \forall struct xLIST_ITEM *i; 
     \valid(i) ==> i->pvOwner == \old(i->pvOwner);
+
+  // item value preserved
+  ensures \forall struct xLIST_ITEM *i; 
+    \valid(i) ==> i->xItemValue == \old(i->xItemValue);
 
   // other lists untouched
   ensures \forall struct xLIST *L;
