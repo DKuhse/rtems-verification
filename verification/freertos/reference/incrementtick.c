@@ -48,16 +48,13 @@ typedef struct tskTaskControlBlock TCB_t;
     &((TCB_t *)(i->pvOwner))->xStateListItem == i;
 */
 
-/* List-level well-formedness. Uses pxContainer == L for membership
- * (rather than in_list) — consistent_membership preservation as a
- * mutator ensures is unsound in Typed+Cast (universal foralls over
- * xLIST_ITEM* instantiate on xLIST* via type-confusion, conflicting
- * with assigns writes). */
+/* List-level owner-back-link consistency. Structural soundness lives
+ * separately in valid_list_model (list.h). */
 /*@
   predicate well_formed_list(struct xLIST *L) =
     \valid(L) &&
     (\forall struct xLIST_ITEM *i;
-      \valid(i) && i->pxContainer == L ==> well_formed_item_owner(i));
+      \valid(i) && in_list(i, L) ==> well_formed_item_owner(i));
 */
 
 /* Hack: Frama-C can't handle volatile */
@@ -138,34 +135,6 @@ TCB_t * prvGetOwnerOfHeadEntry(List_t * pxList);
         vListInsert(&(xReadyTasksList), &((pxTCB)->xStateListItem));        \
     } while (0)
 
-/* ─── Soundness isolation test ─────────────────────────────────────────
- *
- * This isolates the consistent_membership preservation soundness issue.
- * With two consistent_membership preconditions on different lists, after
- * a single uxListRemove call, the post-state assert \false should NOT
- * prove. If it does, the model is unsound (the contradiction is the
- * source of vacuous "proofs" we observed in the helper).
- */
-/*@
-  requires \valid(pxItem);
-  requires \valid(pxList);
-  requires \valid(pxList2);
-  requires \separated(pxItem, pxList);
-  requires \separated(pxItem, pxList2);
-  requires \separated(pxList, pxList2);
-  requires consistent_membership(pxList);
-  requires consistent_membership(pxList2);
-  requires pxItem->pxContainer == pxList;
-*/
-void __test_cons_mem_soundness(ListItem_t *pxItem,
-                                List_t *pxList,
-                                List_t *pxList2) {
-    (void) uxListRemove(pxItem);
-#ifdef SANITY_PROBE
-    //@ assert post_remove: \false;
-#endif
-}
-
 /* Per-iteration body of the unblock loop, factored out so the substantive
  * proof obligation lives in a single helper contract instead of being
  * spread across the loop's invariants. The caller has already established
@@ -181,8 +150,13 @@ void __test_cons_mem_soundness(ListItem_t *pxItem,
   requires well_formed_item_owner(&pxTCB->xStateListItem);
   requires well_formed_list(pxDelayedTaskList);
   requires well_formed_list(&xReadyTasksList);
+  requires valid_list_model(pxDelayedTaskList);
+  requires valid_list_model(&xReadyTasksList);
   requires xItemValue_matches_deadline(&xReadyTasksList);
   requires pxTCB->xStateListItem.pxContainer == pxDelayedTaskList;
+  // Simplification: pxTCB's event list item is not attached.
+  requires pxTCB->xEventListItem.pxContainer == \null;
+  requires disjoint_lists(pxDelayedTaskList, &xReadyTasksList);
 
   // TODO: add an assigns clause. The four "unchanged"/\valid ensures
   // below (pxCurrentTCB, pxDelayedTaskList) are only here because
@@ -198,6 +172,8 @@ void __test_cons_mem_soundness(ListItem_t *pxItem,
   ensures well_formed_item_owner(&pxTCB->xStateListItem);
   ensures well_formed_list(pxDelayedTaskList);
   ensures well_formed_list(&xReadyTasksList);
+  ensures valid_list_model(pxDelayedTaskList);
+  ensures valid_list_model(&xReadyTasksList);
   ensures xItemValue_matches_deadline(&xReadyTasksList);
 */
 static BaseType_t prvProcessUnblockedTask(TCB_t *pxTCB,
@@ -250,7 +226,27 @@ static BaseType_t prvProcessUnblockedTask(TCB_t *pxTCB,
     requires well_formed_list(pxDelayedTaskList);
     requires well_formed_list(pxOverflowDelayedTaskList);
     requires well_formed_list(&xReadyTasksList);
+    requires valid_list_model(pxDelayedTaskList);
+    requires valid_list_model(pxOverflowDelayedTaskList);
+    requires valid_list_model(&xReadyTasksList);
     requires xItemValue_matches_deadline(&xReadyTasksList);
+    requires disjoint_lists(pxDelayedTaskList, &xReadyTasksList);
+    requires disjoint_lists(pxOverflowDelayedTaskList, &xReadyTasksList);
+    requires disjoint_lists(pxDelayedTaskList, pxOverflowDelayedTaskList);
+    // Simplification: tasks in delayed lists don't have event list items
+    // attached. Covers the typical case where a task is just waiting on
+    // a delay (not a queue/semaphore with timeout). The general case
+    // requires more invariants on event-list well-behavedness.
+    requires
+      \forall struct xLIST_ITEM *i;
+        \valid(i) && in_list(i, pxDelayedTaskList) ==>
+          \valid((TCB_t *)i->pvOwner) &&
+          ((TCB_t *)i->pvOwner)->xEventListItem.pxContainer == \null;
+    requires
+      \forall struct xLIST_ITEM *i;
+        \valid(i) && in_list(i, pxOverflowDelayedTaskList) ==>
+          \valid((TCB_t *)i->pvOwner) &&
+          ((TCB_t *)i->pvOwner)->xEventListItem.pxContainer == \null;
     ensures pxCurrentTCB == \old(pxCurrentTCB);
     ensures sorted(&xReadyTasksList);
     // Tick advances by 1, modulo wrap.
@@ -292,8 +288,16 @@ BaseType_t xTaskIncrementTick(void) {
               loop invariant sorted(&xReadyTasksList);
               loop invariant well_formed_list(pxDelayedTaskList);
               loop invariant well_formed_list(&xReadyTasksList);
+              loop invariant valid_list_model(pxDelayedTaskList);
+              loop invariant valid_list_model(&xReadyTasksList);
+              loop invariant disjoint_lists(pxDelayedTaskList, &xReadyTasksList);
               loop invariant xItemValue_matches_deadline(&xReadyTasksList);
               loop invariant xTickCount == (TickType_t)(\at(xTickCount, Pre) + 1U);
+              loop invariant
+                \forall struct xLIST_ITEM *i;
+                  \valid(i) && in_list(i, pxDelayedTaskList) ==>
+                    \valid((TCB_t *)i->pvOwner) &&
+                    ((TCB_t *)i->pvOwner)->xEventListItem.pxContainer == \null;
             */
             for (;;) {
                 if (listLIST_IS_EMPTY(pxDelayedTaskList) != pdFALSE) {
