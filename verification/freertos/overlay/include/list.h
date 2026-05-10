@@ -516,6 +516,7 @@ typedef struct xLIST
       \valid(pxList1) && \valid(pxList2) &&
       \forall struct xLIST_ITEM *item; !(in_list(item, pxList1) && in_list(item, pxList2));
 
+
     // Frame rule for list mutations
     // intentionally includes valid_list so further strengthening
     // becomes an explicit lists mutator obligation
@@ -585,6 +586,10 @@ typedef struct xLIST
 
   assigns pxListItem->xItemValue;
   ensures pxListItem->xItemValue == xValue;
+  ensures \forall struct xLIST_ITEM *i;
+    \valid(i) && i != pxListItem ==> i->xItemValue == \old(i->xItemValue);
+  ensures \forall struct xLIST_ITEM *i;
+    \valid(i) ==> i->pvOwner == \old(i->pvOwner);
   
   // Changing the value of a detached item does not change abstract list contents.
   ensures \forall struct xLIST *L;
