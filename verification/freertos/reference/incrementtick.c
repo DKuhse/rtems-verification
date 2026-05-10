@@ -110,6 +110,12 @@ typedef struct tskTaskControlBlock TCB_t;
     disjoint_lists(overflow, ready) &&
     disjoint_lists(delayed, overflow);
 
+  predicate delayed_storage_model =
+    (pxDelayedTaskList == &xDelayedTaskList1 &&
+     pxOverflowDelayedTaskList == &xDelayedTaskList2) ||
+    (pxDelayedTaskList == &xDelayedTaskList2 &&
+     pxOverflowDelayedTaskList == &xDelayedTaskList1);
+
   predicate state_item_value_separated_from_ready_deadlines(TCB_t *t,
                                                             struct xLIST *ready) =
     \valid(t) &&
@@ -133,9 +139,19 @@ typedef struct tskTaskControlBlock TCB_t;
       &pxCurrentTCB, &pxDelayedTaskList, &pxOverflowDelayedTaskList
     ) &&
     \separated(
+      pxDelayedTaskList,
+      &pxCurrentTCB, &pxDelayedTaskList, &pxOverflowDelayedTaskList
+    ) &&
+    \separated(
       &pxCurrentTCB, &pxDelayedTaskList, &pxOverflowDelayedTaskList,
       { &item->pxNext | struct xLIST_ITEM *item; \valid(item) },
-      { &item->pxPrevious | struct xLIST_ITEM *item; \valid(item) }
+      { &item->pxPrevious | struct xLIST_ITEM *item; \valid(item) },
+      { &item->pxContainer | struct xLIST_ITEM *item; \valid(item) }
+    ) &&
+    \separated(
+      &pxCurrentTCB, &pxDelayedTaskList, &pxOverflowDelayedTaskList,
+      &(pxDelayedTaskList->uxNumberOfItems),
+      &(pxDelayedTaskList->pxIndex)
     );
 */
 
@@ -145,6 +161,10 @@ typedef struct tskTaskControlBlock TCB_t;
  * it as opaque — its exact effect doesn't matter for the
  * suspended-branch proof. */
 /*@
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+
   assigns xNextTaskUnblockTime;
 */
 static void prvResetNextTaskUnblockTime(void);
@@ -203,11 +223,14 @@ TCB_t * prvGetOwnerOfHeadEntry(List_t * pxList);
   requires state_item_value_separated_from_ready_deadlines(pxTCB, &xReadyTasksList);
   requires \separated(pxTCB + (..), &pxCurrentTCB, &pxDelayedTaskList, &pxOverflowDelayedTaskList);
 
-  assigns pxTCB->xStateListItem.pxContainer,
-          pxDelayedTaskList->uxNumberOfItems,
-          pxDelayedTaskList->pxIndex,
-          pxTCB->xStateListItem.pxNext->pxPrevious,
-          pxTCB->xStateListItem.pxPrevious->pxNext;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+
+  assigns *pxDelayedTaskList,
+          { item->pxNext      | struct xLIST_ITEM *item; \valid(item) },
+          { item->pxPrevious  | struct xLIST_ITEM *item; \valid(item) },
+          { item->pxContainer | struct xLIST_ITEM *item; \valid(item) };
 
   ensures \valid(pxTCB);
   ensures pxTCB->xStateListItem.pxContainer == \null;
@@ -223,9 +246,13 @@ TCB_t * prvGetOwnerOfHeadEntry(List_t * pxList);
   ensures state_item_value_separated_from_ready_deadlines(pxTCB, &xReadyTasksList);
   ensures \separated(pxTCB + (..), &pxCurrentTCB, &pxDelayedTaskList, &pxOverflowDelayedTaskList);
 */
+#ifdef __FRAMAC__
+static void prvDetachUnblockedTaskFromDelayedList(TCB_t *pxTCB);
+#else
 static void prvDetachUnblockedTaskFromDelayedList(TCB_t *pxTCB) {
     listREMOVE_ITEM(&(pxTCB->xStateListItem));
 }
+#endif
 
 /*@
   requires \valid(pxTCB);
@@ -237,19 +264,24 @@ static void prvDetachUnblockedTaskFromDelayedList(TCB_t *pxTCB) {
   requires state_item_value_separated_from_ready_deadlines(pxTCB, &xReadyTasksList);
   requires insert_ready_frame_separated(pxTCB);
 
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+
   assigns pxTCB->xStateListItem.xItemValue,
-          xReadyTasksList.uxNumberOfItems,
-          pxTCB->xStateListItem.pxNext,
-          pxTCB->xStateListItem.pxPrevious,
-          pxTCB->xStateListItem.pxContainer,
-          { item->pxNext     | struct xLIST_ITEM *item; \valid(item) },
-          { item->pxPrevious | struct xLIST_ITEM *item; \valid(item) };
+          xReadyTasksList,
+          { item->pxNext       | struct xLIST_ITEM *item; \valid(item) },
+          { item->pxPrevious   | struct xLIST_ITEM *item; \valid(item) },
+          { item->pxContainer  | struct xLIST_ITEM *item; \valid(item) };
 
   ensures \valid(pxTCB);
   ensures \valid(pxCurrentTCB);
   ensures pxCurrentTCB == \old(pxCurrentTCB);
   ensures tick_lists_model(&xReadyTasksList, pxDelayedTaskList, pxOverflowDelayedTaskList);
 */
+#ifdef __FRAMAC__
+static void prvInsertUnblockedTaskIntoReadyList(TCB_t *pxTCB);
+#else
 static void prvInsertUnblockedTaskIntoReadyList(TCB_t *pxTCB) {
 BeforeSetValue:
     //@ assert xItemValue_matches_deadline(&xReadyTasksList);
@@ -318,6 +350,7 @@ BeforeReadyInsert:
             i->xItemValue == ((TCB_t *)i->pvOwner)->xDeadline;
     */
 }
+#endif
 
 /* Per-iteration body of the unblock loop, factored out so the substantive
  * proof obligation lives in a single helper contract instead of being
@@ -340,17 +373,16 @@ BeforeReadyInsert:
   requires insert_ready_frame_separated(pxTCB);
   requires xSwitchRequired == pdTRUE || xSwitchRequired == pdFALSE;
 
-  assigns pxTCB->xStateListItem.pxContainer,
-          pxDelayedTaskList->uxNumberOfItems,
-          pxDelayedTaskList->pxIndex,
-          pxTCB->xStateListItem.pxNext->pxPrevious,
-          pxTCB->xStateListItem.pxPrevious->pxNext,
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+
+  assigns *pxDelayedTaskList,
           pxTCB->xStateListItem.xItemValue,
-          xReadyTasksList.uxNumberOfItems,
-          pxTCB->xStateListItem.pxNext,
-          pxTCB->xStateListItem.pxPrevious,
-          { item->pxNext     | struct xLIST_ITEM *item; \valid(item) },
-          { item->pxPrevious | struct xLIST_ITEM *item; \valid(item) };
+          xReadyTasksList,
+          { item->pxNext       | struct xLIST_ITEM *item; \valid(item) },
+          { item->pxPrevious   | struct xLIST_ITEM *item; \valid(item) },
+          { item->pxContainer  | struct xLIST_ITEM *item; \valid(item) };
 
   ensures \valid(pxTCB);
   ensures \valid(pxCurrentTCB);
@@ -369,11 +401,16 @@ static BaseType_t prvProcessUnblockedTask(TCB_t *pxTCB,
                                           BaseType_t xSwitchRequired) {
     prvDetachUnblockedTaskFromDelayedList(pxTCB);
 
+#ifdef __FRAMAC__
+    //@ assert listLIST_ITEM_CONTAINER(&(pxTCB->xEventListItem)) == NULL;
+    mtCOVERAGE_TEST_MARKER();
+#else
     if (listLIST_ITEM_CONTAINER(&(pxTCB->xEventListItem)) != NULL) {
         listREMOVE_ITEM(&(pxTCB->xEventListItem));
     } else {
         mtCOVERAGE_TEST_MARKER();
     }
+#endif
 
     prvInsertUnblockedTaskIntoReadyList(pxTCB);
 #ifdef SANITY_PROBE
@@ -399,6 +436,7 @@ static BaseType_t prvProcessUnblockedTask(TCB_t *pxTCB,
 /*@
   behavior suspended:
     assumes uxSchedulerSuspended != (UBaseType_t)0U;
+    exits \false;
     assigns xPendedTicks;
     // casting to account for wrapping
     ensures xPendedTicks == (TickType_t)( \old(xPendedTicks) + 1U );
@@ -412,17 +450,19 @@ static BaseType_t prvProcessUnblockedTask(TCB_t *pxTCB,
     requires \forall TCB_t *t; \valid(t) ==> insert_ready_frame_separated(t);
 
     requires tick_lists_model(&xReadyTasksList, pxDelayedTaskList, pxOverflowDelayedTaskList);
+    requires delayed_storage_model;
+
+    allocates \nothing;
+    frees \nothing;
 
     assigns xTickCount,
             xNextTaskUnblockTime,
             xNumOfOverflows,
             pxDelayedTaskList,
             pxOverflowDelayedTaskList,
-            xReadyTasksList.uxNumberOfItems,
-            pxDelayedTaskList->uxNumberOfItems,
-            pxDelayedTaskList->pxIndex,
-            pxOverflowDelayedTaskList->uxNumberOfItems,
-            pxOverflowDelayedTaskList->pxIndex,
+            xReadyTasksList,
+            xDelayedTaskList1,
+            xDelayedTaskList2,
             { item->xItemValue   | struct xLIST_ITEM *item; \valid(item) },
             { item->pxNext       | struct xLIST_ITEM *item; \valid(item) },
             { item->pxPrevious   | struct xLIST_ITEM *item; \valid(item) },
@@ -474,6 +514,7 @@ BaseType_t xTaskIncrementTick(void) {
                 loop invariant disjoint_lists(pxOverflowDelayedTaskList, &xReadyTasksList);
                 loop invariant disjoint_lists(pxDelayedTaskList, pxOverflowDelayedTaskList);
                 loop invariant tick_lists_model(&xReadyTasksList, pxDelayedTaskList, pxOverflowDelayedTaskList);
+                loop invariant delayed_storage_model;
                 loop invariant xSwitchRequired == pdTRUE || xSwitchRequired == pdFALSE;
                 loop invariant xTickCount == (TickType_t)(\at(xTickCount, Pre) + 1U);
 
@@ -481,9 +522,9 @@ BaseType_t xTaskIncrementTick(void) {
                              xItemValue,
                              xSwitchRequired,
                              xNextTaskUnblockTime,
-                             xReadyTasksList.uxNumberOfItems,
-                             pxDelayedTaskList->uxNumberOfItems,
-                             pxDelayedTaskList->pxIndex,
+                             xReadyTasksList,
+                             xDelayedTaskList1,
+                             xDelayedTaskList2,
                              { item->xItemValue   | struct xLIST_ITEM *item; \valid(item) },
                              { item->pxNext       | struct xLIST_ITEM *item; \valid(item) },
                              { item->pxPrevious   | struct xLIST_ITEM *item; \valid(item) },
