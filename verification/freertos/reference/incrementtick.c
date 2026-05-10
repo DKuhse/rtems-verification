@@ -155,11 +155,16 @@ static void prvResetNextTaskUnblockTime(void);
   requires pxList->uxNumberOfItems != (UBaseType_t)0;
   requires well_formed_list(pxList);
 
-  assigns \nothing;
+  assigns \result \from pxList,
+                       pxList->uxNumberOfItems,
+                       pxList->xListEnd.pxNext,
+                       { item->pvOwner | struct xLIST_ITEM *item; \valid(item) };
 
   ensures \valid(\result);
   ensures well_formed_item_owner(&\result->xStateListItem);
   ensures \result->xStateListItem.pxContainer == pxList;
+  ensures \result->xEventListItem.pxContainer == \null;
+  ensures state_item_value_separated_from_ready_deadlines(\result, &xReadyTasksList);
 */
 TCB_t * prvGetOwnerOfHeadEntry(List_t * pxList);
 
@@ -333,6 +338,7 @@ BeforeReadyInsert:
   requires tick_lists_model(&xReadyTasksList, pxDelayedTaskList, pxOverflowDelayedTaskList);
   requires state_item_value_separated_from_ready_deadlines(pxTCB, &xReadyTasksList);
   requires insert_ready_frame_separated(pxTCB);
+  requires xSwitchRequired == pdTRUE || xSwitchRequired == pdFALSE;
 
   assigns pxTCB->xStateListItem.pxContainer,
           pxDelayedTaskList->uxNumberOfItems,
@@ -356,6 +362,7 @@ BeforeReadyInsert:
   ensures disjoint_lists(pxOverflowDelayedTaskList, &xReadyTasksList);
   ensures disjoint_lists(pxDelayedTaskList, pxOverflowDelayedTaskList);
   ensures tick_lists_model(&xReadyTasksList, pxDelayedTaskList, pxOverflowDelayedTaskList);
+  ensures \result == pdTRUE || \result == pdFALSE;
 
 */
 static BaseType_t prvProcessUnblockedTask(TCB_t *pxTCB,
@@ -406,6 +413,21 @@ static BaseType_t prvProcessUnblockedTask(TCB_t *pxTCB,
 
     requires tick_lists_model(&xReadyTasksList, pxDelayedTaskList, pxOverflowDelayedTaskList);
 
+    assigns xTickCount,
+            xNextTaskUnblockTime,
+            xNumOfOverflows,
+            pxDelayedTaskList,
+            pxOverflowDelayedTaskList,
+            xReadyTasksList.uxNumberOfItems,
+            pxDelayedTaskList->uxNumberOfItems,
+            pxDelayedTaskList->pxIndex,
+            pxOverflowDelayedTaskList->uxNumberOfItems,
+            pxOverflowDelayedTaskList->pxIndex,
+            { item->xItemValue   | struct xLIST_ITEM *item; \valid(item) },
+            { item->pxNext       | struct xLIST_ITEM *item; \valid(item) },
+            { item->pxPrevious   | struct xLIST_ITEM *item; \valid(item) },
+            { item->pxContainer  | struct xLIST_ITEM *item; \valid(item) };
+
     ensures pxCurrentTCB == \old(pxCurrentTCB);
     ensures sorted(&xReadyTasksList);
     // Tick advances by 1, modulo wrap.
@@ -447,13 +469,25 @@ BaseType_t xTaskIncrementTick(void) {
                 loop invariant \valid(pxDelayedTaskList);
                 loop invariant ready_list_model(&xReadyTasksList);
                 loop invariant delayed_list_model(pxDelayedTaskList);
+                loop invariant delayed_list_model(pxOverflowDelayedTaskList);
                 loop invariant disjoint_lists(pxDelayedTaskList, &xReadyTasksList);
-
+                loop invariant disjoint_lists(pxOverflowDelayedTaskList, &xReadyTasksList);
+                loop invariant disjoint_lists(pxDelayedTaskList, pxOverflowDelayedTaskList);
+                loop invariant tick_lists_model(&xReadyTasksList, pxDelayedTaskList, pxOverflowDelayedTaskList);
                 loop invariant xSwitchRequired == pdTRUE || xSwitchRequired == pdFALSE;
-                loop invariant xSwitchRequired == pdTRUE ||
-                    edf_property(&xReadyTasksList, pxCurrentTCB);
-
                 loop invariant xTickCount == (TickType_t)(\at(xTickCount, Pre) + 1U);
+
+                loop assigns pxTCB,
+                             xItemValue,
+                             xSwitchRequired,
+                             xNextTaskUnblockTime,
+                             xReadyTasksList.uxNumberOfItems,
+                             pxDelayedTaskList->uxNumberOfItems,
+                             pxDelayedTaskList->pxIndex,
+                             { item->xItemValue   | struct xLIST_ITEM *item; \valid(item) },
+                             { item->pxNext       | struct xLIST_ITEM *item; \valid(item) },
+                             { item->pxPrevious   | struct xLIST_ITEM *item; \valid(item) },
+                             { item->pxContainer  | struct xLIST_ITEM *item; \valid(item) };
             */
             for (;;) {
                 if (listLIST_IS_EMPTY(pxDelayedTaskList) != pdFALSE) {
