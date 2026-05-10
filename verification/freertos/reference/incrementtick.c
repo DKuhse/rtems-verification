@@ -74,8 +74,8 @@ typedef struct tskTaskControlBlock TCB_t;
   // Owner well-formedness.
   predicate well_formed_item_owner(struct xLIST_ITEM *i) =
     i->pvOwner != \null &&
+    \valid((TCB_t *)(i->pvOwner)) &&
     &((TCB_t *)(i->pvOwner))->xStateListItem == i;
-
 
   // List-level owner-back-link consistency. Structural soundness lives
   // separately in valid_list_model (list.h).x
@@ -143,6 +143,34 @@ TCB_t * prvGetOwnerOfHeadEntry(List_t * pxList);
     #define listGET_OWNER_OF_HEAD_ENTRY( pxList )    prvGetOwnerOfHeadEntry( pxList )
 #endif
 
+/* Verification-only wrapper around the detached state-item value write in
+ * prvAddTaskToReadyList. The raw macro is only a field assignment, but the
+ * typed/cast memory model does not cheaply recover that existing list owners'
+ * deadlines are unaffected by the write through a detached TCB item. */
+/*@
+  requires \valid(pxTCB);
+  requires pxTCB->xStateListItem.pxContainer == \null;
+  requires pxTCB->xStateListItem.pvOwner == pxTCB;
+  requires well_formed_item_owner(&pxTCB->xStateListItem);
+  requires tick_lists_model(&xReadyTasksList, pxDelayedTaskList, pxOverflowDelayedTaskList);
+
+  assigns pxTCB->xStateListItem.xItemValue;
+
+  ensures \valid(pxTCB);
+  ensures pxTCB->xStateListItem.xItemValue == pxTCB->xDeadline;
+  ensures pxTCB->xStateListItem.pxContainer == \null;
+  ensures pxTCB->xStateListItem.pvOwner == pxTCB;
+  ensures well_formed_item_owner(&pxTCB->xStateListItem);
+  ensures tick_lists_model(&xReadyTasksList, pxDelayedTaskList, pxOverflowDelayedTaskList);
+*/
+static void prvSetStateItemValueToDeadline(TCB_t *pxTCB);
+
+#ifndef __FRAMAC__
+static void prvSetStateItemValueToDeadline(TCB_t *pxTCB) {
+    listSET_LIST_ITEM_VALUE(&(pxTCB->xStateListItem), pxTCB->xDeadline);
+}
+#endif
+
 /* From tasks.c:271. */
 #define taskSWITCH_DELAYED_LISTS()                                          \
     do {                                                                    \
@@ -182,11 +210,26 @@ TCB_t * prvGetOwnerOfHeadEntry(List_t * pxList);
   ensures \valid(pxTCB);
   ensures \valid(pxCurrentTCB);
   ensures pxCurrentTCB == \old(pxCurrentTCB);
+  ensures ready_list_model(&xReadyTasksList);
+  ensures delayed_list_model(pxDelayedTaskList);
+  ensures delayed_list_model(pxOverflowDelayedTaskList);
+  ensures disjoint_lists(pxDelayedTaskList, &xReadyTasksList);
+  ensures disjoint_lists(pxOverflowDelayedTaskList, &xReadyTasksList);
+  ensures disjoint_lists(pxDelayedTaskList, pxOverflowDelayedTaskList);
+  ensures tick_lists_model(&xReadyTasksList, pxDelayedTaskList, pxOverflowDelayedTaskList);
 
 */
 static BaseType_t prvProcessUnblockedTask(TCB_t *pxTCB,
                                           BaseType_t xSwitchRequired) {
     listREMOVE_ITEM(&(pxTCB->xStateListItem));
+    //@ assert pxTCB->xStateListItem.pxContainer == \null;
+    //@ assert ready_list_model(&xReadyTasksList);
+    //@ assert delayed_list_model(pxDelayedTaskList);
+    //@ assert delayed_list_model(pxOverflowDelayedTaskList);
+    //@ assert !in_list(&pxTCB->xStateListItem, &xReadyTasksList);
+    //@ assert disjoint_lists(pxDelayedTaskList, &xReadyTasksList);
+    //@ assert disjoint_lists(pxOverflowDelayedTaskList, &xReadyTasksList);
+    //@ assert disjoint_lists(pxDelayedTaskList, pxOverflowDelayedTaskList);
 
     if (listLIST_ITEM_CONTAINER(&(pxTCB->xEventListItem)) != NULL) {
         listREMOVE_ITEM(&(pxTCB->xEventListItem));
@@ -194,7 +237,77 @@ static BaseType_t prvProcessUnblockedTask(TCB_t *pxTCB,
         mtCOVERAGE_TEST_MARKER();
     }
 
-    prvAddTaskToReadyList(pxTCB);
+BeforeSetValue:
+    //@ assert xItemValue_matches_deadline(&xReadyTasksList);
+    prvSetStateItemValueToDeadline(pxTCB);
+    //@ assert pxTCB->xStateListItem.pxContainer == \null;
+    //@ assert pxTCB->xStateListItem.pvOwner == pxTCB;
+    //@ assert well_formed_item_owner(&pxTCB->xStateListItem);
+    //@ assert pxTCB->xStateListItem.xItemValue == ((TCB_t *)pxTCB->xStateListItem.pvOwner)->xDeadline;
+    //@ assert !in_list(&pxTCB->xStateListItem, &xReadyTasksList);
+    /*@ assert \forall struct xLIST_ITEM *i;
+          in_list(i, &xReadyTasksList) <==> in_list{BeforeSetValue}(i, &xReadyTasksList);
+    */
+    /*@ assert \forall struct xLIST_ITEM *i;
+          in_list(i, &xReadyTasksList) ==> i != &pxTCB->xStateListItem;
+    */
+    /*@ assert \forall struct xLIST_ITEM *i;
+          \valid(i) &&
+          in_list(i, &xReadyTasksList) ==>
+            well_formed_item_owner(i);
+    */
+    /*@ assert \forall struct xLIST_ITEM *i;
+          \valid(i) &&
+          in_list(i, &xReadyTasksList) ==>
+            i->pvOwner != pxTCB;
+    */
+    //@ assert disjoint_lists(&xReadyTasksList, pxDelayedTaskList);
+    //@ assert disjoint_lists(&xReadyTasksList, pxOverflowDelayedTaskList);
+BeforeReadyInsert:
+    vListInsert(&(xReadyTasksList), &(pxTCB->xStateListItem));
+    //@ assert in_list(&pxTCB->xStateListItem, &xReadyTasksList);
+    //@ assert well_formed_item_owner(&pxTCB->xStateListItem);
+    //@ assert pxTCB->xStateListItem.xItemValue == ((TCB_t *)pxTCB->xStateListItem.pvOwner)->xDeadline;
+    /*@ assert \forall struct xLIST_ITEM *i;
+          i != &pxTCB->xStateListItem ==>
+            (in_list(i, &xReadyTasksList) <==> in_list{BeforeReadyInsert}(i, &xReadyTasksList));
+    */
+    /*@ assert \forall struct xLIST_ITEM *i;
+          in_list(i, &xReadyTasksList) &&
+          i != &pxTCB->xStateListItem ==>
+            in_list{BeforeSetValue}(i, &xReadyTasksList);
+    */
+    /*@ assert \forall struct xLIST_ITEM *i;
+          in_list{BeforeReadyInsert}(i, &xReadyTasksList) ==>
+            i->xItemValue == ((TCB_t *)i->pvOwner)->xDeadline;
+    */
+    /*@ assert \forall struct xLIST_ITEM *i;
+          \valid(i) &&
+          in_list(i, &xReadyTasksList) &&
+          i != &pxTCB->xStateListItem ==>
+            well_formed_item_owner(i);
+    */
+    /*@ assert \forall struct xLIST_ITEM *i;
+          in_list(i, &xReadyTasksList) &&
+          i != &pxTCB->xStateListItem ==>
+            i->xItemValue == ((TCB_t *)i->pvOwner)->xDeadline;
+    */
+    //@ assert valid_list_model(&xReadyTasksList);
+    //@ assert well_formed_list(&xReadyTasksList);
+    //@ assert sorted(&xReadyTasksList);
+    //@ assert xItemValue_matches_deadline(&xReadyTasksList);
+    //@ assert valid_list_model(pxDelayedTaskList);
+    //@ assert well_formed_list(pxDelayedTaskList);
+    //@ assert sorted(pxDelayedTaskList);
+    //@ assert valid_list_model(pxOverflowDelayedTaskList);
+    //@ assert well_formed_list(pxOverflowDelayedTaskList);
+    //@ assert sorted(pxOverflowDelayedTaskList);
+    //@ assert ready_list_model(&xReadyTasksList);
+    //@ assert delayed_list_model(pxDelayedTaskList);
+    //@ assert delayed_list_model(pxOverflowDelayedTaskList);
+    //@ assert disjoint_lists(pxDelayedTaskList, &xReadyTasksList);
+    //@ assert disjoint_lists(pxOverflowDelayedTaskList, &xReadyTasksList);
+    //@ assert disjoint_lists(pxDelayedTaskList, pxOverflowDelayedTaskList);
 #ifdef SANITY_PROBE
     /* Sanity probe — must NOT prove. Checks that the hypothesis set
      * inside the unblock helper is not vacuous. Enabled only by
