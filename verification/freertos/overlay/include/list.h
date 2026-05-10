@@ -642,6 +642,9 @@ void vListInitialiseItem( ListItem_t * const pxItem ) PRIVILEGED_FUNCTION;
   // item gets inserted
   ensures list_contents{Here}(pxList) == insert_item(list_contents{Pre}(pxList), pxNewListItem);
 
+  // still a valid list
+  ensures valid_list_model(pxList);
+
   // separation
   ensures \forall struct xLIST *L; 
       unchanged_if_disjoint{Pre,Here}(pxList, L);
@@ -727,6 +730,9 @@ void vListInsertEnd( List_t * const pxList,
           list_contents{Pre}(\at(pxItemToRemove->pxContainer, Pre)),
           pxItemToRemove
         );
+
+  // still a valid list
+  ensures valid_list_model(\at(pxItemToRemove->pxContainer, Pre));
     
   // Frame: pxContainer of other items is unchanged.
   ensures \forall struct xLIST_ITEM *otherItem; \valid(otherItem) &&
