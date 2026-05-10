@@ -118,6 +118,25 @@ typedef struct tskTaskControlBlock TCB_t;
         \valid((TCB_t *)i->pvOwner) &&
         \separated(&(t->xStateListItem.xItemValue),
                    &((TCB_t *)i->pvOwner)->xDeadline));
+
+  predicate insert_ready_frame_separated(TCB_t *t) =
+    \valid(t) &&
+    \separated(
+      &pxCurrentTCB, &pxDelayedTaskList, &pxOverflowDelayedTaskList,
+      &(t->xStateListItem.xItemValue),
+      &(t->xStateListItem.pxNext),
+      &(t->xStateListItem.pxPrevious),
+      &(t->xStateListItem.pxContainer)
+    ) &&
+    \separated(
+      t + (..),
+      &pxCurrentTCB, &pxDelayedTaskList, &pxOverflowDelayedTaskList
+    ) &&
+    \separated(
+      &pxCurrentTCB, &pxDelayedTaskList, &pxOverflowDelayedTaskList,
+      { &item->pxNext | struct xLIST_ITEM *item; \valid(item) },
+      { &item->pxPrevious | struct xLIST_ITEM *item; \valid(item) }
+    );
 */
 
 
@@ -170,55 +189,63 @@ TCB_t * prvGetOwnerOfHeadEntry(List_t * pxList);
         vListInsert(&(xReadyTasksList), &((pxTCB)->xStateListItem));        \
     } while (0)
 
-/* Per-iteration body of the unblock loop, factored out so the substantive
- * proof obligation lives in a single helper contract instead of being
- * spread across the loop's invariants. The caller has already established
- * that pxTCB is at the head of pxDelayedTaskList and its deadline is
- * past — the helper just performs the four mutations (remove from state
- * list, optional event-list remove, add to ready list, optional
- * preemption-flag bump) and gives back the updated xSwitchRequired. */
+/*@
+  requires \valid(pxTCB);
+  requires well_formed_item_owner(&pxTCB->xStateListItem);
+  requires pxTCB->xStateListItem.pxContainer == pxDelayedTaskList;
+  requires pxTCB->xEventListItem.pxContainer == \null;
+  requires tick_lists_model(&xReadyTasksList, pxDelayedTaskList, pxOverflowDelayedTaskList);
+  requires state_item_value_separated_from_ready_deadlines(pxTCB, &xReadyTasksList);
+  requires \separated(pxTCB + (..), &pxCurrentTCB, &pxDelayedTaskList, &pxOverflowDelayedTaskList);
+
+  assigns pxTCB->xStateListItem.pxContainer,
+          pxDelayedTaskList->uxNumberOfItems,
+          pxDelayedTaskList->pxIndex,
+          pxTCB->xStateListItem.pxNext->pxPrevious,
+          pxTCB->xStateListItem.pxPrevious->pxNext;
+
+  ensures \valid(pxTCB);
+  ensures pxTCB->xStateListItem.pxContainer == \null;
+  ensures pxTCB->xEventListItem.pxContainer == \null;
+  ensures well_formed_item_owner(&pxTCB->xStateListItem);
+  ensures ready_list_model(&xReadyTasksList);
+  ensures delayed_list_model(pxDelayedTaskList);
+  ensures delayed_list_model(pxOverflowDelayedTaskList);
+  ensures !in_list(&pxTCB->xStateListItem, &xReadyTasksList);
+  ensures disjoint_lists(pxDelayedTaskList, &xReadyTasksList);
+  ensures disjoint_lists(pxOverflowDelayedTaskList, &xReadyTasksList);
+  ensures disjoint_lists(pxDelayedTaskList, pxOverflowDelayedTaskList);
+  ensures state_item_value_separated_from_ready_deadlines(pxTCB, &xReadyTasksList);
+  ensures \separated(pxTCB + (..), &pxCurrentTCB, &pxDelayedTaskList, &pxOverflowDelayedTaskList);
+*/
+static void prvDetachUnblockedTaskFromDelayedList(TCB_t *pxTCB) {
+    listREMOVE_ITEM(&(pxTCB->xStateListItem));
+}
+
 /*@
   requires \valid(pxTCB);
   requires \valid(pxCurrentTCB);
   requires well_formed_item_owner(&pxTCB->xStateListItem);
-  requires pxTCB->xStateListItem.pxContainer == pxDelayedTaskList;
-
-  // simplificaiton: event lists out of scope (for now? TODO)
-  requires pxTCB->xEventListItem.pxContainer == \null;
-  
+  requires pxTCB->xStateListItem.pxContainer == \null;
   requires tick_lists_model(&xReadyTasksList, pxDelayedTaskList, pxOverflowDelayedTaskList);
+  requires !in_list(&pxTCB->xStateListItem, &xReadyTasksList);
   requires state_item_value_separated_from_ready_deadlines(pxTCB, &xReadyTasksList);
+  requires insert_ready_frame_separated(pxTCB);
+
+  assigns pxTCB->xStateListItem.xItemValue,
+          xReadyTasksList.uxNumberOfItems,
+          pxTCB->xStateListItem.pxNext,
+          pxTCB->xStateListItem.pxPrevious,
+          pxTCB->xStateListItem.pxContainer,
+          { item->pxNext     | struct xLIST_ITEM *item; \valid(item) },
+          { item->pxPrevious | struct xLIST_ITEM *item; \valid(item) };
 
   ensures \valid(pxTCB);
   ensures \valid(pxCurrentTCB);
   ensures pxCurrentTCB == \old(pxCurrentTCB);
-  ensures ready_list_model(&xReadyTasksList);
-  ensures delayed_list_model(pxDelayedTaskList);
-  ensures delayed_list_model(pxOverflowDelayedTaskList);
-  ensures disjoint_lists(pxDelayedTaskList, &xReadyTasksList);
-  ensures disjoint_lists(pxOverflowDelayedTaskList, &xReadyTasksList);
-  ensures disjoint_lists(pxDelayedTaskList, pxOverflowDelayedTaskList);
   ensures tick_lists_model(&xReadyTasksList, pxDelayedTaskList, pxOverflowDelayedTaskList);
-
 */
-static BaseType_t prvProcessUnblockedTask(TCB_t *pxTCB,
-                                          BaseType_t xSwitchRequired) {
-    listREMOVE_ITEM(&(pxTCB->xStateListItem));
-    //@ assert pxTCB->xStateListItem.pxContainer == \null;
-    //@ assert ready_list_model(&xReadyTasksList);
-    //@ assert delayed_list_model(pxDelayedTaskList);
-    //@ assert delayed_list_model(pxOverflowDelayedTaskList);
-    //@ assert !in_list(&pxTCB->xStateListItem, &xReadyTasksList);
-    //@ assert disjoint_lists(pxDelayedTaskList, &xReadyTasksList);
-    //@ assert disjoint_lists(pxOverflowDelayedTaskList, &xReadyTasksList);
-    //@ assert disjoint_lists(pxDelayedTaskList, pxOverflowDelayedTaskList);
-
-    if (listLIST_ITEM_CONTAINER(&(pxTCB->xEventListItem)) != NULL) {
-        listREMOVE_ITEM(&(pxTCB->xEventListItem));
-    } else {
-        mtCOVERAGE_TEST_MARKER();
-    }
-
+static void prvInsertUnblockedTaskIntoReadyList(TCB_t *pxTCB) {
 BeforeSetValue:
     //@ assert xItemValue_matches_deadline(&xReadyTasksList);
     listSET_LIST_ITEM_VALUE(&(pxTCB->xStateListItem), pxTCB->xDeadline);
@@ -285,22 +312,63 @@ BeforeReadyInsert:
           i != &pxTCB->xStateListItem ==>
             i->xItemValue == ((TCB_t *)i->pvOwner)->xDeadline;
     */
-    //@ assert valid_list_model(&xReadyTasksList);
-    //@ assert well_formed_list(&xReadyTasksList);
-    //@ assert sorted(&xReadyTasksList);
-    //@ assert xItemValue_matches_deadline(&xReadyTasksList);
-    //@ assert valid_list_model(pxDelayedTaskList);
-    //@ assert well_formed_list(pxDelayedTaskList);
-    //@ assert sorted(pxDelayedTaskList);
-    //@ assert valid_list_model(pxOverflowDelayedTaskList);
-    //@ assert well_formed_list(pxOverflowDelayedTaskList);
-    //@ assert sorted(pxOverflowDelayedTaskList);
-    //@ assert ready_list_model(&xReadyTasksList);
-    //@ assert delayed_list_model(pxDelayedTaskList);
-    //@ assert delayed_list_model(pxOverflowDelayedTaskList);
-    //@ assert disjoint_lists(pxDelayedTaskList, &xReadyTasksList);
-    //@ assert disjoint_lists(pxOverflowDelayedTaskList, &xReadyTasksList);
-    //@ assert disjoint_lists(pxDelayedTaskList, pxOverflowDelayedTaskList);
+}
+
+/* Per-iteration body of the unblock loop, factored out so the substantive
+ * proof obligation lives in a single helper contract instead of being
+ * spread across the loop's invariants. The caller has already established
+ * that pxTCB is at the head of pxDelayedTaskList and its deadline is
+ * past — the helper just performs the four mutations (remove from state
+ * list, optional event-list remove, add to ready list, optional
+ * preemption-flag bump) and gives back the updated xSwitchRequired. */
+/*@
+  requires \valid(pxTCB);
+  requires \valid(pxCurrentTCB);
+  requires well_formed_item_owner(&pxTCB->xStateListItem);
+  requires pxTCB->xStateListItem.pxContainer == pxDelayedTaskList;
+
+  // simplificaiton: event lists out of scope (for now? TODO)
+  requires pxTCB->xEventListItem.pxContainer == \null;
+
+  requires tick_lists_model(&xReadyTasksList, pxDelayedTaskList, pxOverflowDelayedTaskList);
+  requires state_item_value_separated_from_ready_deadlines(pxTCB, &xReadyTasksList);
+  requires insert_ready_frame_separated(pxTCB);
+
+  assigns pxTCB->xStateListItem.pxContainer,
+          pxDelayedTaskList->uxNumberOfItems,
+          pxDelayedTaskList->pxIndex,
+          pxTCB->xStateListItem.pxNext->pxPrevious,
+          pxTCB->xStateListItem.pxPrevious->pxNext,
+          pxTCB->xStateListItem.xItemValue,
+          xReadyTasksList.uxNumberOfItems,
+          pxTCB->xStateListItem.pxNext,
+          pxTCB->xStateListItem.pxPrevious,
+          { item->pxNext     | struct xLIST_ITEM *item; \valid(item) },
+          { item->pxPrevious | struct xLIST_ITEM *item; \valid(item) };
+
+  ensures \valid(pxTCB);
+  ensures \valid(pxCurrentTCB);
+  ensures pxCurrentTCB == \old(pxCurrentTCB);
+  ensures ready_list_model(&xReadyTasksList);
+  ensures delayed_list_model(pxDelayedTaskList);
+  ensures delayed_list_model(pxOverflowDelayedTaskList);
+  ensures disjoint_lists(pxDelayedTaskList, &xReadyTasksList);
+  ensures disjoint_lists(pxOverflowDelayedTaskList, &xReadyTasksList);
+  ensures disjoint_lists(pxDelayedTaskList, pxOverflowDelayedTaskList);
+  ensures tick_lists_model(&xReadyTasksList, pxDelayedTaskList, pxOverflowDelayedTaskList);
+
+*/
+static BaseType_t prvProcessUnblockedTask(TCB_t *pxTCB,
+                                          BaseType_t xSwitchRequired) {
+    prvDetachUnblockedTaskFromDelayedList(pxTCB);
+
+    if (listLIST_ITEM_CONTAINER(&(pxTCB->xEventListItem)) != NULL) {
+        listREMOVE_ITEM(&(pxTCB->xEventListItem));
+    } else {
+        mtCOVERAGE_TEST_MARKER();
+    }
+
+    prvInsertUnblockedTaskIntoReadyList(pxTCB);
 #ifdef SANITY_PROBE
     /* Sanity probe — must NOT prove. Checks that the hypothesis set
      * inside the unblock helper is not vacuous. Enabled only by
@@ -334,6 +402,7 @@ BeforeReadyInsert:
   behavior running:
     assumes uxSchedulerSuspended == (UBaseType_t)0U;
     requires \valid(pxCurrentTCB);
+    requires \forall TCB_t *t; \valid(t) ==> insert_ready_frame_separated(t);
 
     requires tick_lists_model(&xReadyTasksList, pxDelayedTaskList, pxOverflowDelayedTaskList);
 

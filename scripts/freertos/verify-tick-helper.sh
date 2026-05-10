@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# Headless WP run for the per-iteration helper extracted from
-# xTaskIncrementTick (prvProcessUnblockedTask in reference/incrementtick.c).
+# Headless WP run for the per-iteration helpers extracted from
+# xTaskIncrementTick (reference/incrementtick.c).
 #
 # Companion to verify-tick-reference.sh: that script verifies the caller
 # (treating the helper's contract as a black-box assumption); this one
@@ -36,11 +36,15 @@ echo "========================================"
 echo " WP Verification (FreeRTOS reference)"
 echo "========================================"
 echo ""
-echo "--- prvProcessUnblockedTask (reference) ---"
+echo "--- xTaskIncrementTick helpers (reference) ---"
 
 frama-c \
     -cpp-command "${CPP_CMD}" \
     -machdep "${MACHDEP}" -cpp-frama-c-compliant -c11 \
-    -wp -wp-fct prvProcessUnblockedTask -wp-model "Typed+Cast" \
+    -wp \
+    -wp-fct prvDetachUnblockedTaskFromDelayedList \
+    -wp-fct prvInsertUnblockedTaskIntoReadyList \
+    -wp-fct prvProcessUnblockedTask \
+    -wp-model "Typed+Cast" \
     "$@" \
     "${OVERLAY}/reference/incrementtick.c"
