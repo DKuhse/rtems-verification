@@ -16,6 +16,21 @@ if command -v opam >/dev/null 2>&1; then
     eval $(opam env)
 fi
 
+# ---------------------------------------------------------------------------
+# TOOLCHAIN WORKAROUND -- DO NOT REMOVE
+# Frama-C 25 + Why3 1.5.1 packaging bug: wp.driver references vset as
+# "vset.Vset" (no namespace) but the file actually lives in the frama_c_wp/
+# subdirectory. Expose it at the path the driver expects by symlinking
+# (idempotent). DO NOT patch wp.driver to add the namespace prefix -- that
+# triggers a duplicate memory.Memory.addr load and breaks every goal.
+# Full background: see scripts/6.2/README.md ("vset.mlw symlink").
+# Any new EDF-touching verify script must include this same shim.
+# ---------------------------------------------------------------------------
+WP_WHY3_DIR="$(dirname "$(command -v frama-c)")/../share/frama-c/wp/why3"
+if [ -f "${WP_WHY3_DIR}/frama_c_wp/vset.mlw" ] && [ ! -e "${WP_WHY3_DIR}/vset.mlw" ]; then
+    ln -s frama_c_wp/vset.mlw "${WP_WHY3_DIR}/vset.mlw"
+fi
+
 FRAMA_C_CMD="frama-c"
 if [ "$1" = "--gui" ]; then
     FRAMA_C_CMD="frama-c-gui"

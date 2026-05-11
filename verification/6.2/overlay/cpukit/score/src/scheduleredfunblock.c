@@ -43,6 +43,57 @@
 #include <rtems/score/schedulerimpl.h>
 #include <rtems/score/thread.h>
 
+/*@
+  requires \valid_read( scheduler );
+  requires \valid( the_thread );
+  requires \valid( (Scheduler_EDF_Node *) node );
+  requires &((Scheduler_EDF_Node *) node)->Base == node;
+  requires \valid( (Scheduler_EDF_Context *) scheduler->context );
+  requires edf_ready_context_well_formed{Pre}(
+    (Scheduler_EDF_Context *) scheduler->context );
+  requires !edf_ready_member{Pre}(
+    (Scheduler_EDF_Context *) scheduler->context,
+    (Scheduler_EDF_Node *) node );
+
+  requires \valid_read( &_Thread_Heir->is_preemptible );
+  requires \valid_read( &_Thread_Heir->Scheduler.nodes );
+  requires \valid( _Thread_Heir->Scheduler.nodes );
+
+  assigns ((Scheduler_EDF_Node *) node)->Base.Priority,
+          ((Scheduler_EDF_Node *) node)->priority,
+          ((Scheduler_EDF_Context *) scheduler->context)->Ready,
+          { other->Node | Scheduler_EDF_Node *other; \valid( other ) },
+          _Thread_Heir, _Thread_Dispatch_necessary;
+
+  ensures ((Scheduler_EDF_Node *) node)->priority ==
+    SCHEDULER_PRIORITY_PURIFY( \at( node->Priority.value, Pre ) );
+  ensures edf_ready_set{Post}(
+            (Scheduler_EDF_Context *) scheduler->context ) ==
+          edf_ready_insert(
+            edf_ready_set{Pre}(
+              (Scheduler_EDF_Context *) scheduler->context ),
+            (Scheduler_EDF_Node *) node );
+
+  behavior keep_due_to_priority:
+    assumes SCHEDULER_PRIORITY_PURIFY( node->Priority.value ) >=
+      \at( _Thread_Heir, Pre )->Scheduler.nodes->Wait.Priority.Node.priority;
+    ensures _Thread_Heir == \at( _Thread_Heir, Pre );
+
+  behavior keep_due_to_nonpreemptible:
+    assumes SCHEDULER_PRIORITY_PURIFY( node->Priority.value ) <
+      \at( _Thread_Heir, Pre )->Scheduler.nodes->Wait.Priority.Node.priority;
+    assumes !\at( _Thread_Heir, Pre )->is_preemptible;
+    ensures _Thread_Heir == \at( _Thread_Heir, Pre );
+
+  behavior update_heir:
+    assumes SCHEDULER_PRIORITY_PURIFY( node->Priority.value ) <
+      \at( _Thread_Heir, Pre )->Scheduler.nodes->Wait.Priority.Node.priority;
+    assumes \at( _Thread_Heir, Pre )->is_preemptible;
+    ensures _Thread_Heir == the_thread;
+
+  complete behaviors;
+  disjoint behaviors;
+*/
 void _Scheduler_EDF_Unblock(
   const Scheduler_Control *scheduler,
   Thread_Control          *the_thread,
