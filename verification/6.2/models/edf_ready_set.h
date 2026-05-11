@@ -12,11 +12,9 @@
       // only read frame is `context->Ready` (the tree root), which serves
       // as the proxy for the abstract set. The set "changes" only through
       // the `ensures` of operations (Enqueue/Extract); RBTree pointer
-      // bookkeeping inside the nodes is below the abstraction. This is
-      // *deliberately* a lie at the C level -- the actual set value
-      // depends on tree traversal -- but it is sound against the
-      // abstraction layer: callers above this layer don't read RBTree
-      // node fields directly.
+      // bookkeeping inside the nodes is below the abstraction.
+      // This is a 'soft' lie - a true assigns would need an traversal model
+      // however, since we don't touch the internals, this should be fine.
       logic set<Scheduler_EDF_Node *> edf_ready_set{L}(
         Scheduler_EDF_Context *context
       )
