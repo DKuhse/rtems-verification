@@ -27,20 +27,28 @@
 
       predicate edf_thread_owns_earliest_ready_node{L}(
         set<Scheduler_EDF_Node *> nodes,
-        Thread_Control           *heir
+        Thread_Control           *thread
       ) =
         \exists Scheduler_EDF_Node *node;
           edf_ready_earliest_node{L}( nodes, node ) &&
-          node->Base.owner == heir;
+          node->Base.owner == thread;
 
-      predicate edf_heir_is_earliest_ready{L}(
+      predicate edf_thread_is_earliest_ready{L}(
         Scheduler_EDF_Context *context,
-        Thread_Control        *heir
+        Thread_Control        *thread
       ) =
         edf_thread_owns_earliest_ready_node{L}(
           edf_ready_set{L}( context ),
-          heir
+          thread
         );
+
+      predicate edf_preemptible_heir_is_earliest_ready{L}(
+        Scheduler_EDF_Context *context,
+        Thread_Control        *heir
+      ) =
+        \valid_read( heir ) &&
+        ( !heir->is_preemptible ||
+          edf_thread_is_earliest_ready{L}( context, heir ) );
     }
 */
 

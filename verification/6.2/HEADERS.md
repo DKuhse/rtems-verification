@@ -189,11 +189,17 @@ abstract ready set.
 - `predicate edf_ready_earliest_node{L}(nodes, node)`
 - `predicate edf_ready_node_not_after{L}(left, right)`
 - `predicate edf_thread_owns_earliest_ready_node{L}(nodes, heir)`
-- `predicate edf_heir_is_earliest_ready{L}(context, heir)`
+- `predicate edf_thread_is_earliest_ready{L}(context, thread)`
+- `predicate edf_preemptible_heir_is_earliest_ready{L}(context, heir)`
 
-`edf_heir_is_earliest_ready{L}(context, heir)` states that `heir` owns a ready
-EDF node which satisfies `edf_ready_node_not_after{L}(node, other)` for every
-other ready EDF node in `edf_ready_set{L}(context)`.
+`edf_thread_is_earliest_ready{L}(context, thread)` states that `thread` owns a
+ready EDF node which satisfies `edf_ready_node_not_after{L}(node, other)` for
+every other ready EDF node in `edf_ready_set{L}(context)`.
+
+`edf_preemptible_heir_is_earliest_ready{L}(context, heir)` is the RTEMS
+heir-state property: if `heir` is preemptible, then it must be EDF-earliest;
+if it is not preemptible, RTEMS may intentionally leave it as the heir even
+when another ready thread has an earlier EDF priority.
 
 **Current scope**: EDF ordering over ready nodes and the scheduler heir. This
 model intentionally does not state that a priority value represents a
