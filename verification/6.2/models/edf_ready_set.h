@@ -43,22 +43,42 @@
         \valid( context ) &&
         edf_ready_valid_nodes{L}( edf_ready_set{L}( context ) );
 
+      // Set constructors are declared abstractly and characterised by
+      // membership axioms below. FC 32's WP rejects the equivalent
+      // `{ n | T *n; P(n) }` set-comprehension definitions with
+      // `Concretization for comprehension sets not implemented yet`.
       logic set<Scheduler_EDF_Node *> edf_ready_singleton(
         Scheduler_EDF_Node *node
-      ) =
-        { n | Scheduler_EDF_Node *n; n == node };
+      );
+
+      axiom edf_ready_singleton_membership:
+        \forall Scheduler_EDF_Node *node;
+        \forall Scheduler_EDF_Node *n;
+          ( n \in edf_ready_singleton( node ) ) <==> ( n == node );
 
       logic set<Scheduler_EDF_Node *> edf_ready_insert(
         set<Scheduler_EDF_Node *> nodes,
         Scheduler_EDF_Node       *node
-      ) =
-        { n | Scheduler_EDF_Node *n; n == node || n \in nodes };
+      );
+
+      axiom edf_ready_insert_membership:
+        \forall set<Scheduler_EDF_Node *> nodes;
+        \forall Scheduler_EDF_Node *node;
+        \forall Scheduler_EDF_Node *n;
+          ( n \in edf_ready_insert( nodes, node ) ) <==>
+          ( n == node || n \in nodes );
 
       logic set<Scheduler_EDF_Node *> edf_ready_extract(
         set<Scheduler_EDF_Node *> nodes,
         Scheduler_EDF_Node       *node
-      ) =
-        { n | Scheduler_EDF_Node *n; n != node && n \in nodes };
+      );
+
+      axiom edf_ready_extract_membership:
+        \forall set<Scheduler_EDF_Node *> nodes;
+        \forall Scheduler_EDF_Node *node;
+        \forall Scheduler_EDF_Node *n;
+          ( n \in edf_ready_extract( nodes, node ) ) <==>
+          ( n != node && n \in nodes );
 
       predicate edf_ready_minimum_node{L}(
         set<Scheduler_EDF_Node *> nodes,

@@ -34,8 +34,18 @@ RUN ../source-builder/sb-set-builder --prefix=${RTEMS_PREFIX} 5/rtems-x86_64
 # =============================================================================
 # Stage 2: Final image with cross-compiler and Frama-C
 # RTEMS source lives on the host and is mounted at runtime.
+#
+# FRAMA_C_VERSION selects the Frama-C/Why3/Alt-Ergo stack:
+#   25.0 (default) -- legacy stack used for the published hand-port results
+#                     (Frama-C 25 + Alt-Ergo 2.4.2 pinned).
+#   32.0           -- active-port stack. Lets opam pick a compatible
+#                     Alt-Ergo (no explicit pin). FC 25's wp.driver has a
+#                     vset packaging bug that breaks set-typed `assigns`
+#                     clauses needed for the EDF model.
 # =============================================================================
 FROM ubuntu:22.04 AS final
+
+ARG FRAMA_C_VERSION=25.0
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV HOME=/root
@@ -53,10 +63,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install Frama-C BEFORE adding RTEMS toolchain to PATH, so opam uses
 # system autoconf/automake (RTEMS ships its own which confuses opam builds).
+# For FRAMA_C_VERSION=25.0 we pin Alt-Ergo to 2.4.2 (matches the published
+# legacy results). For newer Frama-C, let opam resolve a compatible Alt-Ergo.
 RUN opam init --disable-sandboxing --compiler=4.14.1 -y \
     && eval $(opam env) \
-    && opam pin add alt-ergo 2.4.2 -y --no-action \
-    && opam install frama-c.25.0 alt-ergo.2.4.2 -y \
+    && if [ "${FRAMA_C_VERSION}" = "25.0" ]; then \
+         opam pin add alt-ergo 2.4.2 -y --no-action \
+         && opam install frama-c.${FRAMA_C_VERSION} alt-ergo.2.4.2 -y; \
+       else \
+         opam install frama-c.${FRAMA_C_VERSION} alt-ergo -y; \
+       fi \
     && eval $(opam env) \
     && why3 config detect
 

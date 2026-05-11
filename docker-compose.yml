@@ -40,18 +40,38 @@ services:
       - ./legacy/rtems-6.2-hand-port/verification:/workspace/verification
     command: ["/opt/scripts/6.2/verify-wp-all.sh", "-wp-model", "Typed+Cast", "-wp-timeout", "30"]
 
-  # Active headless verification (RTEMS 6.2 abstract RBTree port).
-  # Default invocation parses/runs the active _Scheduler_EDF_Unblock slice
-  # with the EDF ready-set model included. Override the command to pass WP
-  # flags as contracts are added, e.g.:
-  #   docker compose run --rm verify-6.2-active \
-  #     /opt/scripts/6.2/verify-edf-unblock.sh \
-  #     -wp -wp-fct _Scheduler_EDF_Unblock -wp-model 'Typed+Cast'
+  # Active headless verification (RTEMS 6.2 abstract RBTree port) on the
+  # legacy Frama-C 25 stack. KEPT FOR REFERENCE ONLY: the active scripts
+  # have moved to `-std c11` (FC 32 syntax), so this service no longer
+  # parses the .c file. Use `verify-6.2-active-fc32` for active work.
   verify-6.2-active:
     build:
       context: .
       dockerfile: Dockerfile
     image: rtems-edf-toolchain
+    working_dir: /workspace/rtems/src/rtems-6.2-pristine/cpukit
+    volumes:
+      - ./rtems:/workspace/rtems
+      - ./scripts:/opt/scripts
+      - ./verification:/workspace/verification
+    command: ["/opt/scripts/6.2/verify-edf-unblock.sh"]
+
+  # Active headless verification on the modern Frama-C 32 stack. Same
+  # source tree as verify-6.2-active but a separate toolchain image, so
+  # the legacy FC 25 results remain byte-reproducible while active-port
+  # work moves forward on a healthy toolchain.
+  #
+  # Override the command to pass WP flags, e.g.:
+  #   docker compose run --rm verify-6.2-active-fc32 \
+  #     /opt/scripts/6.2/verify-edf-unblock.sh \
+  #     -wp -wp-fct _Scheduler_EDF_Unblock -wp-model 'Typed+Cast'
+  verify-6.2-active-fc32:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        FRAMA_C_VERSION: "32.0"
+    image: rtems-edf-toolchain-fc32
     working_dir: /workspace/rtems/src/rtems-6.2-pristine/cpukit
     volumes:
       - ./rtems:/workspace/rtems

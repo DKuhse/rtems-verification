@@ -39,6 +39,26 @@
 #include "config.h"
 #endif
 
+#ifdef __FRAAMC__
+/*
+ * Frama-C 32 is strict about implicit function declarations. RTEMS'
+ * timestampimpl.h calls sbttots/tstosbt/sbttotv without a visible
+ * declaration in the headers we include here. Forward-declare them so
+ * parsing succeeds; their bodies aren't part of the Unblock slice.
+ */
+#include <stdint.h>
+#include <sys/time.h>
+#include <time.h>
+
+int64_t          tstosbt( struct timespec );
+struct timespec  sbttots( int64_t );
+struct timeval   sbttotv( int64_t );
+
+#ifndef SBT_1S
+#define SBT_1S ( (int64_t) 1 << 32 )
+#endif
+#endif
+
 #include <rtems/score/scheduleredfimpl.h>
 #include <rtems/score/schedulerimpl.h>
 #include <rtems/score/thread.h>

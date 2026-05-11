@@ -43,7 +43,7 @@ ${FRAMA_C_CMD} \
         -I${RTEMS_SRC}/bsps/x86_64/include \
         -I${RTEMS_SRC}/bsps/x86_64/amd64/include \
         -nostdinc" \
-    -machdep gcc_x86_64 -cpp-frama-c-compliant -c11 \
+    -machdep gcc_x86_64 -cpp-frama-c-compliant -std c11 \
     -wp \
     -wp-rte \
     -wp-model "Typed+Cast" \
