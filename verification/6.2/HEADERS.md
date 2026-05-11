@@ -21,6 +21,7 @@ Copied from `rtems/src/rtems-6.2-pristine/`:
 - `overlay/cpukit/include/rtems/score/thread.h`
 - `overlay/cpukit/score/src/scheduleredfunblock.c`
 - `models/edf_ready_set.h`
+- `models/edf_property.h`
 
 The next implementation step is to connect `_Scheduler_EDF_Enqueue()` and
 eventually `_Scheduler_EDF_Extract()` / `_Scheduler_EDF_Get_highest_ready()` to
@@ -63,6 +64,9 @@ slice.
 
 - Commented out `#include <limits.h>` for Frama-C preprocessing compatibility.
   This matches the legacy 6.2 hand-port workaround.
+- Includes `edf_ready_set.h` and `edf_property.h` when `__FRAAMC__` is defined
+  so contracts on EDF declarations can use the verification models after
+  `Scheduler_EDF_Context` and `Scheduler_EDF_Node` are declared.
 
 **Assumption**:
 
@@ -170,3 +174,27 @@ RBTree shape, colors, rotations, or traversal.
 
 **Expected next changes**: add contracts for `_Scheduler_EDF_Enqueue()` in
 terms of `edf_ready_set{Pre}` and `edf_ready_set{Here}`.
+
+### edf_property.h
+
+**Source**: new verification-only model header.
+
+**Status**: active abstract model.
+
+**Reason for import**: introduces the scheduler-level EDF property over the
+abstract ready set.
+
+**Definitions**:
+
+- `predicate edf_ready_earliest_node{L}(nodes, node)`
+- `predicate edf_ready_node_not_after{L}(left, right)`
+- `predicate edf_thread_owns_earliest_ready_node{L}(nodes, heir)`
+- `predicate edf_heir_is_earliest_ready{L}(context, heir)`
+
+`edf_heir_is_earliest_ready{L}(context, heir)` states that `heir` owns a ready
+EDF node which satisfies `edf_ready_node_not_after{L}(node, other)` for every
+other ready EDF node in `edf_ready_set{L}(context)`.
+
+**Current scope**: EDF ordering over ready nodes and the scheduler heir. This
+model intentionally does not state that a priority value represents a
+particular deadline and does not model equal-priority FIFO/tie order.

@@ -1,0 +1,47 @@
+/*
+ * Abstract EDF scheduler property model. Verification only header.
+ */
+
+#ifndef VERIFICATION_6_2_EDF_PROPERTY_H
+#define VERIFICATION_6_2_EDF_PROPERTY_H
+
+#include <edf_ready_set.h>
+
+/*@ axiomatic EDFProperty {
+      predicate edf_ready_node_not_after{L}(
+        Scheduler_EDF_Node *left,
+        Scheduler_EDF_Node *right
+      ) =
+        \valid_read( left ) &&
+        \valid_read( right ) &&
+        left->priority <= right->priority;
+
+      predicate edf_ready_earliest_node{L}(
+        set<Scheduler_EDF_Node *> nodes,
+        Scheduler_EDF_Node       *node
+      ) =
+        edf_ready_valid_nodes{L}( nodes ) &&
+        node \in nodes &&
+        \forall Scheduler_EDF_Node *other;
+          other \in nodes ==> edf_ready_node_not_after{L}( node, other );
+
+      predicate edf_thread_owns_earliest_ready_node{L}(
+        set<Scheduler_EDF_Node *> nodes,
+        Thread_Control           *heir
+      ) =
+        \exists Scheduler_EDF_Node *node;
+          edf_ready_earliest_node{L}( nodes, node ) &&
+          node->Base.owner == heir;
+
+      predicate edf_heir_is_earliest_ready{L}(
+        Scheduler_EDF_Context *context,
+        Thread_Control        *heir
+      ) =
+        edf_thread_owns_earliest_ready_node{L}(
+          edf_ready_set{L}( context ),
+          heir
+        );
+    }
+*/
+
+#endif /* VERIFICATION_6_2_EDF_PROPERTY_H */

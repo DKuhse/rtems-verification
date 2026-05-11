@@ -121,6 +121,11 @@ typedef struct {
   Priority_Control priority;
 } Scheduler_EDF_Node;
 
+#ifdef __FRAAMC__
+#include <edf_ready_set.h>
+#include <edf_property.h>
+#endif
+
 /**
  * @brief Initializes EDF scheduler.
  *

@@ -33,6 +33,7 @@ MODEL="${OVERLAY}/models/edf_ready_set.h"
 echo "=== EDF Unblock (RTEMS 6.2 active port) ==="
 ${FRAMA_C_CMD} \
     -cpp-command "${RTEMS_PREFIX}/bin/x86_64-rtems5-gcc -C -E \
+        -D__FRAAMC__ \
         -I${OVERLAY}/overlay/cpukit/include \
         -I${OVERLAY}/models \
         -I${RTEMS_SRC}/cpukit/include \
@@ -43,7 +44,7 @@ ${FRAMA_C_CMD} \
         -I${RTEMS_SRC}/bsps/include \
         -I${RTEMS_SRC}/bsps/x86_64/include \
         -I${RTEMS_SRC}/bsps/x86_64/amd64/include \
-        -nostdinc -include ${MODEL}" \
+        -nostdinc" \
     -machdep gcc_x86_64 -cpp-frama-c-compliant -c11 \
     -inline-calls "_Scheduler_uniprocessor_Unblock,_Scheduler_uniprocessor_Update_heir_if_preemptible,_Scheduler_uniprocessor_Update_heir" \
     "${SRC}" \
