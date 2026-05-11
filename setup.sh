@@ -113,10 +113,10 @@ sed -i 's|Per_CPU_Control_envelope _Per_CPU_Information\[\]|Per_CPU_Control_enve
 
 echo "Patches (5.1) applied."
 
-# RTEMS 6.2 uses the overlay model — see verification/6.2/. The pristine
-# 6.2 source is left untouched; annotated headers, modified sources, and
-# stubs live under verification/6.2/{overlay,stubs}/ and shadow upstream
-# at verification time via Frama-C's -I order.
+# The old RTEMS 6.2 overlay hand-port is retained under
+# legacy/rtems-6.2-hand-port/ as reference material. The active 6.2 effort is
+# documented in verification/6.2/EDF_RBTREE_ABSTRACTION_PLAN.md and should
+# rebuild the proof around an abstract RBTree contract layer.
 
 # ── Step 5: Copy verification files into RTEMS source tree ────────
 echo "Copying verification files (5.1)..."
@@ -143,18 +143,19 @@ echo ""
 echo "Setup complete."
 echo "  Modified (annotated) 5.1 source: rtems/src/rtems-5.1/"
 echo "  Pristine             5.1 source: rtems/src/rtems-5.1-pristine/"
-echo "  Pristine             6.2 source: rtems/src/rtems-6.2/ (overlay shadows it at verify time)"
+echo "  Pristine             6.2 source: rtems/src/rtems-6.2/"
 echo "  Pristine reference   6.2 source: rtems/src/rtems-6.2-pristine/"
-echo "  6.2 overlay (modifications):     verification/6.2/overlay/, verification/6.2/stubs/"
+echo "  Legacy 6.2 hand-port:             legacy/rtems-6.2-hand-port/"
+echo "  Active 6.2 plan:                  verification/6.2/EDF_RBTREE_ABSTRACTION_PLAN.md"
 echo ""
 echo "  Diff modified vs pristine (5.1): diff -ruN rtems/src/rtems-5.1-pristine/ rtems/src/rtems-5.1/"
-echo "  Diff overlay vs pristine (6.2):  diff -ruN rtems/src/rtems-6.2-pristine/cpukit/ verification/6.2/overlay/cpukit/"
+echo "  Diff legacy overlay vs pristine (6.2): diff -ruN rtems/src/rtems-6.2-pristine/cpukit/ legacy/rtems-6.2-hand-port/verification/6.2/overlay/cpukit/"
 echo ""
 echo "Usage (RTEMS 5.1):"
 echo "  docker compose run --rm verify verify-wp-all.sh -wp-model 'Typed+Cast'"
 echo "  docker compose run --rm verify verify-edf-update-priority.sh -wp -wp-fct _Scheduler_EDF_Update_priority -wp-model 'Typed+Cast'"
 echo ""
-echo "Usage (RTEMS 6.2):"
+echo "Usage (legacy RTEMS 6.2 hand-port):"
 echo "  docker compose run --rm verify-6.2"
 echo "  docker compose run --rm verify-6.2 /opt/scripts/6.2/verify-edf-update-priority.sh -wp -wp-fct _Scheduler_EDF_Update_priority -wp-model 'Typed+Cast'"
 echo ""

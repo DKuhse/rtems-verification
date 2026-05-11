@@ -4,7 +4,7 @@
  * @file
  *
  * SIMPLIFIED VERIFICATION HEADER — replaces the original threadimpl.h.
- * See verification/6.2/HEADERS.md for documentation of changes.
+ * See legacy/rtems-6.2-hand-port/verification/6.2/HEADERS.md for documentation.
  *
  * Original: cpukit/include/rtems/score/threadimpl.h (RTEMS 6.2, ~2600 lines, 71 inline functions)
  * This version keeps only the ~10 functions needed for EDF scheduler

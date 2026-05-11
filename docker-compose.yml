@@ -21,9 +21,10 @@ services:
       - ./verification:/workspace/verification
     command: ["verify-all.sh"]
 
-  # Headless verification (RTEMS 6.2). Default invocation matches the
-  # published 4,804/4,804 result. Override the command to target a
-  # single function, e.g.:
+  # Legacy headless verification (RTEMS 6.2 hand-port). This is retained
+  # as reference material while the active 6.2 effort moves to an abstract
+  # RBTree model under verification/6.2/.
+  # Override the command to target a single legacy function, e.g.:
   #   docker compose run --rm verify-6.2 \
   #     /opt/scripts/6.2/verify-edf-update-priority.sh \
   #     -wp -wp-fct _Scheduler_EDF_Update_priority -wp-model 'Typed+Cast'
@@ -35,14 +36,13 @@ services:
     working_dir: /workspace/rtems/src/rtems-6.2/cpukit
     volumes:
       - ./rtems:/workspace/rtems
-      - ./scripts:/opt/scripts
-      - ./verification:/workspace/verification
+      - ./legacy/rtems-6.2-hand-port/scripts:/opt/scripts
+      - ./legacy/rtems-6.2-hand-port/verification:/workspace/verification
     command: ["/opt/scripts/6.2/verify-wp-all.sh", "-wp-model", "Typed+Cast", "-wp-timeout", "30"]
 
   # Headless verification (FreeRTOS EDF). Currently a smoke test that
   # only exercises the toolchain wiring against list.c — annotated targets
-  # get added incrementally. Override the command to target a single
-  # function the same way as verify-6.2.
+  # get added incrementally.
   verify-freertos:
     build:
       context: .

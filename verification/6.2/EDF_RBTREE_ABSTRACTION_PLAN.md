@@ -41,8 +41,10 @@ For EDF specifically:
 - `Scheduler_EDF_Context::Ready` is the EDF ready RBTree.
 - `Scheduler_EDF_Node::Node` is the RBTree node embedded in each EDF scheduler
   node.
-- EDF helper code that touches the ready tree is in
-  `verification/6.2/overlay/cpukit/include/rtems/score/scheduleredfimpl.h`.
+- The legacy 6.2 hand-port's EDF helper code is kept for reference at
+  `legacy/rtems-6.2-hand-port/verification/6.2/overlay/cpukit/include/rtems/score/scheduleredfimpl.h`.
+  The active verification work should recreate this boundary with explicit
+  abstract RBTree contracts instead of extending the legacy stubs directly.
 
 There is a second RBTree use in the thread priority aggregation code:
 

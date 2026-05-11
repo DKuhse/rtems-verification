@@ -189,7 +189,7 @@ during debugging but turned out to be unnecessary for Release/Cancel.
 WP only analyzes functions targeted by `-wp-fct`, so the 450
 uncontracted inline functions from original headers don't interfere.
 
-The simplified headers are kept in `verification/6.2/headers/` in case
+The simplified headers are kept in `legacy/rtems-6.2-hand-port/verification/6.2/headers/` in case
 they're needed for Phase 3 (Update_priority, Unblock), where
 `-inline-calls` pulls in `scheduleruniimpl.h` functions that call
 `_Thread_Get_CPU`, `_Thread_Update_CPU_time_used`, etc. But they should

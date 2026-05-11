@@ -4,7 +4,7 @@
  * @file
  *
  * SIMPLIFIED VERIFICATION HEADER — replaces the original schedulerimpl.h.
- * See verification/6.2/HEADERS.md for documentation of changes.
+ * See legacy/rtems-6.2-hand-port/verification/6.2/HEADERS.md for documentation.
  *
  * Original: cpukit/include/rtems/score/schedulerimpl.h (RTEMS 6.2)
  * This version keeps only the functions needed for EDF scheduler

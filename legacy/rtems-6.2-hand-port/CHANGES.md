@@ -1,7 +1,7 @@
 # Changes to Verification Annotations
 
 Changes made to the ACSL annotations and WP invocation from the original
-[Formally-Verifying-Implementations-of-EDF-Scheduler-in-RTEMS](Formally-Verifying-Implementations-of-EDF-Scheduler-in-RTEMS/)
+[Formally-Verifying-Implementations-of-EDF-Scheduler-in-RTEMS](../../Formally-Verifying-Implementations-of-EDF-Scheduler-in-RTEMS/)
 repository that brought all proof goals to 100%.
 
 ## Unverified Assumptions (5.1 and 6.2)

@@ -4,7 +4,7 @@
  *            scheduleredfunblock.c
  *
  * Each signature matches the actual RTEMS 6.2 declaration.
- * See verification/6.2/HEADERS.md for documentation.
+ * See legacy/rtems-6.2-hand-port/verification/6.2/HEADERS.md for documentation.
  */
 
 #include <rtems/score/thread.h>

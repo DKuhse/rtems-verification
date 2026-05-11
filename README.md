@@ -4,6 +4,18 @@ scripts/ has scripts to verify individual functions.
 verification/ includes the annotated source code that is overlayed on top of the original source code.
 original source code needs to be obtained separately (see setup.sh).
 
+## Active RTEMS 6.2 Direction
+
+The previous RTEMS 6.2 verification hand-port has been quarantined under
+`legacy/rtems-6.2-hand-port/`. It is kept as reference material, not as the
+trusted active verification path.
+
+The active RTEMS 6.2 plan is now:
+
+- `verification/6.2/EDF_RBTREE_ABSTRACTION_PLAN.md`
+
+The next 6.2 implementation should build a clean abstract RBTree contract layer
+instead of extending the legacy ghost-stub hand-port.
 
 ## Reproduce
 
@@ -11,11 +23,11 @@ original source code needs to be obtained separately (see setup.sh).
 docker compose build                    # Frama-C 25 + RSB cross-toolchain
 ./setup.sh                              # download/extract sources, build BSP, apply 5.1 patches
 docker compose run --rm verify          # RTEMS 5.1 — runs verify-wp-all.sh
-docker compose run --rm verify-6.2      # RTEMS 6.2 — runs verify-wp-all.sh -wp-timeout 30
+docker compose run --rm verify-6.2      # legacy RTEMS 6.2 hand-port
 docker compose run --rm verify-freertos # FreeRTOS EDF (MSP430) — smoke test only for now
 ```
 
-Run a single function:
+Run a single legacy 6.2 function:
 
 ```sh
 docker compose run --rm verify-6.2 \

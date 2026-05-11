@@ -5,8 +5,7 @@
 # At this stage there are no annotated functions — this script just
 # preprocesses list.c through Frama-C with the MSP430-flavoured toolchain
 # and runs WP, so we can confirm the Docker setup is wired up correctly.
-# Real verification targets get added later (one block per function group,
-# mirroring scripts/6.2/verify-wp-all.sh).
+# Real verification targets get added later, one block per function group.
 #
 # Usage:
 #   verify-wp-all.sh                            # default flags
