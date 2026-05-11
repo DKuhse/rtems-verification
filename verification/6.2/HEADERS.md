@@ -17,6 +17,7 @@ Copied from `rtems/src/rtems-6.2-pristine/`:
 - `overlay/cpukit/include/rtems/score/scheduleredf.h`
 - `overlay/cpukit/include/rtems/score/scheduleredfimpl.h`
 - `overlay/cpukit/include/rtems/score/schedulerimpl.h`
+- `overlay/cpukit/include/rtems/score/schedulernodeimpl.h`
 - `overlay/cpukit/include/rtems/score/scheduleruniimpl.h`
 - `overlay/cpukit/include/rtems/score/thread.h`
 - `overlay/cpukit/score/src/scheduleredfunblock.c`
@@ -77,14 +78,24 @@ slice.
 
 **Source**: `cpukit/include/rtems/score/scheduleredfimpl.h`
 
-**Status**: pristine copy, no verification changes.
+**Status**: active compatibility patch.
 
 **Reason for import**: contains the inline EDF helpers used by
 `_Scheduler_EDF_Unblock()`, especially `_Scheduler_EDF_Get_context()`,
 `_Scheduler_EDF_Node_downcast()`, and `_Scheduler_EDF_Enqueue()`.
 
-**Expected verification changes**: add contracts around the EDF helper layer
-and connect `_Scheduler_EDF_Enqueue()` to the abstract EDF ready-tree model.
+**Modified**:
+
+- Added ACSL contracts for `_Scheduler_EDF_Get_context()` and
+  `_Scheduler_EDF_Node_downcast()`. The context contract requires a readable
+  scheduler with a valid EDF context, assigns nothing, and returns
+  `scheduler->context` cast to `Scheduler_EDF_Context *`. The downcast contract
+  requires a `Scheduler_Node *` that is the embedded `Base` member of a valid
+  `Scheduler_EDF_Node`, assigns nothing, and returns the enclosing EDF node.
+
+**Expected verification changes**: add contracts around the remaining EDF
+helper layer and connect `_Scheduler_EDF_Enqueue()` to the abstract EDF
+ready-tree model.
 
 ### schedulerimpl.h
 
@@ -95,6 +106,22 @@ and connect `_Scheduler_EDF_Enqueue()` to the abstract EDF ready-tree model.
 **Reason for import**: directly included by `scheduleredfunblock.c` and by
 `scheduleruniimpl.h`; provides scheduler helper APIs used by the uniprocessor
 scheduler path.
+
+### schedulernodeimpl.h
+
+**Source**: `cpukit/include/rtems/score/schedulernodeimpl.h`
+
+**Status**: active compatibility patch.
+
+**Reason for import**: provides `_Scheduler_Node_get_priority()`, which is
+used by `_Scheduler_EDF_Unblock()` to obtain the scheduler node priority before
+purifying and storing it in the EDF node.
+
+**Modified**:
+
+- Added an ACSL contract for `_Scheduler_Node_get_priority()`. The contract
+  requires a valid scheduler node, assigns only the scheduler-node priority
+  subobject, preserves `node->Priority.value`, and returns its pre-call value.
 
 ### scheduleruniimpl.h
 

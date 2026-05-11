@@ -67,6 +67,15 @@ extern "C" {
  *
  * @return The scheduler context of @a scheduler.
  */
+/*@
+  requires \valid_read( scheduler );
+  requires \valid( (Scheduler_EDF_Context *) scheduler->context );
+
+  assigns \nothing;
+
+  ensures \result == (Scheduler_EDF_Context *) scheduler->context;
+  ensures \valid( \result );
+*/
 static inline Scheduler_EDF_Context *
   _Scheduler_EDF_Get_context( const Scheduler_Control *scheduler )
 {
@@ -94,6 +103,16 @@ static inline Scheduler_EDF_Node *_Scheduler_EDF_Thread_get_node(
  *
  * @return The corresponding scheduler EDF node.
  */
+/*@
+  requires \valid( (Scheduler_EDF_Node *) node );
+  requires &((Scheduler_EDF_Node *) node)->Base == node;
+
+  assigns \nothing;
+
+  ensures \result == (Scheduler_EDF_Node *) node;
+  ensures \valid( \result );
+  ensures &\result->Base == node;
+*/
 static inline Scheduler_EDF_Node * _Scheduler_EDF_Node_downcast(
   Scheduler_Node *node
 )
