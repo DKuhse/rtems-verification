@@ -37,6 +37,12 @@
         \forall Scheduler_EDF_Node *node;
           node \in nodes ==> \valid_read( node );
 
+      predicate edf_ready_context_well_formed{L}(
+        Scheduler_EDF_Context *context
+      ) =
+        \valid( context ) &&
+        edf_ready_valid_nodes{L}( edf_ready_set{L}( context ) );
+
       logic set<Scheduler_EDF_Node *> edf_ready_singleton(
         Scheduler_EDF_Node *node
       ) =

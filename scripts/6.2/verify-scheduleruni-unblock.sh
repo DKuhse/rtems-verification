@@ -1,14 +1,12 @@
 #!/bin/bash
 #
-# Verify _Scheduler_EDF_Unblock on the active RTEMS 6.2 port.
-#
-# This script uses the active overlay in verification/6.2 and includes the
-# abstract EDF ready-set model.  It does not use the legacy hand-port stubs.
+# Verify uniprocessor scheduler unblock inline helpers on the active RTEMS 6.2
+# port.
 #
 # Usage:
-#   verify-edf-unblock.sh
-#   verify-edf-unblock.sh --gui
-#   verify-edf-unblock.sh -wp -wp-fct _Scheduler_EDF_Unblock -wp-model "Typed+Cast"
+#   verify-scheduleruni-unblock.sh
+#   verify-scheduleruni-unblock.sh --gui
+#   verify-scheduleruni-unblock.sh -wp-model "Typed+Cast"
 #
 set -e
 
@@ -27,13 +25,11 @@ RTEMS_PREFIX="${RTEMS_PREFIX:-/opt/rtems5}"
 OVERLAY="${OVERLAY:-/workspace/verification/6.2}"
 RTEMS_BUILD_BSP="${RTEMS_BUILD_BSP:-/workspace/rtems/build/amd64/x86_64-rtems5/c/amd64/include}"
 
-SRC="${OVERLAY}/overlay/cpukit/score/src/scheduleredfunblock.c"
-MODEL="${OVERLAY}/models/edf_ready_set.h"
+SRC="${OVERLAY}/harnesses/scheduleruni-unblock-harness.c"
 
-[ -f "${SRC}" ] || { echo "missing overlay source: ${SRC}" >&2; exit 1; }
-[ -f "${MODEL}" ] || { echo "missing EDF ready model: ${MODEL}" >&2; exit 1; }
+[ -f "${SRC}" ] || { echo "missing harness source: ${SRC}" >&2; exit 1; }
 
-echo "=== EDF Unblock (RTEMS 6.2 active port) ==="
+echo "=== Scheduler Uniprocessor Unblock Helpers (RTEMS 6.2 active port) ==="
 ${FRAMA_C_CMD} \
     -cpp-command "${RTEMS_PREFIX}/bin/x86_64-rtems5-gcc -C -E \
         -D__FRAAMC__ \
@@ -50,6 +46,7 @@ ${FRAMA_C_CMD} \
         -I${RTEMS_SRC}/bsps/x86_64/amd64/include \
         -nostdinc" \
     -machdep gcc_x86_64 -cpp-frama-c-compliant -c11 \
-    -inline-calls "_Scheduler_uniprocessor_Unblock,_Scheduler_uniprocessor_Update_heir_if_preemptible,_Scheduler_uniprocessor_Update_heir" \
+    -wp \
+    -wp-fct "_Scheduler_uniprocessor_Update_heir_if_necessary,_Scheduler_uniprocessor_Update_heir_if_preemptible,_Scheduler_uniprocessor_Unblock" \
     "${SRC}" \
     "$@"

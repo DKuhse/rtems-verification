@@ -57,6 +57,14 @@ extern "C" {
  * @param[in, out] heir is the current heir thread.
  * @param[in, out] new_heir is the new heir thread.
  */
+/*@
+  requires heir != new_heir;
+
+  assigns _Thread_Heir, _Thread_Dispatch_necessary;
+
+  ensures _Thread_Heir == new_heir;
+  ensures _Thread_Dispatch_necessary == true;
+*/
 static inline void _Scheduler_uniprocessor_Update_heir(
   Thread_Control *heir,
   Thread_Control *new_heir
@@ -86,6 +94,18 @@ static inline void _Scheduler_uniprocessor_Update_heir(
  *
  * @param[in, out] new_heir is the new heir thread.
  */
+/*@
+  assigns _Thread_Heir, _Thread_Dispatch_necessary;
+
+  ensures \at( _Thread_Heir, Pre ) == new_heir ==>
+    _Thread_Heir == \at( _Thread_Heir, Pre );
+  ensures \at( _Thread_Heir, Pre ) == new_heir ==>
+    _Thread_Dispatch_necessary == \at( _Thread_Dispatch_necessary, Pre );
+  ensures \at( _Thread_Heir, Pre ) != new_heir ==>
+    _Thread_Heir == new_heir;
+  ensures \at( _Thread_Heir, Pre ) != new_heir ==>
+    _Thread_Dispatch_necessary == true;
+*/
 static inline void _Scheduler_uniprocessor_Update_heir_if_necessary(
   Thread_Control *new_heir
 )
@@ -104,6 +124,20 @@ static inline void _Scheduler_uniprocessor_Update_heir_if_necessary(
  * @param[in, out] heir is the current heir thread.
  * @param[in, out] new_heir is the new heir thread.
  */
+/*@
+  requires \valid_read( &heir->is_preemptible );
+
+  assigns _Thread_Heir, _Thread_Dispatch_necessary;
+
+  ensures ( heir == new_heir || !\at( heir->is_preemptible, Pre ) ) ==>
+    _Thread_Heir == \at( _Thread_Heir, Pre );
+  ensures ( heir == new_heir || !\at( heir->is_preemptible, Pre ) ) ==>
+    _Thread_Dispatch_necessary == \at( _Thread_Dispatch_necessary, Pre );
+  ensures ( heir != new_heir && \at( heir->is_preemptible, Pre ) ) ==>
+    _Thread_Heir == new_heir;
+  ensures ( heir != new_heir && \at( heir->is_preemptible, Pre ) ) ==>
+    _Thread_Dispatch_necessary == true;
+*/
 static inline void _Scheduler_uniprocessor_Update_heir_if_preemptible(
   Thread_Control *heir,
   Thread_Control *new_heir
@@ -154,6 +188,38 @@ static inline void _Scheduler_uniprocessor_Block(
  * @param the_thread is the thread.
  * @param priority is the priority of the thread.
  */
+/*@
+  requires \valid_read( &_Thread_Heir->is_preemptible );
+  requires \valid( _Thread_Heir->Scheduler.nodes );
+
+  assigns _Thread_Heir, _Thread_Dispatch_necessary;
+
+  ensures (
+    priority >=
+      \at( _Thread_Heir, Pre )->Scheduler.nodes->Wait.Priority.Node.priority
+    || !\at( _Thread_Heir, Pre )->is_preemptible
+  ) ==> _Thread_Heir == \at( _Thread_Heir, Pre );
+
+  ensures (
+    priority >=
+      \at( _Thread_Heir, Pre )->Scheduler.nodes->Wait.Priority.Node.priority
+    || !\at( _Thread_Heir, Pre )->is_preemptible
+  ) ==>
+    _Thread_Dispatch_necessary == \at( _Thread_Dispatch_necessary, Pre );
+
+  ensures (
+    priority <
+      \at( _Thread_Heir, Pre )->Scheduler.nodes->Wait.Priority.Node.priority
+    && \at( _Thread_Heir, Pre )->is_preemptible
+  ) ==> _Thread_Heir == the_thread;
+
+  ensures (
+    priority <
+      \at( _Thread_Heir, Pre )->Scheduler.nodes->Wait.Priority.Node.priority
+    && \at( _Thread_Heir, Pre )->is_preemptible
+    && \at( _Thread_Heir, Pre ) != the_thread
+  ) ==> _Thread_Dispatch_necessary == true;
+*/
 static inline void _Scheduler_uniprocessor_Unblock(
   const Scheduler_Control *scheduler,
   Thread_Control          *the_thread,

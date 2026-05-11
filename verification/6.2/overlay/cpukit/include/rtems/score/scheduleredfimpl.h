@@ -184,6 +184,18 @@ static inline bool _Scheduler_EDF_Priority_less_equal(
  * @param node The node to be inserted.
  * @param insert_priority The priority with which the node will be inserted.
  */
+/*@
+  requires edf_ready_context_well_formed{Pre}( context );
+  requires \valid( node );
+  requires !edf_ready_member{Pre}( context, node );
+
+  assigns context->Ready,
+          { other->Node | Scheduler_EDF_Node *other; \valid( other ) };
+
+  ensures edf_ready_set{Post}( context ) ==
+    edf_ready_insert( edf_ready_set{Pre}( context ), node );
+  ensures edf_ready_context_well_formed{Post}( context );
+*/
 static inline void _Scheduler_EDF_Enqueue(
   Scheduler_EDF_Context *context,
   Scheduler_EDF_Node    *node,

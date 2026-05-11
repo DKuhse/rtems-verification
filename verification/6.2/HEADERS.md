@@ -21,6 +21,7 @@ Copied from `rtems/src/rtems-6.2-pristine/`:
 - `overlay/cpukit/include/rtems/score/scheduleruniimpl.h`
 - `overlay/cpukit/include/rtems/score/thread.h`
 - `overlay/cpukit/score/src/scheduleredfunblock.c`
+- `harnesses/scheduleruni-unblock-harness.c`
 - `models/edf_ready_set.h`
 - `models/edf_property.h`
 
@@ -35,6 +36,8 @@ needed to verify `_Scheduler_EDF_Unblock()`.
   shadow pristine RTEMS 6.2 headers
 - `overlay/cpukit/score/src/` — annotated source files passed directly to
   Frama-C
+- `harnesses/` — small translation units used to verify header-only inline
+  helpers
 - `models/` — verification-only model contracts, especially the abstract RBTree
   boundary
 - `headers/` — reserve simplified headers, not part of the active include path
@@ -92,10 +95,14 @@ slice.
   `scheduler->context` cast to `Scheduler_EDF_Context *`. The downcast contract
   requires a `Scheduler_Node *` that is the embedded `Base` member of a valid
   `Scheduler_EDF_Node`, assigns nothing, and returns the enclosing EDF node.
+- Added an ACSL contract for `_Scheduler_EDF_Enqueue()`. It requires a
+  well-formed ready context and EDF node, plus no double enqueue. It abstracts
+  RBTree insertion as an `edf_ready_insert()` update to
+  `edf_ready_set`.
 
 **Expected verification changes**: add contracts around the remaining EDF
-helper layer and connect `_Scheduler_EDF_Enqueue()` to the abstract EDF
-ready-tree model.
+helper layer, especially `_Scheduler_EDF_Extract()` and
+`_Scheduler_EDF_Get_highest_ready()`.
 
 ### schedulerimpl.h
 
@@ -127,14 +134,24 @@ purifying and storing it in the EDF node.
 
 **Source**: `cpukit/include/rtems/score/scheduleruniimpl.h`
 
-**Status**: pristine copy, no verification changes.
+**Status**: active compatibility patch.
 
 **Reason for import**: contains `_Scheduler_uniprocessor_Unblock()` and heir
 update helpers called by `_Scheduler_EDF_Unblock()`.
 
-**Expected verification changes**: add contract boundaries for uniprocessor
-heir-update behavior so EDF proofs do not have to inline all scheduler
-mechanics.
+**Modified**:
+
+- Added ACSL contracts for `_Scheduler_uniprocessor_Update_heir()`,
+  `_Scheduler_uniprocessor_Update_heir_if_necessary()`,
+  `_Scheduler_uniprocessor_Update_heir_if_preemptible()`, and
+  `_Scheduler_uniprocessor_Unblock()`. These contracts describe when
+  `_Thread_Heir` changes to a new thread, when it remains unchanged due to
+  equal/non-preemptible cases, and when dispatch is marked necessary.
+  `_Scheduler_uniprocessor_Unblock()` expresses the current heir priority via
+  the non-SMP home scheduler node path used by `_Thread_Get_priority()`.
+
+**Expected verification changes**: refine frames for CPU accounting if the
+uniprocessor helper bodies are verified directly.
 
 ### thread.h
 
@@ -154,6 +171,18 @@ for `Thread_Control` layout used by the unblock contract.
 **Reason for import**: first active EDF verification target for the new 6.2
 port.
 
+### scheduleruni-unblock-harness.c
+
+**Source**: new verification-only harness.
+
+**Status**: active harness.
+
+**Reason for import**: includes `scheduleruniimpl.h` as a translation unit so
+Frama-C/WP can verify the header-only uniprocessor scheduler inline helpers.
+
+**Behavior preserved**: no runtime behavior is added. The harness only includes
+the RTEMS uniprocessor scheduler implementation header.
+
 ### edf_ready_set.h
 
 **Source**: new verification-only model header.
@@ -171,6 +200,7 @@ representation function for the scheduler-facing contents of
 - `predicate edf_ready_empty{L}(context)`
 - `predicate edf_ready_set_member(nodes, node)`
 - `predicate edf_ready_valid_nodes{L}(nodes)`
+- `predicate edf_ready_context_well_formed{L}(context)`
 - `logic set<Scheduler_EDF_Node *> edf_ready_singleton(node)`
 - `logic set<Scheduler_EDF_Node *> edf_ready_insert(nodes, node)`
 - `logic set<Scheduler_EDF_Node *> edf_ready_extract(nodes, node)`
@@ -196,11 +226,15 @@ They are intended for contracts such as:
 `edf_ready_valid_nodes{L}(nodes)` so priority comparisons only range over valid
 EDF scheduler nodes.
 
+`edf_ready_context_well_formed{L}(context)` currently requires a valid context
+and valid ready nodes. It is the context-level invariant used by scheduler
+helper contracts and can be extended as the EDF model grows.
+
 **Current scope**: contents only. This model intentionally does not describe
 RBTree shape, colors, rotations, or traversal.
 
-**Expected next changes**: add contracts for `_Scheduler_EDF_Enqueue()` in
-terms of `edf_ready_set{Pre}` and `edf_ready_set{Here}`.
+**Expected next changes**: add contracts for `_Scheduler_EDF_Extract()` and
+`_Scheduler_EDF_Get_highest_ready()` in terms of the ready-set model.
 
 ### edf_property.h
 

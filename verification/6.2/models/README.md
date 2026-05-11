@@ -9,7 +9,8 @@ This directory is for verification-only abstract models.
   with pure logic operations for singleton, insert, extract, membership, and
   minimum-node selection.  The model also includes
   `edf_ready_valid_nodes{L}(nodes)` to guard priority comparisons over ready
-  nodes.
+  nodes and `edf_ready_context_well_formed{L}(context)` as the context-level
+  ready-set invariant.
 - `edf_property.h` — introduces the scheduler-level EDF property that the
   selected thread owns a ready EDF node which is not after every other ready
   EDF node according to the EDF ordering predicate.  It also includes the RTEMS
