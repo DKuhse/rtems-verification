@@ -18,4 +18,8 @@ not silently depend on the legacy stubs.
   `_Scheduler_uniprocessor_Update_heir_if_necessary()`,
   `_Scheduler_uniprocessor_Update_heir_if_preemptible()`, and
   `_Scheduler_uniprocessor_Unblock()`, using the contract of
-  `_Scheduler_uniprocessor_Update_heir()` as the CPU-state boundary.
+  `_Scheduler_uniprocessor_Update_heir()` as the CPU-state boundary. Expected
+  result with `-wp-model 'Typed+Cast' -wp-timeout 30`: all goals proved.
+- `tmp-verify-thread-get-priority.sh` — temporary isolation script for
+  `_Thread_Get_priority()` and its immediate priority/home-node helper
+  contracts.
