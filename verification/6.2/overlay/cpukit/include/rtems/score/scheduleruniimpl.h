@@ -132,14 +132,8 @@ static inline void _Scheduler_uniprocessor_Update_heir_if_necessary(
 /*@
   requires \valid_read( &heir->is_preemptible );
 
-  behavior same_heir:
-    assumes heir == new_heir;
-    assigns \nothing;
-    ensures _Thread_Heir == \at( _Thread_Heir, Pre );
-
-  behavior not_preemptible:
-    assumes heir != new_heir;
-    assumes !\at( heir->is_preemptible, Pre );
+  behavior old_heir:
+    assumes heir == new_heir || !\at( heir->is_preemptible, Pre );
     assigns \nothing;
     ensures _Thread_Heir == \at( _Thread_Heir, Pre );
 
@@ -207,15 +201,17 @@ static inline void _Scheduler_uniprocessor_Block(
   requires \valid_read( &_Thread_Heir->is_preemptible );
   requires \valid_read( &_Thread_Heir->Scheduler.nodes );
   requires \valid( _Thread_Heir->Scheduler.nodes );
-  requires \separated(
-    the_thread + (..),
-    (Per_CPU_Control_envelope *) _Per_CPU_Information + (..)
-  );
 
-  behavior keep_heir:
+  behavior keep_due_to_priority:
     assumes priority >=
-      \at( _Thread_Heir, Pre )->Scheduler.nodes->Wait.Priority.Node.priority
-      || !\at( _Thread_Heir, Pre )->is_preemptible;
+      \at( _Thread_Heir, Pre )->Scheduler.nodes->Wait.Priority.Node.priority;
+    assigns \nothing;
+    ensures _Thread_Heir == \at( _Thread_Heir, Pre );
+
+  behavior keep_due_to_nonpreemptible:
+    assumes priority <
+      \at( _Thread_Heir, Pre )->Scheduler.nodes->Wait.Priority.Node.priority;
+    assumes !\at( _Thread_Heir, Pre )->is_preemptible;
     assigns \nothing;
     ensures _Thread_Heir == \at( _Thread_Heir, Pre );
 
@@ -246,13 +242,7 @@ static inline void _Scheduler_uniprocessor_Unblock(
    * thread is preemptible, then we need to do a context switch.
    */
   if ( priority < _Thread_Get_priority( heir ) ) {
-#if defined( __FRAAMC__ )
-    if ( heir != the_thread && heir->is_preemptible ) {
-      _Scheduler_uniprocessor_Update_heir( heir, the_thread );
-    }
-#else
     _Scheduler_uniprocessor_Update_heir_if_preemptible( heir, the_thread );
-#endif
   }
 }
 
