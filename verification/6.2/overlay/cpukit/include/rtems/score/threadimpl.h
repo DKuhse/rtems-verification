@@ -993,6 +993,10 @@ Objects_Id _Thread_Self_id( void );
  *
  * @return The cpu of the thread's scheduler.
  */
+/*@
+  assigns \nothing;
+  ensures \valid( \result );
+*/
 static inline Per_CPU_Control *_Thread_Get_CPU(
   const Thread_Control *thread
 )
@@ -1266,6 +1270,12 @@ static inline Thread_Control *_Thread_Get_heir_and_make_it_executing(
  *      used.
  * @param cpu The cpu.
  */
+/*@
+  requires \valid( &the_thread->cpu_time_used );
+  requires \valid( &cpu->cpu_usage_timestamp );
+  assigns cpu->cpu_usage_timestamp,
+          the_thread->cpu_time_used;
+*/
 static inline void _Thread_Update_CPU_time_used(
   Thread_Control  *the_thread,
   Per_CPU_Control *cpu

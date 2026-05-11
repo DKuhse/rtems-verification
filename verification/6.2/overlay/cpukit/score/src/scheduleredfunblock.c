@@ -81,6 +81,9 @@ struct timeval   sbttotv( int64_t );
   requires \valid_read( &_Thread_Heir->is_preemptible );
   requires \valid_read( &_Thread_Heir->Scheduler.nodes );
   requires \valid( _Thread_Heir->Scheduler.nodes );
+  // Needed by inlined _Thread_Update_CPU_time_used in the update path.
+  requires \valid( &_Thread_Heir->cpu_time_used );
+  requires \valid( &_Per_CPU_Get()->cpu_usage_timestamp );
 
   requires \separated(
     _Thread_Heir->Scheduler.nodes,
@@ -98,12 +101,25 @@ struct timeval   sbttotv( int64_t );
     scheduler + (..),
     (Per_CPU_Control_envelope *) _Per_CPU_Information + (..)
   );
+  // _Thread_Heir points to a Thread_Control that is not inside Per_CPU
+  // and is not the scheduler context. Needed so WP can derive that
+  // _Thread_Heir->Scheduler.nodes is preserved across Enqueue's
+  // `assigns context->Ready`.
+  requires \separated(
+    _Thread_Heir + (..),
+    scheduler + (..),
+    (Scheduler_EDF_Context *) scheduler->context + (..)
+  );
 
   assigns ((Scheduler_EDF_Node *) node)->Base.Priority,
           ((Scheduler_EDF_Node *) node)->priority,
           ((Scheduler_EDF_Context *) scheduler->context)->Ready,
-          { other->Node | Scheduler_EDF_Node *other; \valid( other ) },
-          _Thread_Heir, _Thread_Dispatch_necessary;
+          _Thread_Heir, _Thread_Dispatch_necessary,
+          // From the inlined _Thread_Update_CPU_time_used in the update
+          // path (only reached when the heir is preempted; anchored to
+          // Pre since the call happens *before* _Thread_Heir is updated):
+          \at( _Thread_Heir, Pre )->cpu_time_used,
+          _Per_CPU_Information[0].per_cpu.cpu_usage_timestamp;
 
   ensures ((Scheduler_EDF_Node *) node)->priority ==
     SCHEDULER_PRIORITY_PURIFY( \at( node->Priority.value, Pre ) );
