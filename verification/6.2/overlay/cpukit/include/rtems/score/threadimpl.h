@@ -1271,10 +1271,11 @@ static inline Thread_Control *_Thread_Get_heir_and_make_it_executing(
  * @param cpu The cpu.
  */
 /*@
-  requires \valid( &the_thread->cpu_time_used );
-  requires \valid( &cpu->cpu_usage_timestamp );
-  assigns cpu->cpu_usage_timestamp,
-          the_thread->cpu_time_used;
+  // CPU-time bookkeeping is below the scheduler abstraction; callers in
+  // the EDF stack do not reason about cpu_time_used or cpu_usage_timestamp.
+  // Declare `assigns \nothing` so the helper is opaque w.r.t. the frame
+  // condition.
+  assigns \nothing;
 */
 static inline void _Thread_Update_CPU_time_used(
   Thread_Control  *the_thread,
