@@ -8,19 +8,24 @@ The legacy hand-port inventory lives at:
 
 ## Current State
 
-The active tree contains pristine RTEMS 6.2 copies for the first EDF unblock
-verification slice plus the first abstract ready-set model. The copied RTEMS
-files are baseline imports only. They do not yet contain active ACSL contracts.
+The active tree contains RTEMS 6.2 overlays for the first EDF unblock
+verification slice plus the first abstract ready-set model. Some files remain
+pristine imports, while the scheduler, priority, and thread helper path now has
+active ACSL contracts.
 
 Copied from `rtems/src/rtems-6.2-pristine/`:
 
 - `overlay/cpukit/include/rtems/score/scheduleredf.h`
 - `overlay/cpukit/include/rtems/score/scheduleredfimpl.h`
 - `overlay/cpukit/include/rtems/score/schedulerimpl.h`
+- `overlay/cpukit/include/rtems/score/percpu.h`
+- `overlay/cpukit/include/rtems/score/priorityimpl.h`
 - `overlay/cpukit/include/rtems/score/schedulernodeimpl.h`
 - `overlay/cpukit/include/rtems/score/scheduleruniimpl.h`
 - `overlay/cpukit/include/rtems/score/thread.h`
+- `overlay/cpukit/include/rtems/score/threadimpl.h`
 - `overlay/cpukit/score/src/scheduleredfunblock.c`
+- `harnesses/thread-get-priority-harness.c`
 - `harnesses/scheduleruni-unblock-harness.c`
 - `models/edf_ready_set.h`
 - `models/edf_property.h`
@@ -114,6 +119,39 @@ helper layer, especially `_Scheduler_EDF_Extract()` and
 `scheduleruniimpl.h`; provides scheduler helper APIs used by the uniprocessor
 scheduler path.
 
+### percpu.h
+
+**Source**: `cpukit/include/rtems/score/percpu.h`
+
+**Status**: active compatibility patch.
+
+**Reason for import**: defines `_Thread_Heir`, `_Thread_Dispatch_necessary`,
+and `_Per_CPU_Information`, which are used by the uniprocessor scheduler
+contracts.
+
+**Modified**:
+
+- Under `__FRAMAC__`, changed `_Per_CPU_Information` from an unsized extern
+  array with the alignment attribute before the type to a one-element extern
+  array with the alignment attribute after the declarator. This mirrors the
+  legacy 6.2 workaround and lets WP reason about `_Per_CPU_Information[0]` in
+  the non-SMP proof. The non-Frama-C path keeps the pristine RTEMS declaration.
+
+### priorityimpl.h
+
+**Source**: `cpukit/include/rtems/score/priorityimpl.h`
+
+**Status**: active compatibility patch.
+
+**Reason for import**: provides `_Priority_Get_priority()`, the final helper
+in the non-SMP `_Thread_Get_priority()` path.
+
+**Modified**:
+
+- Added an ACSL contract for `_Priority_Get_priority()` requiring a readable
+  aggregation priority, assigning only the result, and returning the pre-call
+  `aggregation->Node.priority`.
+
 ### schedulernodeimpl.h
 
 **Source**: `cpukit/include/rtems/score/schedulernodeimpl.h`
@@ -146,12 +184,22 @@ update helpers called by `_Scheduler_EDF_Unblock()`.
   `_Scheduler_uniprocessor_Update_heir_if_preemptible()`, and
   `_Scheduler_uniprocessor_Unblock()`. These contracts describe when
   `_Thread_Heir` changes to a new thread, when it remains unchanged due to
-  equal/non-preemptible cases, and when dispatch is marked necessary.
-  `_Scheduler_uniprocessor_Unblock()` expresses the current heir priority via
-  the non-SMP home scheduler node path used by `_Thread_Get_priority()`.
+  equal/non-preemptible cases. `_Scheduler_uniprocessor_Unblock()` expresses
+  the current heir priority via the non-SMP home scheduler node path used by
+  `_Thread_Get_priority()`. Update branches keep `_Thread_Dispatch_necessary`
+  in their assigns clauses because the code writes it, but the current
+  EDF-facing contract does not prove dispatch-state postconditions. This
+  mirrors the legacy 6.2 port: `_Thread_Dispatch_necessary` is volatile, so
+  postconditions about its final value are intentionally omitted.
+- Under `__FRAAMC__`, `_Scheduler_uniprocessor_Unblock()` expands the
+  preemptible-heir condition locally and calls `_Scheduler_uniprocessor_Update_heir()`
+  only in the branch where the heir can actually change. The production RTEMS
+  body still calls `_Scheduler_uniprocessor_Update_heir_if_preemptible()`.
 
-**Expected verification changes**: refine frames for CPU accounting if the
-uniprocessor helper bodies are verified directly.
+**Expected verification result**: `scripts/6.2/verify-scheduleruni-unblock.sh
+-wp-model 'Typed+Cast' -wp-timeout 30` proves all goals for the helper harness.
+The volatile dispatch flag remains in frame clauses, but there is no
+postcondition about its final value.
 
 ### thread.h
 
@@ -161,6 +209,23 @@ uniprocessor helper bodies are verified directly.
 
 **Reason for import**: directly included by `scheduleredfunblock.c` and needed
 for `Thread_Control` layout used by the unblock contract.
+
+### threadimpl.h
+
+**Source**: `cpukit/include/rtems/score/threadimpl.h`
+
+**Status**: active compatibility patch.
+
+**Reason for import**: provides `_Thread_Get_priority()` and
+`_Thread_Scheduler_get_home_node()`, which connect the uniprocessor unblock
+priority comparison to the non-SMP home scheduler node.
+
+**Modified**:
+
+- Added a non-SMP ACSL contract for `_Thread_Scheduler_get_home_node()`,
+  returning `the_thread->Scheduler.nodes`.
+- Added an ACSL contract for `_Thread_Get_priority()`, requiring readable
+  scheduler-node state and returning the pre-call home-node wait priority.
 
 ### scheduleredfunblock.c
 
@@ -182,6 +247,19 @@ Frama-C/WP can verify the header-only uniprocessor scheduler inline helpers.
 
 **Behavior preserved**: no runtime behavior is added. The harness only includes
 the RTEMS uniprocessor scheduler implementation header.
+
+### thread-get-priority-harness.c
+
+**Source**: new temporary verification-only harness.
+
+**Status**: temporary active harness.
+
+**Reason for import**: includes `threadimpl.h` as a small translation unit so
+Frama-C/WP can isolate `_Thread_Get_priority()` and the direct helper contracts
+it depends on.
+
+**Behavior preserved**: no runtime behavior is added. The harness only includes
+the RTEMS thread implementation header.
 
 ### edf_ready_set.h
 

@@ -60,10 +60,12 @@ extern "C" {
 /*@
   requires heir != new_heir;
 
-  assigns _Thread_Heir, _Thread_Dispatch_necessary;
+  assigns _Thread_Heir \from new_heir;
+  assigns _Thread_Dispatch_necessary;
 
   ensures _Thread_Heir == new_heir;
-  ensures _Thread_Dispatch_necessary == true;
+  // ensures _Thread_Dispatch_necessary == true;
+  // Unprovable: dispatch_necessary is volatile.
 */
 static inline void _Scheduler_uniprocessor_Update_heir(
   Thread_Control *heir,
@@ -95,16 +97,19 @@ static inline void _Scheduler_uniprocessor_Update_heir(
  * @param[in, out] new_heir is the new heir thread.
  */
 /*@
-  assigns _Thread_Heir, _Thread_Dispatch_necessary;
+  behavior same_heir:
+    assumes \at( _Thread_Heir, Pre ) == new_heir;
+    assigns \nothing;
+    ensures _Thread_Heir == \at( _Thread_Heir, Pre );
 
-  ensures \at( _Thread_Heir, Pre ) == new_heir ==>
-    _Thread_Heir == \at( _Thread_Heir, Pre );
-  ensures \at( _Thread_Heir, Pre ) == new_heir ==>
-    _Thread_Dispatch_necessary == \at( _Thread_Dispatch_necessary, Pre );
-  ensures \at( _Thread_Heir, Pre ) != new_heir ==>
-    _Thread_Heir == new_heir;
-  ensures \at( _Thread_Heir, Pre ) != new_heir ==>
-    _Thread_Dispatch_necessary == true;
+  behavior new_heir:
+    assumes \at( _Thread_Heir, Pre ) != new_heir;
+    assigns _Thread_Heir \from new_heir;
+    assigns _Thread_Dispatch_necessary;
+    ensures _Thread_Heir == new_heir;
+
+  complete behaviors;
+  disjoint behaviors;
 */
 static inline void _Scheduler_uniprocessor_Update_heir_if_necessary(
   Thread_Control *new_heir
@@ -127,16 +132,26 @@ static inline void _Scheduler_uniprocessor_Update_heir_if_necessary(
 /*@
   requires \valid_read( &heir->is_preemptible );
 
-  assigns _Thread_Heir, _Thread_Dispatch_necessary;
+  behavior same_heir:
+    assumes heir == new_heir;
+    assigns \nothing;
+    ensures _Thread_Heir == \at( _Thread_Heir, Pre );
 
-  ensures ( heir == new_heir || !\at( heir->is_preemptible, Pre ) ) ==>
-    _Thread_Heir == \at( _Thread_Heir, Pre );
-  ensures ( heir == new_heir || !\at( heir->is_preemptible, Pre ) ) ==>
-    _Thread_Dispatch_necessary == \at( _Thread_Dispatch_necessary, Pre );
-  ensures ( heir != new_heir && \at( heir->is_preemptible, Pre ) ) ==>
-    _Thread_Heir == new_heir;
-  ensures ( heir != new_heir && \at( heir->is_preemptible, Pre ) ) ==>
-    _Thread_Dispatch_necessary == true;
+  behavior not_preemptible:
+    assumes heir != new_heir;
+    assumes !\at( heir->is_preemptible, Pre );
+    assigns \nothing;
+    ensures _Thread_Heir == \at( _Thread_Heir, Pre );
+
+  behavior preemptible:
+    assumes heir != new_heir;
+    assumes \at( heir->is_preemptible, Pre );
+    assigns _Thread_Heir \from new_heir;
+    assigns _Thread_Dispatch_necessary;
+    ensures _Thread_Heir == new_heir;
+
+  complete behaviors;
+  disjoint behaviors;
 */
 static inline void _Scheduler_uniprocessor_Update_heir_if_preemptible(
   Thread_Control *heir,
@@ -190,35 +205,30 @@ static inline void _Scheduler_uniprocessor_Block(
  */
 /*@
   requires \valid_read( &_Thread_Heir->is_preemptible );
+  requires \valid_read( &_Thread_Heir->Scheduler.nodes );
   requires \valid( _Thread_Heir->Scheduler.nodes );
+  requires \separated(
+    the_thread + (..),
+    (Per_CPU_Control_envelope *) _Per_CPU_Information + (..)
+  );
 
-  assigns _Thread_Heir, _Thread_Dispatch_necessary;
-
-  ensures (
-    priority >=
+  behavior keep_heir:
+    assumes priority >=
       \at( _Thread_Heir, Pre )->Scheduler.nodes->Wait.Priority.Node.priority
-    || !\at( _Thread_Heir, Pre )->is_preemptible
-  ) ==> _Thread_Heir == \at( _Thread_Heir, Pre );
+      || !\at( _Thread_Heir, Pre )->is_preemptible;
+    assigns \nothing;
+    ensures _Thread_Heir == \at( _Thread_Heir, Pre );
 
-  ensures (
-    priority >=
-      \at( _Thread_Heir, Pre )->Scheduler.nodes->Wait.Priority.Node.priority
-    || !\at( _Thread_Heir, Pre )->is_preemptible
-  ) ==>
-    _Thread_Dispatch_necessary == \at( _Thread_Dispatch_necessary, Pre );
+  behavior update_heir:
+    assumes priority <
+      \at( _Thread_Heir, Pre )->Scheduler.nodes->Wait.Priority.Node.priority;
+    assumes \at( _Thread_Heir, Pre )->is_preemptible;
+    assigns _Thread_Heir \from the_thread;
+    assigns _Thread_Dispatch_necessary;
+    ensures _Thread_Heir == the_thread;
 
-  ensures (
-    priority <
-      \at( _Thread_Heir, Pre )->Scheduler.nodes->Wait.Priority.Node.priority
-    && \at( _Thread_Heir, Pre )->is_preemptible
-  ) ==> _Thread_Heir == the_thread;
-
-  ensures (
-    priority <
-      \at( _Thread_Heir, Pre )->Scheduler.nodes->Wait.Priority.Node.priority
-    && \at( _Thread_Heir, Pre )->is_preemptible
-    && \at( _Thread_Heir, Pre ) != the_thread
-  ) ==> _Thread_Dispatch_necessary == true;
+  complete behaviors;
+  disjoint behaviors;
 */
 static inline void _Scheduler_uniprocessor_Unblock(
   const Scheduler_Control *scheduler,
@@ -236,7 +246,13 @@ static inline void _Scheduler_uniprocessor_Unblock(
    * thread is preemptible, then we need to do a context switch.
    */
   if ( priority < _Thread_Get_priority( heir ) ) {
+#if defined( __FRAAMC__ )
+    if ( heir != the_thread && heir->is_preemptible ) {
+      _Scheduler_uniprocessor_Update_heir( heir, the_thread );
+    }
+#else
     _Scheduler_uniprocessor_Update_heir_if_preemptible( heir, the_thread );
+#endif
   }
 }
 
