@@ -46,7 +46,9 @@
 /*@
   requires \valid_read( scheduler );
   requires \valid( the_thread );
+  requires \valid( node );
   requires \valid( (Scheduler_EDF_Node *) node );
+  requires \valid( &((Scheduler_EDF_Node *) node)->Base );
   requires &((Scheduler_EDF_Node *) node)->Base == node;
   requires \valid( (Scheduler_EDF_Context *) scheduler->context );
   requires edf_ready_context_well_formed{Pre}(
@@ -55,9 +57,27 @@
     (Scheduler_EDF_Context *) scheduler->context,
     (Scheduler_EDF_Node *) node );
 
+  requires \valid( _Thread_Heir );
   requires \valid_read( &_Thread_Heir->is_preemptible );
   requires \valid_read( &_Thread_Heir->Scheduler.nodes );
   requires \valid( _Thread_Heir->Scheduler.nodes );
+
+  requires \separated(
+    _Thread_Heir->Scheduler.nodes,
+    (Scheduler_EDF_Node *) node
+  );
+  requires \separated(
+    node + (..),
+    (Per_CPU_Control_envelope *) _Per_CPU_Information + (..)
+  );
+  requires \separated(
+    the_thread + (..),
+    (Per_CPU_Control_envelope *) _Per_CPU_Information + (..)
+  );
+  requires \separated(
+    scheduler + (..),
+    (Per_CPU_Control_envelope *) _Per_CPU_Information + (..)
+  );
 
   assigns ((Scheduler_EDF_Node *) node)->Base.Priority,
           ((Scheduler_EDF_Node *) node)->priority,
