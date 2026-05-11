@@ -2,8 +2,8 @@
  * Abstract ready-set models. Verification only header.
  */
 
-#ifndef VERIFICATION_6_2_EDF_READY_MODEL_H
-#define VERIFICATION_6_2_EDF_READY_MODEL_H
+#ifndef VERIFICATION_6_2_EDF_READY_SET_H
+#define VERIFICATION_6_2_EDF_READY_SET_H
 
 #include <rtems/score/scheduleredf.h>
 
@@ -31,6 +31,12 @@
       ) =
         node \in nodes;
 
+      predicate edf_ready_valid_nodes{L}(
+        set<Scheduler_EDF_Node *> nodes
+      ) =
+        \forall Scheduler_EDF_Node *node;
+          node \in nodes ==> \valid_read( node );
+
       logic set<Scheduler_EDF_Node *> edf_ready_singleton(
         Scheduler_EDF_Node *node
       ) =
@@ -52,6 +58,7 @@
         set<Scheduler_EDF_Node *> nodes,
         Scheduler_EDF_Node       *node
       ) =
+        edf_ready_valid_nodes{L}( nodes ) &&
         node \in nodes &&
         \forall Scheduler_EDF_Node *other;
           other \in nodes ==> node->priority <= other->priority;
@@ -64,4 +71,4 @@
     }
 */
 
-#endif /* VERIFICATION_6_2_EDF_READY_MODEL_H */
+#endif /* VERIFICATION_6_2_EDF_READY_SET_H */

@@ -139,6 +139,7 @@ representation function for the scheduler-facing contents of
 - `predicate edf_ready_member{L}(context, node)`
 - `predicate edf_ready_empty{L}(context)`
 - `predicate edf_ready_set_member(nodes, node)`
+- `predicate edf_ready_valid_nodes{L}(nodes)`
 - `logic set<Scheduler_EDF_Node *> edf_ready_singleton(node)`
 - `logic set<Scheduler_EDF_Node *> edf_ready_insert(nodes, node)`
 - `logic set<Scheduler_EDF_Node *> edf_ready_extract(nodes, node)`
@@ -159,6 +160,10 @@ They are intended for contracts such as:
   edf_ready_extract(edf_ready_set{Pre}(context), node)`
 - highest ready: result owner comes from a node satisfying
   `edf_ready_minimum{Here}(context, node)`
+
+`edf_ready_minimum_node{L}(nodes, node)` requires
+`edf_ready_valid_nodes{L}(nodes)` so priority comparisons only range over valid
+EDF scheduler nodes.
 
 **Current scope**: contents only. This model intentionally does not describe
 RBTree shape, colors, rotations, or traversal.

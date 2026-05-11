@@ -7,7 +7,9 @@ This directory is for verification-only abstract models.
 - `edf_ready_set.h` — introduces `edf_ready_set{L}(context)` as an ACSL
   `set<Scheduler_EDF_Node *>` representation of the EDF ready queue contents,
   with pure logic operations for singleton, insert, extract, membership, and
-  minimum-node selection.
+  minimum-node selection.  The model also includes
+  `edf_ready_valid_nodes{L}(nodes)` to guard priority comparisons over ready
+  nodes.
 
 These are not stubs for missing code. They are intentional abstraction
 boundaries used by the active RTEMS 6.2 proof.
