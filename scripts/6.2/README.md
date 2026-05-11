@@ -13,4 +13,4 @@ not silently depend on the legacy stubs.
 
 - `verify-edf-unblock.sh` — runs Frama-C on the active
   `_Scheduler_EDF_Unblock()` slice and includes
-  `verification/6.2/models/edf_ready_model.h`.
+  `verification/6.2/models/edf_ready_set.h`.

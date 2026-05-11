@@ -25,7 +25,7 @@ OVERLAY="${OVERLAY:-/workspace/verification/6.2}"
 RTEMS_BUILD_BSP="${RTEMS_BUILD_BSP:-/workspace/rtems/build/amd64/x86_64-rtems5/c/amd64/include}"
 
 SRC="${OVERLAY}/overlay/cpukit/score/src/scheduleredfunblock.c"
-MODEL="${OVERLAY}/models/edf_ready_model.h"
+MODEL="${OVERLAY}/models/edf_ready_set.h"
 
 [ -f "${SRC}" ] || { echo "missing overlay source: ${SRC}" >&2; exit 1; }
 [ -f "${MODEL}" ] || { echo "missing EDF ready model: ${MODEL}" >&2; exit 1; }

@@ -20,7 +20,7 @@ Copied from `rtems/src/rtems-6.2-pristine/`:
 - `overlay/cpukit/include/rtems/score/scheduleruniimpl.h`
 - `overlay/cpukit/include/rtems/score/thread.h`
 - `overlay/cpukit/score/src/scheduleredfunblock.c`
-- `models/edf_ready_model.h`
+- `models/edf_ready_set.h`
 
 The next implementation step is to connect `_Scheduler_EDF_Enqueue()` and
 eventually `_Scheduler_EDF_Extract()` / `_Scheduler_EDF_Get_highest_ready()` to
@@ -123,19 +123,19 @@ for `Thread_Control` layout used by the unblock contract.
 **Reason for import**: first active EDF verification target for the new 6.2
 port.
 
-### edf_ready_model.h
+### edf_ready_set.h
 
 **Source**: new verification-only model header.
 
 **Status**: active abstract model.
 
-**Reason for import**: introduces `edf_ready_nodes{L}(context)` as the ACSL
+**Reason for import**: introduces `edf_ready_set{L}(context)` as the ACSL
 representation function for the scheduler-facing contents of
 `Scheduler_EDF_Context::Ready`.
 
 **Definitions**:
 
-- `logic set<Scheduler_EDF_Node *> edf_ready_nodes{L}(context)`
+- `logic set<Scheduler_EDF_Node *> edf_ready_set{L}(context)`
 - `predicate edf_ready_member{L}(context, node)`
 - `predicate edf_ready_empty{L}(context)`
 - `predicate edf_ready_set_member(nodes, node)`
@@ -145,7 +145,7 @@ representation function for the scheduler-facing contents of
 - `predicate edf_ready_minimum_node{L}(nodes, node)`
 - `predicate edf_ready_minimum{L}(context, node)`
 
-`edf_ready_nodes{L}(context)` has a `reads` clause over `context->Ready` and
+`edf_ready_set{L}(context)` has a `reads` clause over `context->Ready` and
 the embedded `Scheduler_EDF_Node::Node` fields of valid EDF nodes. This makes
 the representation function explicitly depend on the concrete ready-tree state
 without exposing RBTree shape in scheduler contracts.
@@ -153,10 +153,10 @@ without exposing RBTree shape in scheduler contracts.
 The set operations are pure logic functions over `set<Scheduler_EDF_Node *>`.
 They are intended for contracts such as:
 
-- enqueue: `edf_ready_nodes{Here}(context) ==
-  edf_ready_insert(edf_ready_nodes{Pre}(context), node)`
-- extract: `edf_ready_nodes{Here}(context) ==
-  edf_ready_extract(edf_ready_nodes{Pre}(context), node)`
+- enqueue: `edf_ready_set{Here}(context) ==
+  edf_ready_insert(edf_ready_set{Pre}(context), node)`
+- extract: `edf_ready_set{Here}(context) ==
+  edf_ready_extract(edf_ready_set{Pre}(context), node)`
 - highest ready: result owner comes from a node satisfying
   `edf_ready_minimum{Here}(context, node)`
 
@@ -164,4 +164,4 @@ They are intended for contracts such as:
 RBTree shape, colors, rotations, or traversal.
 
 **Expected next changes**: add contracts for `_Scheduler_EDF_Enqueue()` in
-terms of `edf_ready_nodes{Pre}` and `edf_ready_nodes{Here}`.
+terms of `edf_ready_set{Pre}` and `edf_ready_set{Here}`.

@@ -4,7 +4,7 @@ This directory is for verification-only abstract models.
 
 ## Active Files
 
-- `edf_ready_model.h` — introduces `edf_ready_nodes{L}(context)` as an ACSL
+- `edf_ready_set.h` — introduces `edf_ready_set{L}(context)` as an ACSL
   `set<Scheduler_EDF_Node *>` representation of the EDF ready queue contents,
   with pure logic operations for singleton, insert, extract, membership, and
   minimum-node selection.

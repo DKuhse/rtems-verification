@@ -1,9 +1,5 @@
 /*
- * Abstract ready-set model for RTEMS 6.2 EDF scheduler verification.
- *
- * This header is verification-only.  It does not model the concrete RBTree
- * shape, colors, links, or rotations.  It exposes the scheduler-facing ready
- * contents as an ACSL set of Scheduler_EDF_Node pointers.
+ * Abstract ready-set models. Verification only header.
  */
 
 #ifndef VERIFICATION_6_2_EDF_READY_MODEL_H
@@ -12,7 +8,7 @@
 #include <rtems/score/scheduleredf.h>
 
 /*@ axiomatic EDFReadyNodes {
-      logic set<Scheduler_EDF_Node *> edf_ready_nodes{L}(
+      logic set<Scheduler_EDF_Node *> edf_ready_set{L}(
         Scheduler_EDF_Context *context
       )
         reads context->Ready,
@@ -22,12 +18,12 @@
         Scheduler_EDF_Context *context,
         Scheduler_EDF_Node    *node
       ) =
-        node \in edf_ready_nodes{L}( context );
+        node \in edf_ready_set{L}( context );
 
       predicate edf_ready_empty{L}(
         Scheduler_EDF_Context *context
       ) =
-        edf_ready_nodes{L}( context ) == \empty;
+        edf_ready_set{L}( context ) == \empty;
 
       predicate edf_ready_set_member(
         set<Scheduler_EDF_Node *> nodes,
@@ -64,7 +60,7 @@
         Scheduler_EDF_Context *context,
         Scheduler_EDF_Node    *node
       ) =
-        edf_ready_minimum_node{L}( edf_ready_nodes{L}( context ), node );
+        edf_ready_minimum_node{L}( edf_ready_set{L}( context ), node );
     }
 */
 
