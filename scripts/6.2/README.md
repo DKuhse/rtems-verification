@@ -11,62 +11,59 @@ not silently depend on the legacy stubs.
 
 ---
 
-## ⚠️ Toolchain workaround: `vset.mlw` symlink
+## Toolchain split: FC 25 (legacy) vs FC 32 (active)
 
-> **Read this before adding any script that proves a function whose contracts
-> use `set<T>` / set comprehensions (anything that pulls in `edf_ready_set.h`
-> or the `_Scheduler_EDF_Enqueue` contract).**
+This project runs on **two Frama-C stacks**, picked via `docker-compose`
+services that share Stage 1 (the RTEMS cross-toolchain) but install
+different Frama-C versions in Stage 2:
 
-**Symptom.** Why3 fails every goal with
-`[Why3 Error] Library file not found: vset (Stronger, N warnings)`.
+| stack | service | scripts | purpose |
+|---|---|---|---|
+| Frama-C **25.0** + Alt-Ergo 2.4.2 (pinned) | `verify-6.2` | `legacy/rtems-6.2-hand-port/scripts/6.2/` | byte-reproducibility for the published legacy 74/74 hand-port result |
+| Frama-C **32.0** + Alt-Ergo 2.6.x | `verify-6.2-active-fc32` | `scripts/6.2/` (these) | active-port work, EDF property proofs |
 
-**Root cause.** Packaging bug in our pinned stack
-(Frama-C 25.0 + Why3 1.5.1, both from opam switch `4.14.1`).
-`wp.driver` declares the `vset` library with
+Both are built from the same `Dockerfile`, parameterised by
+`FRAMA_C_VERSION` (default `25.0`). The `verify-6.2-active` service is
+**kept-for-reference-only** — the active scripts here have moved to FC 32
+syntax (`-std c11`) and no longer parse on FC 25.
 
-```
-library vset:
-type set = "set";
-why3.import := "vset.Vset";
-```
+### Why two stacks (the FC 25 vset bug)
 
-while every *other* WP library in the same file is namespaced as
-`frama_c_wp.<name>.<Module>` (see `vlist`, `memory`, etc.). Why3 therefore
-looks for `vset.Vset` at the loadpath root, but the actual file is
-`<wp-share>/why3/frama_c_wp/vset.mlw`.
+FC 25's `wp.driver` declares the `vset` library as `why3.import := "vset.Vset"`
+(no namespace), but the file actually lives in `<wp-share>/why3/frama_c_wp/`.
+On any goal that mixes a set-typed `assigns` clause (`{ other->Node | ... }`)
+with addr-level frame reasoning, Why3 either reports *"Library file not
+found: vset"* or, if you symlink the file into place, a *"Type mismatch
+between vset.Vset.set ... and ... .addr"* — same module loaded under two
+nominal paths. We sank significant time into trying to patch this
+(adjusting `wp.driver`, symlinking, prover-strategy tweaks) before
+concluding the only durable fix is **stay on FC 25 only when you genuinely
+need byte-equivalence with the published numbers; do everything else on a
+modern stack**. The legacy verifications don't hit the bug because their
+contracts don't use `set<T>`-typed `assigns`.
 
-**Do NOT fix this by patching `wp.driver`.** Rewriting the import path to
-`frama_c_wp.vset.Vset` makes Why3 load `memory.Memory` twice through two
-different module paths, which then fails every goal with
-`memory.Memory.addr and frama_c_wp.memory.Memory.addr` clash errors. (Asked,
-answered, scars to show for it.)
+### FC 32 migration gotchas (already applied)
 
-**The workaround we use** is to expose `vset.mlw` at the unprefixed path the
-driver actually asks for, via an idempotent symlink created by the verify
-scripts at startup:
+If you write a new active script or new ACSL, watch for these — they came
+up during the FC 25 → FC 32 move and are baked into the scripts/models now:
 
-```sh
-WP_WHY3_DIR="$(dirname "$(command -v frama-c)")/../share/frama-c/wp/why3"
-if [ -f "${WP_WHY3_DIR}/frama_c_wp/vset.mlw" ] \
-   && [ ! -e "${WP_WHY3_DIR}/vset.mlw" ]; then
-    ln -s frama_c_wp/vset.mlw "${WP_WHY3_DIR}/vset.mlw"
-fi
-```
-
-This is present in `verify-edf-unblock.sh`. **Any new script that triggers
-the `vset` dependency must include the same shim**, otherwise it will fail
-in a way that looks like a contract error but isn't.
-
-**Why we don't just upgrade Frama-C.** This codebase is pinned to
-Frama-C 25 / Why3 1.5.1 / Alt-Ergo 2.4.2 because the published verification
-results (legacy 74/74, current active port) were obtained on that stack;
-bumping Frama-C drags the prover stack and quietly shifts ACSL/WP behavior.
-The right time to upgrade is between milestones, not while iterating on a
-contract.
+- **`-std c11`** replaces `-c11` (kernel flag rename).
+- **Set comprehensions in logic-function definitions** (`{ n | T *n; P(n) }`)
+  hit `Concretization for comprehension sets not implemented yet`. Declare
+  the function abstractly and add a `\forall n; n \in f(...) <==> P(n)`
+  membership axiom instead. See `verification/6.2/models/edf_ready_set.h`
+  for the pattern.
+- **Implicit function declarations are errors**, not warnings. RTEMS'
+  `timestampimpl.h` calls `sbttots`/`tstosbt`/`sbttotv` without a visible
+  declaration in the headers we include; forward-declare them at the top
+  of the slice file under `#ifdef __FRAAMC__`. See the top of
+  `verification/6.2/overlay/cpukit/score/src/scheduleredfunblock.c`.
 
 ---
 
 ## Active Scripts
+
+All run against the FC 32 stack via `docker compose run --rm verify-6.2-active-fc32`.
 
 - `verify-edf-unblock.sh` — runs Frama-C on the active
   `_Scheduler_EDF_Unblock()` slice with `__FRAAMC__` defined so
@@ -76,7 +73,8 @@ contract.
   `_Scheduler_uniprocessor_Update_heir_if_preemptible()`, and
   `_Scheduler_uniprocessor_Unblock()`, using the contract of
   `_Scheduler_uniprocessor_Update_heir()` as the CPU-state boundary. Expected
-  result with `-wp-model 'Typed+Cast' -wp-timeout 30`: all goals proved.
+  result with `-wp-model 'Typed+Cast' -wp-timeout 30`: all goals proved
+  (48/48 on FC 32).
 - `tmp-verify-thread-get-priority.sh` — temporary isolation script for
   `_Thread_Get_priority()` and its immediate priority/home-node helper
   contracts.
