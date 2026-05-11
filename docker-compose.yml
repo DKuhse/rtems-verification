@@ -40,6 +40,25 @@ services:
       - ./legacy/rtems-6.2-hand-port/verification:/workspace/verification
     command: ["/opt/scripts/6.2/verify-wp-all.sh", "-wp-model", "Typed+Cast", "-wp-timeout", "30"]
 
+  # Active headless verification (RTEMS 6.2 abstract RBTree port).
+  # Default invocation parses/runs the active _Scheduler_EDF_Unblock slice
+  # with the EDF ready-set model included. Override the command to pass WP
+  # flags as contracts are added, e.g.:
+  #   docker compose run --rm verify-6.2-active \
+  #     /opt/scripts/6.2/verify-edf-unblock.sh \
+  #     -wp -wp-fct _Scheduler_EDF_Unblock -wp-model 'Typed+Cast'
+  verify-6.2-active:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: rtems-edf-toolchain
+    working_dir: /workspace/rtems/src/rtems-6.2-pristine/cpukit
+    volumes:
+      - ./rtems:/workspace/rtems
+      - ./scripts:/opt/scripts
+      - ./verification:/workspace/verification
+    command: ["/opt/scripts/6.2/verify-edf-unblock.sh"]
+
   # Headless verification (FreeRTOS EDF). Currently a smoke test that
   # only exercises the toolchain wiring against list.c — annotated targets
   # get added incrementally.
