@@ -85,6 +85,19 @@ struct timeval   sbttotv( int64_t );
   requires \valid(
     &_Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp );
 
+  // EDF property assumed at entry: heir is non-preemptible or owns the
+  // earliest-ready node. Proven again at exit (post-call heir).
+  requires edf_preemptible_heir_is_earliest_ready{Pre}(
+    (Scheduler_EDF_Context *) scheduler->context,
+    _Thread_Heir,
+    _Thread_Heir->is_preemptible );
+
+  // The new node belongs to the_thread; needed to make the_thread the
+  // owner of the earliest-ready node in the update_heir case.
+  requires ((Scheduler_EDF_Node *) node)->Base.owner == the_thread;
+
+
+
   requires \separated(
     _Thread_Heir->Scheduler.nodes,
     (Scheduler_EDF_Node *) node
@@ -129,6 +142,14 @@ struct timeval   sbttotv( int64_t );
             edf_ready_set{Pre}(
               (Scheduler_EDF_Context *) scheduler->context ),
             (Scheduler_EDF_Node *) node );
+
+  // EDF property preserved: the post-call heir is non-preemptible or
+  // owns the earliest-ready node in the (updated) ready set.
+  ensures edf_preemptible_heir_is_earliest_ready{Post}(
+    (Scheduler_EDF_Context *) scheduler->context,
+    _Thread_Heir,
+    _Thread_Heir->is_preemptible );
+
 
   behavior keep_due_to_priority:
     assumes SCHEDULER_PRIORITY_PURIFY( node->Priority.value ) >=

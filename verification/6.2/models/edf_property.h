@@ -42,13 +42,21 @@
           thread
         );
 
+      // `is_preemptible` is passed explicitly instead of being dereferenced
+      // inside the predicate body. WP's typed_cast model has trouble with
+      // Thread_Control dereferences inside predicate bodies (Thread_Control
+      // has flexible-array members, so the corresponding `\valid_read`
+      // hypotheses get dropped by Frama-C, which then encodes the predicate
+      // application as a zero-arity opaque atom and lets the call site
+      // become inconsistent with other hypotheses). Validity of `heir` and
+      // readability of its `is_preemptible` field are the caller's
+      // responsibility.
       predicate edf_preemptible_heir_is_earliest_ready{L}(
         Scheduler_EDF_Context *context,
-        Thread_Control        *heir
+        Thread_Control        *heir,
+        boolean                is_preemptible
       ) =
-        \valid_read( heir ) &&
-        ( !heir->is_preemptible ||
-          edf_thread_is_earliest_ready{L}( context, heir ) );
+        !is_preemptible || edf_thread_is_earliest_ready{L}( context, heir );
     }
 */
 
