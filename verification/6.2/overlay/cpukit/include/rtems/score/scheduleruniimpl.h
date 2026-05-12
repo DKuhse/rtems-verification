@@ -342,6 +342,9 @@ static inline void _Scheduler_uniprocessor_Yield(
 {
   Thread_Control *highest_ready;
 
+  // Same as Schedule: pin the indirect-call target for WP. EDF is the
+  // only scheduler in proof scope today.
+  /*@ calls _Scheduler_EDF_Get_highest_ready; */
   highest_ready = ( *get_highest_ready )( scheduler );
   _Scheduler_uniprocessor_Update_heir_if_necessary( highest_ready );
 }
