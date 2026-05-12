@@ -49,6 +49,17 @@
         \valid( context ) &&
         edf_ready_valid_nodes{L}( edf_ready_set{L}( context ) );
 
+      // For every node in `nodes`, its EDF-cached `priority` agrees with
+      // the scheduler-aggregation priority used for ordering decisions
+      // (`Base.Wait.Priority.Node.priority`).
+      predicate edf_priority_cache_consistent{L}(
+        set<Scheduler_EDF_Node *> nodes
+      ) =
+        \forall Scheduler_EDF_Node *node;
+          node \in nodes ==>
+            node->priority ==
+              node->Base.Wait.Priority.Node.priority;
+
       // Set constructors are declared abstractly and characterised by
       // membership axioms below. FC 32's WP rejects the equivalent
       // `{ n | T *n; P(n) }` set-comprehension definitions with
