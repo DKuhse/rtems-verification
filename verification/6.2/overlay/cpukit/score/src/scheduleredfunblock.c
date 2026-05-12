@@ -81,15 +81,23 @@ struct timeval   sbttotv( int64_t );
   requires \valid_read( &_Thread_Heir->is_preemptible );
   requires \valid_read( &_Thread_Heir->Scheduler.nodes );
   requires \valid( _Thread_Heir->Scheduler.nodes );
+  requires \valid_read( (Scheduler_EDF_Node *) _Thread_Heir->Scheduler.nodes );
+  requires &((Scheduler_EDF_Node *) _Thread_Heir->Scheduler.nodes)->Base ==
+    _Thread_Heir->Scheduler.nodes;
   requires \valid( &_Thread_Heir->cpu_time_used );
   requires \valid(
     &_Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp );
 
   // EDF property assumed at entry: heir is non-preemptible or owns the
-  // earliest-ready node. Proven again at exit (post-call heir).
+  // earliest-ready scheduler node. Proven again at exit (post-call heir).
   requires edf_preemptible_heir_is_earliest_ready{Pre}(
     (Scheduler_EDF_Context *) scheduler->context,
     _Thread_Heir,
+    _Thread_Heir->is_preemptible );
+  requires edf_preemptible_heir_node_is_earliest_ready{Pre}(
+    (Scheduler_EDF_Context *) scheduler->context,
+    _Thread_Heir,
+    (Scheduler_EDF_Node *) _Thread_Heir->Scheduler.nodes,
     _Thread_Heir->is_preemptible );
 
   // The new node belongs to the_thread; needed to make the_thread the
@@ -100,11 +108,18 @@ struct timeval   sbttotv( int64_t );
   // Cache invariant for the ready set
   requires edf_priority_cache_consistent{Pre}(
     edf_ready_set{Pre}( (Scheduler_EDF_Context *) scheduler->context ) );
+  requires ((Scheduler_EDF_Node *) _Thread_Heir->Scheduler.nodes)->priority ==
+    _Thread_Heir->Scheduler.nodes->Wait.Priority.Node.priority;
 
 
   requires \separated(
     _Thread_Heir->Scheduler.nodes,
     (Scheduler_EDF_Node *) node
+  );
+  requires \separated(
+    (Scheduler_EDF_Node *) _Thread_Heir->Scheduler.nodes + (..),
+    (Scheduler_EDF_Node *) node + (..),
+    (Scheduler_EDF_Context *) scheduler->context + (..)
   );
   requires \separated(
     node + (..),
@@ -140,6 +155,8 @@ struct timeval   sbttotv( int64_t );
 
   ensures ((Scheduler_EDF_Node *) node)->priority ==
     SCHEDULER_PRIORITY_PURIFY( \at( node->Priority.value, Pre ) );
+  
+  // thread is added to the ready set
   ensures edf_ready_set{Post}(
             (Scheduler_EDF_Context *) scheduler->context ) ==
           edf_ready_insert(
@@ -147,13 +164,11 @@ struct timeval   sbttotv( int64_t );
               (Scheduler_EDF_Context *) scheduler->context ),
             (Scheduler_EDF_Node *) node );
 
-  // EDF property preserved: the post-call heir is non-preemptible or
-  // owns the earliest-ready node in the (updated) ready set.
+  //edf property: the new heir is the earliest ready thread (if preemptible)
   ensures edf_preemptible_heir_is_earliest_ready{Post}(
     (Scheduler_EDF_Context *) scheduler->context,
     _Thread_Heir,
     _Thread_Heir->is_preemptible );
-
 
   behavior keep_due_to_priority:
     assumes SCHEDULER_PRIORITY_PURIFY( node->Priority.value ) >=
@@ -194,5 +209,24 @@ void _Scheduler_EDF_Unblock(
 
   the_node->priority = priority;
   _Scheduler_EDF_Enqueue( context, the_node, insert_priority );
+
+  /*@ assert \at( _Thread_Heir, Pre )->is_preemptible &&
+    priority >=
+      \at( _Thread_Heir, Pre )
+        ->Scheduler.nodes->Wait.Priority.Node.priority ==>
+    edf_thread_node_is_earliest_ready{Here}(
+      context,
+      _Thread_Heir,
+      (Scheduler_EDF_Node *) _Thread_Heir->Scheduler.nodes
+    ); */
+  /*@ assert \at( _Thread_Heir, Pre )->is_preemptible &&
+    priority <
+      \at( _Thread_Heir, Pre )
+        ->Scheduler.nodes->Wait.Priority.Node.priority ==>
+    edf_thread_node_is_earliest_ready{Here}(
+      context,
+      the_thread,
+      the_node
+    ); */
   _Scheduler_uniprocessor_Unblock( scheduler, the_thread, priority );
 }

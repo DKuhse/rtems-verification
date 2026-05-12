@@ -42,21 +42,63 @@
           thread
         );
 
+      // EDF PROPERTY
       // `is_preemptible` is passed explicitly instead of being dereferenced
       // inside the predicate body. WP's typed_cast model has trouble with
-      // Thread_Control dereferences inside predicate bodies (Thread_Control
-      // has flexible-array members, so the corresponding `\valid_read`
-      // hypotheses get dropped by Frama-C, which then encodes the predicate
-      // application as a zero-arity opaque atom and lets the call site
-      // become inconsistent with other hypotheses). Validity of `heir` and
-      // readability of its `is_preemptible` field are the caller's
-      // responsibility.
+      // Thread_Control dereferences inside predicate bodies
       predicate edf_preemptible_heir_is_earliest_ready{L}(
         Scheduler_EDF_Context *context,
         Thread_Control        *heir,
         boolean                is_preemptible
       ) =
         !is_preemptible || edf_thread_is_earliest_ready{L}( context, heir );
+
+      // EDF PROPERTY WITH EXPLICIT WITNESS
+      // Prover sometimes has issues with exists quantified version... concrete witness version:
+
+            predicate edf_node_represents_thread{L}(
+        Scheduler_EDF_Node *node,
+        Thread_Control  *thread
+      ) =
+        \valid_read( node ) &&
+        node->Base.owner == thread;
+
+      predicate edf_thread_node_is_earliest_ready{L}(
+        Scheduler_EDF_Context *context,
+        Thread_Control        *thread,
+        Scheduler_EDF_Node    *node
+      ) =
+        edf_node_represents_thread{L}( node, thread ) &&
+        edf_ready_earliest_node{L}(
+          edf_ready_set{L}( context ),
+          node
+        );
+
+      predicate edf_preemptible_heir_node_is_earliest_ready{L}(
+        Scheduler_EDF_Context *context,
+        Thread_Control        *heir,
+        Scheduler_EDF_Node    *node,
+        boolean                is_preemptible
+      ) =
+        !is_preemptible ||
+        edf_thread_node_is_earliest_ready{L}(
+          context,
+          heir,
+          node
+        );
+
+
+
+      lemma edf_scheduler_node_earliest_implies_thread_earliest{L}:
+        \forall Scheduler_EDF_Context *context;
+        \forall Thread_Control *thread;
+        \forall Scheduler_EDF_Node *node;
+          edf_thread_node_is_earliest_ready{L}(
+            context,
+            thread,
+            node
+          ) ==>
+          edf_thread_is_earliest_ready{L}( context, thread );
     }
 */
 
