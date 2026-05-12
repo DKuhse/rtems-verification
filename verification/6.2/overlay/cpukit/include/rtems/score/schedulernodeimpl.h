@@ -100,6 +100,14 @@ extern "C" {
  *
  * @param priority is the initial priority of the node.
  */
+/*@
+  requires \valid( node );
+
+  assigns node->owner, node->Priority.value;
+
+  ensures node->owner == the_thread;
+  ensures node->Priority.value == priority;
+*/
 static inline void _Scheduler_Node_do_initialize(
   const struct _Scheduler_Control *scheduler,
   Scheduler_Node                  *node,
