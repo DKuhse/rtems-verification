@@ -61,52 +61,38 @@ up during the FC 25 → FC 32 move and are baked into the scripts/models now:
 
 ---
 
-## Abstraction-boundary stubs: `assigns \nothing` as a deliberate lie
+## Abstraction-boundary stubs
 
-Two helpers in the inlined chain under `_Scheduler_EDF_Unblock` have side
-effects that are *below* the EDF/scheduler abstraction — nothing above the
-abstraction reads them, and the EDF property doesn't depend on them. Both
-get a deliberately-lying contract in the overlay rather than honest
-threading of their assigns up through every caller.
+Some helpers in the inlined chain under `_Scheduler_EDF_Unblock` have side
+effects that are below the EDF/scheduler abstraction. Nothing above the
+abstraction should reason about the internal values, but the frame should
+still be honest unless we are deliberately abstracting an implementation
+outside the proof scope.
 
 | helper | overlay contract | what it actually does |
 |---|---|---|
 | `_Scheduler_EDF_Enqueue` | `assigns context->Ready` only (paired with `edf_ready_set` reading only `context->Ready`) | RBTree rotation: rewrites `rbe_{left,right,parent,color}` of various nodes |
-| `_Thread_Update_CPU_time_used` | `assigns \nothing` | writes `cpu->cpu_usage_timestamp` and `the_thread->cpu_time_used` |
+| `_Thread_Update_CPU_time_used` | honest frame for `cpu->cpu_usage_timestamp` and `the_thread->cpu_time_used` | writes exactly those two CPU-accounting fields |
 
-**Why lie**: the honest assigns *can* be threaded up in theory, but in
-practice WP's syntactic frame inference produces fresh universal-addr
-forms after inlining + parameter substitution (e.g. `a6+11`, `_Thread_Heir+52`)
-that don't unify with the caller's field-access ACSL expressions inside
-the prover budget. We hit this concretely on `assigns_normal_part13` for
-`_Scheduler_EDF_Unblock` with the honest cpu-time contract: WP couldn't
-discharge `a6+11 ≡ _Per_CPU_Information[0].per_cpu.cpu_usage_timestamp`
-through the inlined call. With `assigns \nothing` the question doesn't
-arise.
+The CPU-time helper used to be hidden behind `assigns \nothing`. That is no
+longer necessary for the uniprocessor helper proof. Its real writes are
+threaded through `_Scheduler_uniprocessor_Update_heir*()` as bookkeeping
+effects, while EDF contracts continue to ignore the values of those fields.
 
-**Why it's sound**: WP uses the helper's contract at call sites; it does
-*not* verify the contract against the helper's body (the helper isn't
-`-wp-fct`'d). Soundness then reduces to "no contract above the
-abstraction reads the lied-about fields" — true for both helpers above.
+`_Scheduler_EDF_Enqueue` remains the intentional abstraction boundary for now:
+we verify the EDF-level ready-set effect, not RBTree pointer/color mechanics.
 
-**When this pattern doesn't apply**: if a caller's `assigns`/`ensures` or
-a logic function's `reads` clause references the lied-about field, the
-lie becomes load-bearing and risks a vacuous proof. Audit before stubbing.
-Pattern signal in the other direction: if you find yourself stacking
-`\at(X, Pre)->field` *and* `other_view->field` *and*
-`_Per_CPU_Information[0].per_cpu.field` in a caller's `assigns` to chase
-frame matches that nothing semantically needs — that's the cue to stub
-the helper instead.
-
-The legacy 6.2 hand-port used the same pattern (`legacy/.../stubs.h`)
-for the same reasons. Both pattern instances are documented inline at the
-contract sites.
+The legacy 6.2 hand-port used stubs for this style of issue
+(`legacy/.../stubs.h`). In the active overlay, prefer honest frames first and
+only stub when the implementation is intentionally outside the proof scope.
 
 ---
 
 ## Active Scripts
 
 All run against the FC 32 stack via `docker compose run --rm verify-6.2-active-fc32`.
+The scripts also detect FC 25 and switch the C standard flag from `-std c11`
+to `-c11` so quick compatibility checks can run on `verify-6.2-active`.
 
 - `verify-edf-unblock.sh` — runs Frama-C on the active
   `_Scheduler_EDF_Unblock()` slice with `__FRAAMC__` defined so
@@ -116,8 +102,7 @@ All run against the FC 32 stack via `docker compose run --rm verify-6.2-active-f
   `_Scheduler_uniprocessor_Update_heir_if_preemptible()`, and
   `_Scheduler_uniprocessor_Unblock()`, using the contract of
   `_Scheduler_uniprocessor_Update_heir()` as the CPU-state boundary. Expected
-  result with `-wp-model 'Typed+Cast' -wp-timeout 30`: all goals proved
-  (48/48 on FC 32).
+  result with `-wp-model 'Typed+Cast' -wp-timeout 30`: all goals proved.
 - `tmp-verify-thread-get-priority.sh` — temporary isolation script for
   `_Thread_Get_priority()` and its immediate priority/home-node helper
   contracts.

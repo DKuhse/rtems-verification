@@ -20,6 +20,11 @@ if [ "$1" = "--gui" ]; then
     shift
 fi
 
+C_STD_FLAGS=(-std c11)
+if [[ "$(${FRAMA_C_CMD} -version 2>/dev/null)" == 25.* ]]; then
+    C_STD_FLAGS=(-c11)
+fi
+
 RTEMS_SRC="${RTEMS_SRC:-/workspace/rtems/src/rtems-6.2-pristine}"
 RTEMS_PREFIX="${RTEMS_PREFIX:-/opt/rtems5}"
 OVERLAY="${OVERLAY:-/workspace/verification/6.2}"
@@ -45,7 +50,7 @@ ${FRAMA_C_CMD} \
         -I${RTEMS_SRC}/bsps/x86_64/include \
         -I${RTEMS_SRC}/bsps/x86_64/amd64/include \
         -nostdinc" \
-    -machdep gcc_x86_64 -cpp-frama-c-compliant -std c11 \
+    -machdep gcc_x86_64 -cpp-frama-c-compliant "${C_STD_FLAGS[@]}" \
     -wp \
     -wp-fct "_Scheduler_uniprocessor_Update_heir_if_necessary,_Scheduler_uniprocessor_Update_heir_if_preemptible,_Scheduler_uniprocessor_Unblock" \
     "${SRC}" \

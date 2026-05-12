@@ -71,7 +71,7 @@ extern "C" {
   requires \valid_read( scheduler );
   requires \valid( (Scheduler_EDF_Context *) scheduler->context );
 
-  assigns \nothing;
+  assigns \result \from scheduler->context;
 
   ensures \result == (Scheduler_EDF_Context *) scheduler->context;
   ensures \valid( \result );
@@ -107,7 +107,7 @@ static inline Scheduler_EDF_Node *_Scheduler_EDF_Thread_get_node(
   requires \valid( (Scheduler_EDF_Node *) node );
   requires &((Scheduler_EDF_Node *) node)->Base == node;
 
-  assigns \nothing;
+  assigns \result \from node;
 
   ensures \result == (Scheduler_EDF_Node *) node;
   ensures \valid( \result );

@@ -994,7 +994,8 @@ Objects_Id _Thread_Self_id( void );
  * @return The cpu of the thread's scheduler.
  */
 /*@
-  assigns \nothing;
+  assigns \result \from \nothing;
+  ensures \result == &_Per_CPU_Information[ 0 ].per_cpu;
   ensures \valid( \result );
 */
 static inline Per_CPU_Control *_Thread_Get_CPU(
@@ -1271,11 +1272,13 @@ static inline Thread_Control *_Thread_Get_heir_and_make_it_executing(
  * @param cpu The cpu.
  */
 /*@
-  // CPU-time bookkeeping is below the scheduler abstraction; callers in
-  // the EDF stack do not reason about cpu_time_used or cpu_usage_timestamp.
-  // Declare `assigns \nothing` so the helper is opaque w.r.t. the frame
-  // condition.
-  assigns \nothing;
+  requires \valid( &the_thread->cpu_time_used );
+  requires \valid( &cpu->cpu_usage_timestamp );
+
+  // CPU-time bookkeeping is below the EDF scheduler abstraction, but the
+  // helper really updates these two fields. Scheduler contracts may ignore
+  // their values, not their existence in the frame.
+  assigns cpu->cpu_usage_timestamp, the_thread->cpu_time_used;
 */
 static inline void _Thread_Update_CPU_time_used(
   Thread_Control  *the_thread,

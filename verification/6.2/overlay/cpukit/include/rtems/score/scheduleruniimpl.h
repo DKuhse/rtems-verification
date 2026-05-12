@@ -59,9 +59,24 @@ extern "C" {
  */
 /*@
   requires heir != new_heir;
+  requires \valid( &heir->cpu_time_used );
+  requires \separated(
+    heir + (..),
+    (Per_CPU_Control_envelope *) _Per_CPU_Information + (..)
+  );
+  requires \separated(
+    new_heir + (..),
+    (Per_CPU_Control_envelope *) _Per_CPU_Information + (..)
+  );
+  requires \separated(
+    &heir->cpu_time_used,
+    (Per_CPU_Control_envelope *) _Per_CPU_Information + (..)
+  );
 
-  assigns _Thread_Heir \from new_heir;
-  assigns _Thread_Dispatch_necessary;
+  assigns _Per_CPU_Information[ 0 ].per_cpu.heir \from new_heir;
+  assigns _Per_CPU_Information[ 0 ].per_cpu.dispatch_necessary;
+  assigns heir->cpu_time_used,
+          _Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp;
 
   ensures _Thread_Heir == new_heir;
   // ensures _Thread_Dispatch_necessary == true;
@@ -97,6 +112,16 @@ static inline void _Scheduler_uniprocessor_Update_heir(
  * @param[in, out] new_heir is the new heir thread.
  */
 /*@
+  requires \valid( &_Thread_Heir->cpu_time_used );
+  requires \separated(
+    _Thread_Heir + (..),
+    (Per_CPU_Control_envelope *) _Per_CPU_Information + (..)
+  );
+  requires \separated(
+    new_heir + (..),
+    (Per_CPU_Control_envelope *) _Per_CPU_Information + (..)
+  );
+
   behavior same_heir:
     assumes \at( _Thread_Heir, Pre ) == new_heir;
     assigns \nothing;
@@ -104,8 +129,10 @@ static inline void _Scheduler_uniprocessor_Update_heir(
 
   behavior new_heir:
     assumes \at( _Thread_Heir, Pre ) != new_heir;
-    assigns _Thread_Heir \from new_heir;
-    assigns _Thread_Dispatch_necessary;
+    assigns _Per_CPU_Information[ 0 ].per_cpu.heir \from new_heir;
+    assigns _Per_CPU_Information[ 0 ].per_cpu.dispatch_necessary;
+    assigns _Per_CPU_Information[ 0 ].per_cpu.heir->cpu_time_used,
+            _Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp;
     ensures _Thread_Heir == new_heir;
 
   complete behaviors;
@@ -131,9 +158,24 @@ static inline void _Scheduler_uniprocessor_Update_heir_if_necessary(
  */
 /*@
   requires \valid_read( &heir->is_preemptible );
+  requires \valid( &heir->cpu_time_used );
+  requires \separated(
+    heir + (..),
+    (Per_CPU_Control_envelope *) _Per_CPU_Information + (..)
+  );
+  requires \separated(
+    new_heir + (..),
+    (Per_CPU_Control_envelope *) _Per_CPU_Information + (..)
+  );
+  requires \separated(
+    &heir->cpu_time_used,
+    (Per_CPU_Control_envelope *) _Per_CPU_Information + (..)
+  );
 
-  assigns _Thread_Heir \from new_heir;
-  assigns _Thread_Dispatch_necessary;
+  assigns _Per_CPU_Information[ 0 ].per_cpu.heir \from new_heir;
+  assigns _Per_CPU_Information[ 0 ].per_cpu.dispatch_necessary;
+  assigns heir->cpu_time_used,
+          _Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp;
 
   ensures (heir == \old( new_heir ) || !\old( heir->is_preemptible )) ==>
           _Thread_Heir == \old( _Thread_Heir );
@@ -194,6 +236,15 @@ static inline void _Scheduler_uniprocessor_Block(
   requires \valid_read( &_Thread_Heir->is_preemptible );
   requires \valid_read( &_Thread_Heir->Scheduler.nodes );
   requires \valid( _Thread_Heir->Scheduler.nodes );
+  requires \valid( &_Thread_Heir->cpu_time_used );
+  requires \separated(
+    _Thread_Heir + (..),
+    (Per_CPU_Control_envelope *) _Per_CPU_Information + (..)
+  );
+  requires \separated(
+    the_thread + (..),
+    (Per_CPU_Control_envelope *) _Per_CPU_Information + (..)
+  );
 
   behavior keep_due_to_priority:
     assumes priority >=
@@ -205,16 +256,21 @@ static inline void _Scheduler_uniprocessor_Block(
     assumes priority <
       \at( _Thread_Heir, Pre )->Scheduler.nodes->Wait.Priority.Node.priority;
     assumes !\at( _Thread_Heir, Pre )->is_preemptible;
-    assigns _Thread_Heir \from \at( _Thread_Heir, Pre );
-    assigns _Thread_Dispatch_necessary;
+    assigns _Per_CPU_Information[ 0 ].per_cpu.heir
+      \from \at( _Thread_Heir, Pre );
+    assigns _Per_CPU_Information[ 0 ].per_cpu.dispatch_necessary;
+    assigns _Per_CPU_Information[ 0 ].per_cpu.heir->cpu_time_used,
+            _Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp;
     ensures _Thread_Heir == \at( _Thread_Heir, Pre );
 
   behavior update_heir:
     assumes priority <
       \at( _Thread_Heir, Pre )->Scheduler.nodes->Wait.Priority.Node.priority;
     assumes \at( _Thread_Heir, Pre )->is_preemptible;
-    assigns _Thread_Heir \from the_thread;
-    assigns _Thread_Dispatch_necessary;
+    assigns _Per_CPU_Information[ 0 ].per_cpu.heir \from the_thread;
+    assigns _Per_CPU_Information[ 0 ].per_cpu.dispatch_necessary;
+    assigns _Per_CPU_Information[ 0 ].per_cpu.heir->cpu_time_used,
+            _Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp;
     ensures _Thread_Heir == the_thread;
 
   complete behaviors;

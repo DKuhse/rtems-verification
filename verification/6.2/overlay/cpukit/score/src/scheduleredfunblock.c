@@ -81,6 +81,9 @@ struct timeval   sbttotv( int64_t );
   requires \valid_read( &_Thread_Heir->is_preemptible );
   requires \valid_read( &_Thread_Heir->Scheduler.nodes );
   requires \valid( _Thread_Heir->Scheduler.nodes );
+  requires \valid( &_Thread_Heir->cpu_time_used );
+  requires \valid(
+    &_Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp );
 
   requires \separated(
     _Thread_Heir->Scheduler.nodes,
@@ -104,6 +107,7 @@ struct timeval   sbttotv( int64_t );
   // `assigns context->Ready`.
   requires \separated(
     _Thread_Heir + (..),
+    (Per_CPU_Control_envelope *) _Per_CPU_Information + (..),
     scheduler + (..),
     (Scheduler_EDF_Context *) scheduler->context + (..)
   );
@@ -111,7 +115,11 @@ struct timeval   sbttotv( int64_t );
   assigns ((Scheduler_EDF_Node *) node)->Base.Priority,
           ((Scheduler_EDF_Node *) node)->priority,
           ((Scheduler_EDF_Context *) scheduler->context)->Ready,
-          _Thread_Heir, _Thread_Dispatch_necessary;
+          _Per_CPU_Information[ 0 ].per_cpu.heir,
+          _Per_CPU_Information[ 0 ].per_cpu.dispatch_necessary,
+          _Thread_Heir->cpu_time_used,
+          _Per_CPU_Information[ 0 ].per_cpu.heir->cpu_time_used,
+          _Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp;
 
   ensures ((Scheduler_EDF_Node *) node)->priority ==
     SCHEDULER_PRIORITY_PURIFY( \at( node->Priority.value, Pre ) );
