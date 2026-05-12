@@ -26,7 +26,7 @@ set -e
 WP_FCTS="${WP_FCTS:-_Scheduler_EDF_Update_priority,_Scheduler_EDF_Get_context,_Scheduler_EDF_Node_downcast,_Thread_Is_ready}"
 
 WP_FCT_DEFAULTS="${WP_FCT_DEFAULTS:--wp -wp-fct ${WP_FCTS} -wp-model Typed+Cast -wp-timeout 30}"
-WP_LEMMA_DEFAULTS="${WP_LEMMA_DEFAULTS:--wp -wp-prop=edf_scheduler_node_earliest_implies_thread_earliest -wp-model Typed+Cast -wp-timeout 30}"
+WP_LEMMA_DEFAULTS="${WP_LEMMA_DEFAULTS:--wp -wp-prop=@lemma -wp-model Typed+Cast -wp-timeout 30}"
 
 if command -v opam >/dev/null 2>&1; then
     eval $(opam env)

@@ -201,26 +201,11 @@ static inline bool _Scheduler_EDF_Priority_less_equal(
   ensures edf_ready_set{Post}( context ) ==
     edf_ready_insert( edf_ready_set{Pre}( context ), node );
   ensures edf_ready_context_well_formed{Post}( context );
-  ensures \forall Scheduler_EDF_Node *old;
-    edf_ready_earliest_node{Pre}(
-      edf_ready_set{Pre}( context ),
-      old
-    ) &&
-    edf_ready_node_not_after{Pre}( old, node ) ==>
-      edf_ready_earliest_node{Post}(
-        edf_ready_set{Post}( context ),
-        old
-      );
-  ensures \forall Scheduler_EDF_Node *old;
-    edf_ready_earliest_node{Pre}(
-      edf_ready_set{Pre}( context ),
-      old
-    ) &&
-    edf_ready_node_not_after{Pre}( node, old ) ==>
-      edf_ready_earliest_node{Post}(
-        edf_ready_set{Post}( context ),
-        node
-      );
+  // Earliest-preservation/replacement under insertion is stated as the
+  // model-level lemmas `edf_ready_earliest_preserved_under_insert` and
+  // `edf_ready_new_earliest_under_insert` rather than baked in here --
+  // they're pure facts about `edf_ready_insert` + `edf_ready_earliest_node`
+  // and have no Pre/Post wiring concerns.
 */
 static inline void _Scheduler_EDF_Enqueue(
   Scheduler_EDF_Context *context,

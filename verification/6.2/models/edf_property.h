@@ -97,7 +97,7 @@
       // --- Bridge ------------------------------------------------------
       // Existential introduction: a concrete witness satisfying the
       // witness-explicit form discharges the existential form. Proves
-      // cleanly in isolation; Alt-Ergo can then apply it as a rewrite
+      // cleanly in isolation; can then be automatically applied as a rewrite
       // when the witness predicate appears alongside the existential.
 
       lemma edf_scheduler_node_earliest_implies_thread_earliest{L}:
@@ -106,6 +106,48 @@
         \forall Scheduler_EDF_Node *node;
           edf_thread_node_is_earliest_ready{L}( context, thread, node ) ==>
           edf_thread_is_earliest_ready{L}( context, thread );
+
+      // --- Earliest preservation under extraction --------------------
+      // Removing a node distinct from the witness preserves the witness
+      // as earliest.
+
+      lemma edf_ready_earliest_preserved_under_extract{L}:
+        \forall set<Scheduler_EDF_Node *> nodes;
+        \forall Scheduler_EDF_Node *old;
+        \forall Scheduler_EDF_Node *removed;
+          edf_ready_earliest_node{L}( nodes, old ) &&
+          old != removed ==>
+            edf_ready_earliest_node{L}(
+              edf_ready_extract( nodes, removed ),
+              old
+            );
+
+      // --- Earliest preservation/replacement under insertion ----------
+      // If the inserted node is not earlier than the old witness, the
+      // old witness remains earliest. If it is, the inserted node
+      // becomes a new witness.
+
+      lemma edf_ready_earliest_preserved_under_insert{L}:
+        \forall set<Scheduler_EDF_Node *> nodes;
+        \forall Scheduler_EDF_Node *old;
+        \forall Scheduler_EDF_Node *added;
+          edf_ready_earliest_node{L}( nodes, old ) &&
+          edf_ready_node_not_after{L}( old, added ) ==>
+            edf_ready_earliest_node{L}(
+              edf_ready_insert( nodes, added ),
+              old
+            );
+
+      lemma edf_ready_new_earliest_under_insert{L}:
+        \forall set<Scheduler_EDF_Node *> nodes;
+        \forall Scheduler_EDF_Node *old;
+        \forall Scheduler_EDF_Node *added;
+          edf_ready_earliest_node{L}( nodes, old ) &&
+          edf_ready_node_not_after{L}( added, old ) ==>
+            edf_ready_earliest_node{L}(
+              edf_ready_insert( nodes, added ),
+              added
+            );
     }
 */
 
