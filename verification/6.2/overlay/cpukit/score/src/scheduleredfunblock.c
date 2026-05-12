@@ -97,6 +97,10 @@ struct timeval   sbttotv( int64_t );
   requires ((Scheduler_EDF_Node *) node)->Base.owner == the_thread;
 
 
+  // Cache invariant for the ready set
+  requires edf_priority_cache_consistent{Pre}(
+    edf_ready_set{Pre}( (Scheduler_EDF_Context *) scheduler->context ) );
+
 
   requires \separated(
     _Thread_Heir->Scheduler.nodes,
