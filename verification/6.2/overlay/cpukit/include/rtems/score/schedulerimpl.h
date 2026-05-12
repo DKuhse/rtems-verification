@@ -101,6 +101,13 @@ void _Scheduler_Handler_initialization( void );
  *
  * @return The context of @a scheduler.
  */
+/*@
+  requires \valid_read( scheduler );
+
+  assigns \result \from scheduler->context;
+
+  ensures \result == scheduler->context;
+*/
 static inline Scheduler_Context *_Scheduler_Get_context(
   const Scheduler_Control *scheduler
 )

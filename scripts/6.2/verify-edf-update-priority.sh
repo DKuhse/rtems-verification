@@ -1,29 +1,29 @@
 #!/bin/bash
 #
-# Verify _Scheduler_EDF_Unblock on the active RTEMS 6.2 port.
+# Verify _Scheduler_EDF_Update_priority on the active RTEMS 6.2 port.
 #
-# This script uses the active overlay in verification/6.2 and includes the
-# abstract EDF ready-set model.  It does not use the legacy hand-port stubs.
+# Mirrors verify-edf-unblock.sh; uses the active overlay and the abstract
+# EDF ready-set model. Inlines the uniprocessor Schedule helper and the
+# preemptible-update wrapper so WP resolves the function-pointer call.
 #
 # Two WP passes run by default:
-#   1. function goals for _Scheduler_EDF_Unblock
+#   1. function goals for _Scheduler_EDF_Update_priority
 #   2. the EDF property lemma in the model
 # Both must close. Extra args are forwarded to *both* passes.
 #
 # Usage:
-#   verify-edf-unblock.sh                        # full default proof
-#   verify-edf-unblock.sh --gui                  # open in GUI (single pass)
-#   verify-edf-unblock.sh -wp-prop=foo           # narrow goals
+#   verify-edf-update-priority.sh                # full default proof
+#   verify-edf-update-priority.sh --gui          # open in GUI (single pass)
+#   verify-edf-update-priority.sh -wp-prop=foo   # narrow goals
 #
 set -e
 
 # Functions whose bodies we want WP to check against their own contracts.
-# This is the main proof target plus every trivially-verifiable helper
-# above the axiomatic-RBTree boundary. Helpers whose bodies *call* RBTree
-# internals (_Scheduler_EDF_Enqueue / _Extract / _Get_highest_ready) and
-# the uniprocessor helpers (verified by verify-scheduleruni-unblock.sh)
-# are intentionally absent.
-WP_FCTS="${WP_FCTS:-_Scheduler_EDF_Unblock,_Scheduler_EDF_Get_context,_Scheduler_EDF_Node_downcast,_Thread_Is_ready}"
+# Main target plus every trivially-verifiable helper above the axiomatic-
+# RBTree boundary. Helpers whose bodies *call* RBTree internals
+# (_Scheduler_EDF_Enqueue / _Extract / _Get_highest_ready) and the
+# uniprocessor helpers (verified separately) are intentionally absent.
+WP_FCTS="${WP_FCTS:-_Scheduler_EDF_Update_priority,_Scheduler_EDF_Get_context,_Scheduler_EDF_Node_downcast,_Thread_Is_ready}"
 
 WP_FCT_DEFAULTS="${WP_FCT_DEFAULTS:--wp -wp-fct ${WP_FCTS} -wp-model Typed+Cast -wp-timeout 30}"
 WP_LEMMA_DEFAULTS="${WP_LEMMA_DEFAULTS:--wp -wp-prop=edf_scheduler_node_earliest_implies_thread_earliest -wp-model Typed+Cast -wp-timeout 30}"
@@ -50,7 +50,7 @@ RTEMS_PREFIX="${RTEMS_PREFIX:-/opt/rtems5}"
 OVERLAY="${OVERLAY:-/workspace/verification/6.2}"
 RTEMS_BUILD_BSP="${RTEMS_BUILD_BSP:-/workspace/rtems/build/amd64/x86_64-rtems5/c/amd64/include}"
 
-SRC="${OVERLAY}/overlay/cpukit/score/src/scheduleredfunblock.c"
+SRC="${OVERLAY}/overlay/cpukit/score/src/scheduleredfchangepriority.c"
 MODEL="${OVERLAY}/models/edf_ready_set.h"
 
 [ -f "${SRC}" ] || { echo "missing overlay source: ${SRC}" >&2; exit 1; }
@@ -74,18 +74,17 @@ run_fc() {
             -I${RTEMS_SRC}/bsps/x86_64/amd64/include \
             -nostdinc" \
         -machdep gcc_x86_64 -cpp-frama-c-compliant "${C_STD_FLAGS[@]}" \
-        -inline-calls "_Scheduler_uniprocessor_Unblock,_Scheduler_uniprocessor_Update_heir_if_preemptible" \
+        -inline-calls "_Scheduler_uniprocessor_Schedule,_Scheduler_uniprocessor_Update_heir_if_preemptible" \
         "${SRC}" \
         ${defaults} \
         "$@"
 }
 
 if [ "${GUI}" = "1" ]; then
-    # GUI: single pass with combined defaults so all goals appear.
     run_fc "${WP_FCT_DEFAULTS}" "$@"
 else
-    echo "=== EDF Unblock (RTEMS 6.2 active port): function ==="
+    echo "=== EDF Update_priority (RTEMS 6.2 active port): function ==="
     run_fc "${WP_FCT_DEFAULTS}" "$@"
-    echo "=== EDF Unblock (RTEMS 6.2 active port): model lemma ==="
+    echo "=== EDF Update_priority (RTEMS 6.2 active port): model lemma ==="
     run_fc "${WP_LEMMA_DEFAULTS}" "$@"
 fi

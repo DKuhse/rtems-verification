@@ -242,6 +242,17 @@ static inline void _Scheduler_EDF_Enqueue(
  * @param[in, out] context The context to extract the node from.
  * @param[in, out] node The node to extract.
  */
+/*@
+  requires edf_ready_context_well_formed{Pre}( context );
+  requires \valid( node );
+  requires edf_ready_member{Pre}( context, node );
+
+  assigns context->Ready;
+
+  ensures edf_ready_set{Post}( context ) ==
+    edf_ready_extract( edf_ready_set{Pre}( context ), node );
+  ensures edf_ready_context_well_formed{Post}( context );
+*/
 static inline void _Scheduler_EDF_Extract(
   Scheduler_EDF_Context *context,
   Scheduler_EDF_Node    *node
@@ -277,6 +288,33 @@ static inline void _Scheduler_EDF_Extract_body(
  *
  * @param scheduler is the scheduler.
  */
+/*@
+  requires \valid_read( scheduler );
+  requires \valid( (Scheduler_EDF_Context *) scheduler->context );
+  requires edf_ready_context_well_formed{Pre}(
+    (Scheduler_EDF_Context *) scheduler->context );
+
+  // The ready set is non-empty
+  // Callers (Update_priority's extract+enqueue path,
+  // Yield, etc.) always re-enqueue before invoking Schedule.
+  requires \exists Scheduler_EDF_Node *some;
+    some \in edf_ready_set{Pre}(
+      (Scheduler_EDF_Context *) scheduler->context );
+
+  assigns \result \from scheduler->context,
+    ((Scheduler_EDF_Context *) scheduler->context)->Ready;
+
+
+  // result is owner of some earliest node in ready set
+  ensures \exists Scheduler_EDF_Node *node;
+    edf_ready_earliest_node{Pre}(
+      edf_ready_set{Pre}(
+        (Scheduler_EDF_Context *) scheduler->context ),
+      node ) &&
+    node->Base.owner == \result &&
+    \result->Scheduler.nodes == &node->Base;
+  ensures \valid( \result );
+*/
 static inline Thread_Control *_Scheduler_EDF_Get_highest_ready(
   const Scheduler_Control *scheduler
 )

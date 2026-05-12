@@ -45,6 +45,13 @@
 extern "C" {
 #endif
 
+#ifdef __FRAAMC__
+// Forward-declare scheduler-specific get_highest_ready callees so the
+// `calls` annotations on Uniprocessor_Schedule/Yield can name them.
+static inline Thread_Control *_Scheduler_EDF_Get_highest_ready(
+  const Scheduler_Control *scheduler );
+#endif
+
 /**
  * @addtogroup RTEMSScoreScheduler
  *
@@ -310,6 +317,11 @@ static inline void _Scheduler_uniprocessor_Schedule(
 {
   Thread_Control *highest_ready;
 
+  // The `calls` annotation pins the indirect-call target so WP can use
+  // the callee's contract. Only the EDF scheduler is in scope of this
+  // verification effort; other schedulers (priority-simple, etc.) would
+  // need to be added here
+  /*@ calls _Scheduler_EDF_Get_highest_ready; */
   highest_ready = ( *get_highest_ready )( scheduler );
   _Scheduler_uniprocessor_Update_heir_if_preemptible(
     _Thread_Heir,

@@ -3,12 +3,17 @@
 # Verify uniprocessor scheduler unblock inline helpers on the active RTEMS 6.2
 # port.
 #
+# Defaults to the full WP proof with Typed+Cast and a 30s timeout.
+# Extra arguments are appended verbatim.
+#
 # Usage:
-#   verify-scheduleruni-unblock.sh
-#   verify-scheduleruni-unblock.sh --gui
-#   verify-scheduleruni-unblock.sh -wp-model "Typed+Cast"
+#   verify-scheduleruni-unblock.sh            # default proof
+#   verify-scheduleruni-unblock.sh --gui      # open in GUI
+#   verify-scheduleruni-unblock.sh -wp-prop=foo
 #
 set -e
+
+WP_DEFAULTS="${WP_DEFAULTS:--wp-model Typed+Cast -wp-timeout 30}"
 
 if command -v opam >/dev/null 2>&1; then
     eval $(opam env)
@@ -54,4 +59,5 @@ ${FRAMA_C_CMD} \
     -wp \
     -wp-fct "_Scheduler_uniprocessor_Update_heir_if_necessary,_Scheduler_uniprocessor_Update_heir_if_preemptible,_Scheduler_uniprocessor_Unblock" \
     "${SRC}" \
+    ${WP_DEFAULTS} \
     "$@"
