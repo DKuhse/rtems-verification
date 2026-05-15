@@ -278,6 +278,8 @@ representation function for the scheduler-facing contents of
 - `predicate edf_ready_empty{L}(context)`
 - `predicate edf_ready_set_member(nodes, node)`
 - `predicate edf_ready_valid_nodes{L}(nodes)`
+- `predicate edf_ready_node_has_canonical_owner{L}(node)`
+- `predicate edf_ready_owners_canonical{L}(nodes)`
 - `predicate edf_ready_context_well_formed{L}(context)`
 - `logic set<Scheduler_EDF_Node *> edf_ready_singleton(node)`
 - `logic set<Scheduler_EDF_Node *> edf_ready_insert(nodes, node)`
@@ -304,9 +306,11 @@ They are intended for contracts such as:
 `edf_ready_valid_nodes{L}(nodes)` so priority comparisons only range over valid
 EDF scheduler nodes.
 
-`edf_ready_context_well_formed{L}(context)` currently requires a valid context
-and valid ready nodes. It is the context-level invariant used by scheduler
-helper contracts and can be extended as the EDF model grows.
+`edf_ready_context_well_formed{L}(context)` requires a valid context, valid
+ready nodes, owner-distinct ready nodes, and canonical ready-node ownership:
+each ready node's owner points back to that node as its home scheduler node.
+It is the context-level invariant used by scheduler helper contracts and can
+be extended as the EDF model grows.
 
 **Current scope**: contents only. This model intentionally does not describe
 RBTree shape, colors, rotations, or traversal.

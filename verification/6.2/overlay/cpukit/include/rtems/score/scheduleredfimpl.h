@@ -188,6 +188,7 @@ static inline bool _Scheduler_EDF_Priority_less_equal(
   requires edf_ready_context_well_formed{Pre}( context );
   requires \valid( node );
   requires !edf_ready_member{Pre}( context, node );
+  requires edf_ready_node_has_canonical_owner{Pre}( node );
 
   // No owner collision
   requires \forall Scheduler_EDF_Node *m;
@@ -208,6 +209,7 @@ static inline bool _Scheduler_EDF_Priority_less_equal(
   // Owner-frame
   ensures \forall Scheduler_EDF_Node *n;
     \valid_read( n ) ==> n->Base.owner == \old( n->Base.owner );
+  ensures edf_ready_node_has_canonical_owner{Post}( node );
   ensures edf_ready_context_well_formed{Post}( context );
 */
 static inline void _Scheduler_EDF_Enqueue(
@@ -242,6 +244,7 @@ static inline void _Scheduler_EDF_Enqueue(
   // Owner-frame
   ensures \forall Scheduler_EDF_Node *n;
     \valid_read( n ) ==> n->Base.owner == \old( n->Base.owner );
+  ensures edf_ready_node_has_canonical_owner{Post}( node );
   ensures edf_ready_context_well_formed{Post}( context );
 */
 static inline void _Scheduler_EDF_Extract(

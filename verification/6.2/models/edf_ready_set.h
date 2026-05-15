@@ -40,12 +40,31 @@
           m1 \in nodes && m2 \in nodes &&
             m1->Base.owner == m2->Base.owner ==> m1 == m2;
 
+      // Owner-canonical ready node: the owner points back to this node as
+      // its home scheduler node. This is the node-side ownership bijection
+      // invariant used by the EDF proof.
+      predicate edf_ready_node_has_canonical_owner{L}(
+        Scheduler_EDF_Node *node
+      ) =
+        \valid_read( node ) &&
+        node->Base.owner != \null &&
+        \valid_read( &node->Base.owner->Scheduler.nodes ) &&
+        node->Base.owner->Scheduler.nodes == &node->Base;
+
+      predicate edf_ready_owners_canonical{L}(
+        set<Scheduler_EDF_Node *> nodes
+      ) =
+        \forall Scheduler_EDF_Node *node;
+          node \in nodes ==>
+            edf_ready_node_has_canonical_owner{L}( node );
+
       predicate edf_ready_context_well_formed{L}(
         Scheduler_EDF_Context *context
       ) =
         \valid( context ) &&
         edf_ready_valid_nodes{L}( edf_ready_set{L}( context ) ) &&
-        edf_ready_owners_distinct{L}( edf_ready_set{L}( context ) );
+        edf_ready_owners_distinct{L}( edf_ready_set{L}( context ) ) &&
+        edf_ready_owners_canonical{L}( edf_ready_set{L}( context ) );
 
       // For every node in `nodes`, its EDF-cached `priority` agrees with
       // the scheduler-aggregation priority used for ordering decisions
@@ -99,6 +118,22 @@
           ( \forall Scheduler_EDF_Node *m;
               m \in nodes ==> m->Base.owner != added->Base.owner ) ==>
             edf_ready_owners_distinct{L}(
+              edf_ready_insert( nodes, added ) );
+
+      // --- Owner-canonical preservation lemmas --------------------------
+      lemma edf_ready_owners_canonical_under_extract{L}:
+        \forall set<Scheduler_EDF_Node *> nodes;
+        \forall Scheduler_EDF_Node *removed;
+          edf_ready_owners_canonical{L}( nodes ) ==>
+            edf_ready_owners_canonical{L}(
+              edf_ready_extract( nodes, removed ) );
+
+      lemma edf_ready_owners_canonical_under_insert{L}:
+        \forall set<Scheduler_EDF_Node *> nodes;
+        \forall Scheduler_EDF_Node *added;
+          edf_ready_owners_canonical{L}( nodes ) &&
+          edf_ready_node_has_canonical_owner{L}( added ) ==>
+            edf_ready_owners_canonical{L}(
               edf_ready_insert( nodes, added ) );
     }
 */

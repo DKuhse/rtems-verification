@@ -76,6 +76,8 @@ struct timeval   sbttotv( int64_t );
   requires !edf_ready_member{Pre}(
     (Scheduler_EDF_Context *) scheduler->context,
     (Scheduler_EDF_Node *) node );
+  requires edf_ready_node_has_canonical_owner{Pre}(
+    (Scheduler_EDF_Node *) node );
 
   // the_thread is not already represented in the ready set: required so
   // the post-state ready set remains owner-distinct (the well-formedness
@@ -173,8 +175,8 @@ struct timeval   sbttotv( int64_t );
               (Scheduler_EDF_Context *) scheduler->context ),
             (Scheduler_EDF_Node *) node );
 
-  // Inductive invariant: the ready context remains well-formed (valid
-  // nodes + owner-distinct) at every EDF API boundary.
+  // Inductive invariant: the ready context remains well-formed at every
+  // EDF API boundary.
   ensures edf_ready_context_well_formed{Post}(
     (Scheduler_EDF_Context *) scheduler->context );
 
