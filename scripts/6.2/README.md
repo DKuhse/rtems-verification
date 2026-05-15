@@ -97,6 +97,11 @@ to `-c11` so quick compatibility checks can run on `verify-6.2-active`.
 - `verify-edf-unblock.sh` — runs Frama-C on the active
   `_Scheduler_EDF_Unblock()` slice with `__FRAAMC__` defined so
   `scheduleredf.h` includes `verification/6.2/models/edf_ready_set.h`.
+- `verify-edf-release-cancel.sh` — runs Frama-C/WP on the active
+  `_Scheduler_EDF_Release_job()` and `_Scheduler_EDF_Cancel_job()` slice. This
+  replaces the legacy `release_cancel_stubs.h` harness with the active overlay
+  and leaves priority aggregation/thread-priority contracts as the proof
+  boundary.
 - `verify-scheduleruni-unblock.sh` — runs Frama-C/WP on the header harness for
   `_Scheduler_uniprocessor_Update_heir_if_necessary()`,
   `_Scheduler_uniprocessor_Update_heir_if_preemptible()`, and
