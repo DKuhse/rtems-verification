@@ -144,6 +144,11 @@ struct timeval   sbttotv( int64_t );
     _Thread_Heir,
     _Thread_Heir->is_preemptible );
 
+  // Inductive invariant: the ready context remains well-formed at every
+  // EDF API boundary.
+  ensures edf_ready_context_well_formed{Post}(
+    (Scheduler_EDF_Context *) scheduler->context );
+
   behavior not_ready:
     assumes the_thread->current_state != STATES_READY;
     assigns \nothing;

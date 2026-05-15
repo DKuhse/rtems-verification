@@ -77,6 +77,15 @@ struct timeval   sbttotv( int64_t );
     (Scheduler_EDF_Context *) scheduler->context,
     (Scheduler_EDF_Node *) node );
 
+  // the_thread is not already represented in the ready set: required so
+  // the post-state ready set remains owner-distinct (the well-formedness
+  // invariant). Semantically, Unblock moves a thread from blocked to ready,
+  // so the thread must not already be represented by some other ready node.
+  requires \forall Scheduler_EDF_Node *m;
+    m \in edf_ready_set{Pre}(
+      (Scheduler_EDF_Context *) scheduler->context ) ==>
+      m->Base.owner != the_thread;
+
   requires \valid( _Thread_Heir );
   requires \valid_read( &_Thread_Heir->is_preemptible );
   requires \valid_read( &_Thread_Heir->Scheduler.nodes );
@@ -155,7 +164,7 @@ struct timeval   sbttotv( int64_t );
 
   ensures ((Scheduler_EDF_Node *) node)->priority ==
     SCHEDULER_PRIORITY_PURIFY( \at( node->Priority.value, Pre ) );
-  
+
   // thread is added to the ready set
   ensures edf_ready_set{Post}(
             (Scheduler_EDF_Context *) scheduler->context ) ==
@@ -163,6 +172,11 @@ struct timeval   sbttotv( int64_t );
             edf_ready_set{Pre}(
               (Scheduler_EDF_Context *) scheduler->context ),
             (Scheduler_EDF_Node *) node );
+
+  // Inductive invariant: the ready context remains well-formed (valid
+  // nodes + owner-distinct) at every EDF API boundary.
+  ensures edf_ready_context_well_formed{Post}(
+    (Scheduler_EDF_Context *) scheduler->context );
 
   //edf property: the new heir is the earliest ready thread (if preemptible)
   ensures edf_preemptible_heir_is_earliest_ready{Post}(
