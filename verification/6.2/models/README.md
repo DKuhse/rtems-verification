@@ -29,3 +29,12 @@ This directory is for verification-only abstract models.
 
 These are not stubs for missing code. They are intentional abstraction
 boundaries used by the active RTEMS 6.2 proof.
+
+## Notes
+
+- Several operation contracts use the same bridge from
+  `SCHEDULER_PRIORITY_PURIFY(node->Priority.value)` to
+  `((Scheduler_EDF_Node *) node)->Base.Wait.Priority.Node.priority`.  This is
+  currently left inline because it keeps the proof obligations transparent to
+  WP. Using a predicate for it didn't work. If release/cancel repeats this enough to become noisy, consider
+  reintroducing a small shared helper macro for it.
