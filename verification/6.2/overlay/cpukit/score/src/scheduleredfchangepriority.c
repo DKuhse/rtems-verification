@@ -102,8 +102,8 @@ struct timeval   sbttotv( int64_t );
       (Scheduler_EDF_Context *) scheduler->context,
       (Scheduler_EDF_Node *) node );
 
-  // Update_priority repairs cachy consistency for the node its called on. 
-  // Several priority updates can be queued, so others may still be stale
+  // Update_priority repairs cache consistency for the node it is called on.
+  // Several priority updates can be queued, so others may still be stale.
   requires the_thread->current_state == STATES_READY ==>
     SCHEDULER_PRIORITY_PURIFY( node->Priority.value ) ==
       ((Scheduler_EDF_Node *) node)->Base.Wait.Priority.Node.priority;
