@@ -96,6 +96,8 @@
           edf_ready_node_cache_consistent{L1}( node ) ==>
             edf_ready_node_cache_consistent{L2}( node );
 
+      // --- RBTree operations -------------------------------------
+
       // Set comprehension doesn't work in Frama-C 32...
       // so we spell it out as algebraic properties
       logic set<Scheduler_EDF_Node *> edf_ready_insert(
