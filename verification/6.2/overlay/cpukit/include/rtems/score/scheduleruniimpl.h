@@ -45,7 +45,7 @@
 extern "C" {
 #endif
 
-#ifdef __FRAAMC__
+#ifdef __FRAMAC__
 // Forward-declare scheduler-specific get_highest_ready callees so the
 // `calls` annotations on Uniprocessor_Schedule/Yield/Block can name them.
 static inline Thread_Control *_Scheduler_EDF_Get_highest_ready(

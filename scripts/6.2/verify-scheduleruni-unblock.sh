@@ -42,7 +42,7 @@ SRC="${OVERLAY}/harnesses/scheduleruni-unblock-harness.c"
 echo "=== Scheduler Uniprocessor Unblock Helpers (RTEMS 6.2 active port) ==="
 ${FRAMA_C_CMD} \
     -cpp-command "${RTEMS_PREFIX}/bin/x86_64-rtems5-gcc -C -E \
-        -D__FRAAMC__ \
+        -D__FRAMAC__ \
         -D__rtems__ \
         -I${OVERLAY}/overlay/cpukit/include \
         -I${OVERLAY}/models \

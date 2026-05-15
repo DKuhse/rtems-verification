@@ -39,7 +39,7 @@
 #include "config.h"
 #endif
 
-#ifdef __FRAAMC__
+#ifdef __FRAMAC__
 /*
  * FC 32 is strict about implicit function declarations. Forward-declare
  * timestamp helpers reachable through timestampimpl.h.

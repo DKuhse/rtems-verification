@@ -6,7 +6,7 @@
 #include "config.h"
 #endif
 
-#ifdef __FRAAMC__
+#ifdef __FRAMAC__
 #include <stdint.h>
 #include <sys/time.h>
 #include <time.h>

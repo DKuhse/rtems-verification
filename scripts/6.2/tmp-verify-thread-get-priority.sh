@@ -35,7 +35,7 @@ SRC="${OVERLAY}/harnesses/thread-get-priority-harness.c"
 echo "=== Thread Get Priority (RTEMS 6.2 active port) ==="
 ${FRAMA_C_CMD} \
     -cpp-command "${RTEMS_PREFIX}/bin/x86_64-rtems5-gcc -C -E \
-        -D__FRAAMC__ \
+        -D__FRAMAC__ \
         -D__rtems__ \
         -I${OVERLAY}/overlay/cpukit/include \
         -I${OVERLAY}/models \

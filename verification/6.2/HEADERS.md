@@ -73,7 +73,7 @@ slice.
 
 - Commented out `#include <limits.h>` for Frama-C preprocessing compatibility.
   This matches the legacy 6.2 hand-port workaround.
-- Includes `edf_ready_set.h` and `edf_property.h` when `__FRAAMC__` is defined
+- Includes `edf_ready_set.h` and `edf_property.h` when `__FRAMAC__` is defined
   so contracts on EDF declarations can use the verification models after
   `Scheduler_EDF_Context` and `Scheduler_EDF_Node` are declared.
 
@@ -189,7 +189,7 @@ update helpers called by `_Scheduler_EDF_Unblock()`.
   EDF-facing contract does not prove dispatch-state postconditions. This
   mirrors the legacy 6.2 port: `_Thread_Dispatch_necessary` is volatile, so
   postconditions about its final value are intentionally omitted.
-- Under `__FRAAMC__`, `_Scheduler_uniprocessor_Unblock()` expands the
+- Under `__FRAMAC__`, `_Scheduler_uniprocessor_Unblock()` expands the
   preemptible-heir condition locally and calls `_Scheduler_uniprocessor_Update_heir()`
   only in the branch where the heir can actually change. The production RTEMS
   body still calls `_Scheduler_uniprocessor_Update_heir_if_preemptible()`.

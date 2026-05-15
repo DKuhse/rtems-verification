@@ -39,7 +39,7 @@
 #include "config.h"
 #endif
 
-#ifdef __FRAAMC__
+#ifdef __FRAMAC__
 /*
  * Frama-C 32 is strict about implicit function declarations. RTEMS'
  * timestampimpl.h calls sbttots/tstosbt/sbttotv without a visible

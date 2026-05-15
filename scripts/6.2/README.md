@@ -56,7 +56,7 @@ up during the FC 25 → FC 32 move and are baked into the scripts/models now:
 - **Implicit function declarations are errors**, not warnings. RTEMS'
   `timestampimpl.h` calls `sbttots`/`tstosbt`/`sbttotv` without a visible
   declaration in the headers we include; forward-declare them at the top
-  of the slice file under `#ifdef __FRAAMC__`. See the top of
+  of the slice file under `#ifdef __FRAMAC__`. See the top of
   `verification/6.2/overlay/cpukit/score/src/scheduleredfunblock.c`.
 
 ---
@@ -95,7 +95,7 @@ The scripts also detect FC 25 and switch the C standard flag from `-std c11`
 to `-c11` so quick compatibility checks can run on `verify-6.2-active`.
 
 - `verify-edf-unblock.sh` — runs Frama-C on the active
-  `_Scheduler_EDF_Unblock()` slice with `__FRAAMC__` defined so
+  `_Scheduler_EDF_Unblock()` slice with `__FRAMAC__` defined so
   `scheduleredf.h` includes `verification/6.2/models/edf_ready_set.h`.
 - `verify-edf-release-cancel.sh` — runs Frama-C/WP on the active
   `_Scheduler_EDF_Release_job()` and `_Scheduler_EDF_Cancel_job()` slice. This
