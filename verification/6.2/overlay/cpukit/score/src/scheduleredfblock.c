@@ -89,19 +89,9 @@ struct timeval   sbttotv( int64_t );
   requires \valid(
     &_Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp );
 
-  // Heir home-node invariance: _Thread_Heir's home scheduler node is
-  // owned by _Thread_Heir. Combined with `node.owner == the_thread`, this
-  // gives `node != _Thread_Heir->Scheduler.nodes` in the not-heir case,
-  // enabling the extract preservation lemma.
-  requires ((Scheduler_EDF_Node *) _Thread_Heir->Scheduler.nodes)->Base.owner
-    == _Thread_Heir;
-
-  // EDF property at entry, witness-explicit form. Used in the not-heir
-  // case via the extract preservation lemma.
-  requires edf_preemptible_heir_node_is_earliest_ready{Pre}(
+    requires edf_preemptible_heir_is_earliest_ready{Pre}(
     (Scheduler_EDF_Context *) scheduler->context,
     _Thread_Heir,
-    (Scheduler_EDF_Node *) _Thread_Heir->Scheduler.nodes,
     _Thread_Heir->is_preemptible );
 
   // In the heir branch, after extracting the_thread's node the ready set
@@ -187,6 +177,15 @@ void _Scheduler_EDF_Block(
   Scheduler_Node          *node
 )
 {
+  // Recover the concrete home-node witness from the existential EDF
+  // property and the ready-set canonical-owner invariant.
+  /*@ assert _Thread_Heir->is_preemptible ==>
+        edf_thread_node_is_earliest_ready{Here}(
+          (Scheduler_EDF_Context *) scheduler->context,
+          _Thread_Heir,
+          (Scheduler_EDF_Node *) _Thread_Heir->Scheduler.nodes
+        ); */
+
   _Scheduler_uniprocessor_Block(
     scheduler,
     the_thread,
@@ -195,10 +194,8 @@ void _Scheduler_EDF_Block(
     _Scheduler_EDF_Get_highest_ready
   );
 
-  // Case A: not_heir, preemptible. Pre says _Thread_Heir's home node is
-  // earliest in the pre-state ready set. node != _Thread_Heir->Scheduler.nodes
-  // (different owners). The extract preservation lemma gives that the heir's
-  // home node is still earliest in the post-state.
+  // Case A: not_heir, preemptible. Recover from canonical-owner invariant. 
+  // The extract preservation lemma gives that the heir's home node is still earliest in the post-state.
   /*@ assert the_thread != \at( _Thread_Heir, Pre ) &&
         _Thread_Heir->is_preemptible ==>
         edf_thread_node_is_earliest_ready{Here}(

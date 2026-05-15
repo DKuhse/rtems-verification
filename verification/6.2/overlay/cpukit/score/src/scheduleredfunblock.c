@@ -105,11 +105,6 @@ struct timeval   sbttotv( int64_t );
     (Scheduler_EDF_Context *) scheduler->context,
     _Thread_Heir,
     _Thread_Heir->is_preemptible );
-  requires edf_preemptible_heir_node_is_earliest_ready{Pre}(
-    (Scheduler_EDF_Context *) scheduler->context,
-    _Thread_Heir,
-    (Scheduler_EDF_Node *) _Thread_Heir->Scheduler.nodes,
-    _Thread_Heir->is_preemptible );
 
   // The new node belongs to the_thread; needed to make the_thread the
   // owner of the earliest-ready node in the update_heir case.
