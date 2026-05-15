@@ -69,13 +69,32 @@
       // For every node in `nodes`, its EDF-cached `priority` agrees with
       // the scheduler-aggregation priority used for ordering decisions
       // (`Base.Wait.Priority.Node.priority`).
+      predicate edf_ready_node_cache_consistent{L}(
+        Scheduler_EDF_Node *node
+      ) =
+        node->priority ==
+          node->Base.Wait.Priority.Node.priority;
+
       predicate edf_priority_cache_consistent{L}(
         set<Scheduler_EDF_Node *> nodes
       ) =
         \forall Scheduler_EDF_Node *node;
           node \in nodes ==>
-            node->priority ==
-              node->Base.Wait.Priority.Node.priority;
+            edf_ready_node_cache_consistent{L}( node );
+
+      predicate edf_ready_context_cache_consistent{L}(
+        Scheduler_EDF_Context *context
+      ) =
+        \valid( context ) &&
+        edf_priority_cache_consistent{L}( edf_ready_set{L}( context ) );
+
+      predicate edf_priority_cache_consistency_preserved{L1,L2}(
+        set<Scheduler_EDF_Node *> nodes
+      ) =
+        \forall Scheduler_EDF_Node *node;
+          node \in nodes &&
+          edf_ready_node_cache_consistent{L1}( node ) ==>
+            edf_ready_node_cache_consistent{L2}( node );
 
       // Set comprehension doesn't work in Frama-C 32...
       // so we spell it out as algebraic properties
@@ -135,6 +154,31 @@
           edf_ready_node_has_canonical_owner{L}( added ) ==>
             edf_ready_owners_canonical{L}(
               edf_ready_insert( nodes, added ) );
+
+      // --- Priority-cache preservation lemmas ---------------------------
+      lemma edf_priority_cache_consistent_under_extract{L}:
+        \forall set<Scheduler_EDF_Node *> nodes;
+        \forall Scheduler_EDF_Node *removed;
+          edf_priority_cache_consistent{L}( nodes ) ==>
+            edf_priority_cache_consistent{L}(
+              edf_ready_extract( nodes, removed ) );
+
+      lemma edf_priority_cache_consistent_under_insert{L}:
+        \forall set<Scheduler_EDF_Node *> nodes;
+        \forall Scheduler_EDF_Node *added;
+          edf_priority_cache_consistent{L}( nodes ) &&
+          edf_ready_node_cache_consistent{L}( added ) ==>
+            edf_priority_cache_consistent{L}(
+              edf_ready_insert( nodes, added ) );
+
+      lemma edf_priority_cache_consistent_with_refreshed_member{L}:
+        \forall set<Scheduler_EDF_Node *> nodes;
+        \forall Scheduler_EDF_Node *node;
+          node \in nodes &&
+          edf_priority_cache_consistent{L}(
+            edf_ready_extract( nodes, node ) ) &&
+          edf_ready_node_cache_consistent{L}( node ) ==>
+            edf_priority_cache_consistent{L}( nodes );
     }
 */
 

@@ -66,6 +66,8 @@ struct timeval   sbttotv( int64_t );
   requires \valid( (Scheduler_EDF_Context *) scheduler->context );
   requires edf_ready_context_well_formed{Pre}(
     (Scheduler_EDF_Context *) scheduler->context );
+  requires edf_ready_context_cache_consistent{Pre}(
+    (Scheduler_EDF_Context *) scheduler->context );
   // Schedule is meaningful only when there is at least one ready thread.
   // RBTree_Minimum (inside Get_highest_ready) would return NULL otherwise.
   requires \exists Scheduler_EDF_Node *some;
@@ -104,6 +106,8 @@ struct timeval   sbttotv( int64_t );
   // Inductive invariant: the ready context remains well-formed at every
   // EDF API boundary.
   ensures edf_ready_context_well_formed{Post}(
+    (Scheduler_EDF_Context *) scheduler->context );
+  ensures edf_ready_context_cache_consistent{Post}(
     (Scheduler_EDF_Context *) scheduler->context );
 */
 void _Scheduler_EDF_Schedule(

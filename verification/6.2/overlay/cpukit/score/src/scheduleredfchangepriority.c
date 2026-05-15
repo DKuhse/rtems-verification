@@ -102,14 +102,22 @@ struct timeval   sbttotv( int64_t );
       (Scheduler_EDF_Context *) scheduler->context,
       (Scheduler_EDF_Node *) node );
 
-  // Cache invariant for the ready set.
-  requires edf_priority_cache_consistent{Pre}(
-    edf_ready_set{Pre}( (Scheduler_EDF_Context *) scheduler->context ) );
+  // Update_priority repairs cachy consistency for the node its called on. 
+  // Several priority updates can be queued, so others may still be stale
+  requires the_thread->current_state == STATES_READY ==>
+    SCHEDULER_PRIORITY_PURIFY( node->Priority.value ) ==
+      ((Scheduler_EDF_Node *) node)->Base.Wait.Priority.Node.priority;
 
   requires \separated(
     (Scheduler_EDF_Node *) node + (..),
     (Scheduler_EDF_Context *) scheduler->context + (..)
   );
+  requires the_thread->current_state == STATES_READY ==>
+    \forall Scheduler_EDF_Node *m;
+      m \in edf_ready_set{Pre}(
+        (Scheduler_EDF_Context *) scheduler->context ) &&
+      m != (Scheduler_EDF_Node *) node ==>
+        \separated( (Scheduler_EDF_Node *) node + (..), m + (..) );
   requires \separated(
     node + (..),
     (Per_CPU_Control_envelope *) _Per_CPU_Information + (..)
@@ -148,6 +156,10 @@ struct timeval   sbttotv( int64_t );
   // EDF API boundary.
   ensures edf_ready_context_well_formed{Post}(
     (Scheduler_EDF_Context *) scheduler->context );
+  ensures edf_priority_cache_consistency_preserved{Pre,Post}(
+    edf_ready_set{Pre}( (Scheduler_EDF_Context *) scheduler->context ) );
+  ensures the_thread->current_state == STATES_READY ==>
+    edf_ready_node_cache_consistent{Post}( (Scheduler_EDF_Node *) node );
 
   behavior not_ready:
     assumes the_thread->current_state != STATES_READY;
@@ -198,8 +210,10 @@ void _Scheduler_EDF_Update_priority(
 
   the_node->priority = priority;
   context = _Scheduler_EDF_Get_context( scheduler );
+  /*@ assert edf_ready_node_cache_consistent{Here}( the_node ); */
 
   _Scheduler_EDF_Extract( context, the_node );
+  /*@ assert edf_ready_node_cache_consistent{Here}( the_node ); */
   _Scheduler_EDF_Enqueue( context, the_node, insert_priority );
 
   // Pin a witness for Get_highest_ready precondition

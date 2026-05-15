@@ -73,11 +73,15 @@ struct timeval   sbttotv( int64_t );
   requires \valid( (Scheduler_EDF_Context *) scheduler->context );
   requires edf_ready_context_well_formed{Pre}(
     (Scheduler_EDF_Context *) scheduler->context );
+  requires edf_ready_context_cache_consistent{Pre}(
+    (Scheduler_EDF_Context *) scheduler->context );
   requires !edf_ready_member{Pre}(
     (Scheduler_EDF_Context *) scheduler->context,
     (Scheduler_EDF_Node *) node );
   requires edf_ready_node_has_canonical_owner{Pre}(
     (Scheduler_EDF_Node *) node );
+  requires SCHEDULER_PRIORITY_PURIFY( node->Priority.value ) ==
+    ((Scheduler_EDF_Node *) node)->Base.Wait.Priority.Node.priority;
 
   // the_thread is not already represented in the ready set: required so
   // the post-state ready set remains owner-distinct (the well-formedness
@@ -111,9 +115,10 @@ struct timeval   sbttotv( int64_t );
   requires ((Scheduler_EDF_Node *) node)->Base.owner == the_thread;
 
 
-  // Cache invariant for the ready set
-  requires edf_priority_cache_consistent{Pre}(
-    edf_ready_set{Pre}( (Scheduler_EDF_Context *) scheduler->context ) );
+  // Cache invariant for _Thread_Heir's home node. The context-level cache
+  // invariant covers ready nodes; this explicit assumption also covers the
+  // non-preemptible-heir case where the heir need not be represented in the
+  // ready set.
   requires ((Scheduler_EDF_Node *) _Thread_Heir->Scheduler.nodes)->priority ==
     _Thread_Heir->Scheduler.nodes->Wait.Priority.Node.priority;
 
@@ -122,6 +127,10 @@ struct timeval   sbttotv( int64_t );
     _Thread_Heir->Scheduler.nodes,
     (Scheduler_EDF_Node *) node
   );
+  requires \forall Scheduler_EDF_Node *m;
+    m \in edf_ready_set{Pre}(
+      (Scheduler_EDF_Context *) scheduler->context ) ==>
+      \separated( (Scheduler_EDF_Node *) node + (..), m + (..) );
   requires \separated(
     (Scheduler_EDF_Node *) _Thread_Heir->Scheduler.nodes + (..),
     (Scheduler_EDF_Node *) node + (..),
@@ -174,6 +183,8 @@ struct timeval   sbttotv( int64_t );
   // EDF API boundary.
   ensures edf_ready_context_well_formed{Post}(
     (Scheduler_EDF_Context *) scheduler->context );
+  ensures edf_ready_context_cache_consistent{Post}(
+    (Scheduler_EDF_Context *) scheduler->context );
 
   //edf property: the new heir is the earliest ready thread (if preemptible)
   ensures edf_preemptible_heir_is_earliest_ready{Post}(
@@ -219,6 +230,8 @@ void _Scheduler_EDF_Unblock(
   insert_priority = SCHEDULER_PRIORITY_APPEND( priority );
 
   the_node->priority = priority;
+  /*@ assert edf_ready_node_cache_consistent{Here}( the_node ); */
+  /*@ assert edf_ready_context_cache_consistent{Here}( context ); */
   _Scheduler_EDF_Enqueue( context, the_node, insert_priority );
 
   /*@ assert \at( _Thread_Heir, Pre )->is_preemptible &&

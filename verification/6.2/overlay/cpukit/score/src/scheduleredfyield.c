@@ -69,6 +69,8 @@ struct timeval   sbttotv( int64_t );
   requires \valid( (Scheduler_EDF_Context *) scheduler->context );
   requires edf_ready_context_well_formed{Pre}(
     (Scheduler_EDF_Context *) scheduler->context );
+  requires edf_ready_context_cache_consistent{Pre}(
+    (Scheduler_EDF_Context *) scheduler->context );
 
   // The yielding thread's node is in the ready set. Required for Extract.
   requires edf_ready_member{Pre}(
@@ -117,6 +119,8 @@ struct timeval   sbttotv( int64_t );
   // Inductive invariant: the ready context remains well-formed at every
   // EDF API boundary.
   ensures edf_ready_context_well_formed{Post}(
+    (Scheduler_EDF_Context *) scheduler->context );
+  ensures edf_ready_context_cache_consistent{Post}(
     (Scheduler_EDF_Context *) scheduler->context );
 */
 void _Scheduler_EDF_Yield(

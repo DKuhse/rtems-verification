@@ -189,6 +189,7 @@ static inline bool _Scheduler_EDF_Priority_less_equal(
   requires \valid( node );
   requires !edf_ready_member{Pre}( context, node );
   requires edf_ready_node_has_canonical_owner{Pre}( node );
+  requires edf_ready_node_cache_consistent{Pre}( node );
 
   // No owner collision
   requires \forall Scheduler_EDF_Node *m;
@@ -210,7 +211,12 @@ static inline bool _Scheduler_EDF_Priority_less_equal(
   ensures \forall Scheduler_EDF_Node *n;
     \valid_read( n ) ==> n->Base.owner == \old( n->Base.owner );
   ensures edf_ready_node_has_canonical_owner{Post}( node );
+  ensures edf_ready_node_cache_consistent{Post}( node );
+  ensures edf_priority_cache_consistency_preserved{Pre,Post}(
+    edf_ready_set{Pre}( context ) );
   ensures edf_ready_context_well_formed{Post}( context );
+  ensures edf_ready_context_cache_consistent{Pre}( context ) ==>
+    edf_ready_context_cache_consistent{Post}( context );
 */
 static inline void _Scheduler_EDF_Enqueue(
   Scheduler_EDF_Context *context,
@@ -245,7 +251,13 @@ static inline void _Scheduler_EDF_Enqueue(
   ensures \forall Scheduler_EDF_Node *n;
     \valid_read( n ) ==> n->Base.owner == \old( n->Base.owner );
   ensures edf_ready_node_has_canonical_owner{Post}( node );
+  ensures edf_ready_node_cache_consistent{Pre}( node ) ==>
+    edf_ready_node_cache_consistent{Post}( node );
+  ensures edf_priority_cache_consistency_preserved{Pre,Post}(
+    edf_ready_set{Pre}( context ) );
   ensures edf_ready_context_well_formed{Post}( context );
+  ensures edf_ready_context_cache_consistent{Pre}( context ) ==>
+    edf_ready_context_cache_consistent{Post}( context );
 */
 static inline void _Scheduler_EDF_Extract(
   Scheduler_EDF_Context *context,
@@ -284,6 +296,12 @@ static inline void _Scheduler_EDF_Extract(
             (Scheduler_EDF_Node *) node );
   ensures edf_ready_context_well_formed{Post}(
     (Scheduler_EDF_Context *) scheduler->context );
+  ensures edf_priority_cache_consistency_preserved{Pre,Post}(
+    edf_ready_set{Pre}( (Scheduler_EDF_Context *) scheduler->context ) );
+  ensures edf_ready_context_cache_consistent{Pre}(
+            (Scheduler_EDF_Context *) scheduler->context ) ==>
+          edf_ready_context_cache_consistent{Post}(
+            (Scheduler_EDF_Context *) scheduler->context );
 */
 static inline void _Scheduler_EDF_Extract_body(
   const Scheduler_Control *scheduler,
@@ -312,8 +330,8 @@ static inline void _Scheduler_EDF_Extract_body(
     (Scheduler_EDF_Context *) scheduler->context );
 
   // The ready set is non-empty
-  // Callers (Update_priority's extract+enqueue path,
-  // Yield, etc.) always re-enqueue before invoking Schedule.
+  // Callers (Update_priority's extract+enqueue path, Yield, etc.) always
+  // re-enqueue before invoking Schedule.
   requires \exists Scheduler_EDF_Node *some;
     some \in edf_ready_set{Pre}(
       (Scheduler_EDF_Context *) scheduler->context );

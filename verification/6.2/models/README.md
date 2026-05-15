@@ -12,7 +12,14 @@ This directory is for verification-only abstract models.
   nodes, `edf_ready_owners_canonical{L}(nodes)` to state that every ready
   node's owner points back to that node as its home scheduler node, and
   `edf_ready_context_well_formed{L}(context)` as the context-level ready-set
-  invariant.
+  invariant.  The priority-cache predicate
+  `edf_ready_context_cache_consistent{L}(context)` is intentionally separate:
+  release/cancel priority propagation can temporarily leave several ready
+  nodes with stale EDF caches while the ready set remains structurally
+  well-formed.  The two-label
+  `edf_priority_cache_consistency_preserved{L1,L2}(nodes)` predicate captures
+  the weaker update-priority guarantee that nodes which were already
+  cache-consistent remain so.
 - `edf_property.h` — introduces the scheduler-level EDF property that the
   selected thread owns a ready EDF node which is not after every other ready
   EDF node according to the EDF ordering predicate.  It also includes the RTEMS

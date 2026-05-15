@@ -100,14 +100,12 @@ slice.
   `scheduler->context` cast to `Scheduler_EDF_Context *`. The downcast contract
   requires a `Scheduler_Node *` that is the embedded `Base` member of a valid
   `Scheduler_EDF_Node`, assigns nothing, and returns the enclosing EDF node.
-- Added an ACSL contract for `_Scheduler_EDF_Enqueue()`. It requires a
-  well-formed ready context and EDF node, plus no double enqueue. It abstracts
-  RBTree insertion as an `edf_ready_insert()` update to
-  `edf_ready_set`.
-
-**Expected verification changes**: add contracts around the remaining EDF
-helper layer, especially `_Scheduler_EDF_Extract()` and
-`_Scheduler_EDF_Get_highest_ready()`.
+- Added ACSL contracts for `_Scheduler_EDF_Enqueue()`,
+  `_Scheduler_EDF_Extract()`, `_Scheduler_EDF_Extract_body()`, and
+  `_Scheduler_EDF_Get_highest_ready()`. Enqueue/extract abstract RBTree updates
+  through `edf_ready_insert()` and `edf_ready_extract()`, preserve structural
+  ready-context well-formedness, expose per-node priority-cache preservation,
+  and preserve full context cache consistency when it held on entry.
 
 ### schedulerimpl.h
 
@@ -281,6 +279,10 @@ representation function for the scheduler-facing contents of
 - `predicate edf_ready_node_has_canonical_owner{L}(node)`
 - `predicate edf_ready_owners_canonical{L}(nodes)`
 - `predicate edf_ready_context_well_formed{L}(context)`
+- `predicate edf_ready_node_cache_consistent{L}(node)`
+- `predicate edf_priority_cache_consistent{L}(nodes)`
+- `predicate edf_ready_context_cache_consistent{L}(context)`
+- `predicate edf_priority_cache_consistency_preserved{L1,L2}(nodes)`
 - `logic set<Scheduler_EDF_Node *> edf_ready_singleton(node)`
 - `logic set<Scheduler_EDF_Node *> edf_ready_insert(nodes, node)`
 - `logic set<Scheduler_EDF_Node *> edf_ready_extract(nodes, node)`
@@ -309,8 +311,19 @@ EDF scheduler nodes.
 `edf_ready_context_well_formed{L}(context)` requires a valid context, valid
 ready nodes, owner-distinct ready nodes, and canonical ready-node ownership:
 each ready node's owner points back to that node as its home scheduler node.
-It is the context-level invariant used by scheduler helper contracts and can
-be extended as the EDF model grows.
+It is the structural context-level invariant used by scheduler helper contracts.
+
+`edf_ready_context_cache_consistent{L}(context)` is a separate invariant saying
+that every ready node's cached EDF `priority` agrees with its scheduler
+aggregation priority.  It is intentionally not folded into well-formedness:
+release/cancel priority propagation may repair several ready nodes in a loop, so
+the ready set can remain structurally well-formed while some EDF caches are
+temporarily stale.
+
+`edf_priority_cache_consistency_preserved{L1,L2}(nodes)` is the frame-style
+form used by `_Scheduler_EDF_Update_priority()`: any node in `nodes` whose cache
+was consistent at label `L1` remains cache-consistent at label `L2`, without
+requiring every node in `nodes` to be consistent at `L1`.
 
 **Current scope**: contents only. This model intentionally does not describe
 RBTree shape, colors, rotations, or traversal.

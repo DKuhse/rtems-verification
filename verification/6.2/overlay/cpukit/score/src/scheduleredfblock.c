@@ -70,6 +70,8 @@ struct timeval   sbttotv( int64_t );
   requires \valid( (Scheduler_EDF_Context *) scheduler->context );
   requires edf_ready_context_well_formed{Pre}(
     (Scheduler_EDF_Context *) scheduler->context );
+  requires edf_ready_context_cache_consistent{Pre}(
+    (Scheduler_EDF_Context *) scheduler->context );
 
   // the_thread's node is in the ready set: required for Extract.
   requires edf_ready_member{Pre}(
@@ -89,7 +91,7 @@ struct timeval   sbttotv( int64_t );
   requires \valid(
     &_Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp );
 
-    requires edf_preemptible_heir_is_earliest_ready{Pre}(
+  requires edf_preemptible_heir_is_earliest_ready{Pre}(
     (Scheduler_EDF_Context *) scheduler->context,
     _Thread_Heir,
     _Thread_Heir->is_preemptible );
@@ -156,6 +158,8 @@ struct timeval   sbttotv( int64_t );
   // Inductive invariant: the ready context remains well-formed at every
   // EDF API boundary.
   ensures edf_ready_context_well_formed{Post}(
+    (Scheduler_EDF_Context *) scheduler->context );
+  ensures edf_ready_context_cache_consistent{Post}(
     (Scheduler_EDF_Context *) scheduler->context );
 
   behavior not_heir:
