@@ -189,6 +189,11 @@ static inline bool _Scheduler_EDF_Priority_less_equal(
   requires \valid( node );
   requires !edf_ready_member{Pre}( context, node );
 
+  // No owner collision
+  requires \forall Scheduler_EDF_Node *m;
+    m \in edf_ready_set{Pre}( context ) ==>
+      m->Base.owner != node->Base.owner;
+
   // Enqueue is treated as an axiomatic black box: it touches only the
   // tree root pointer `context->Ready` (which the `edf_ready_set` logic
   // function reads), and reflects its abstract effect through the `ensures`
@@ -200,12 +205,10 @@ static inline bool _Scheduler_EDF_Priority_less_equal(
 
   ensures edf_ready_set{Post}( context ) ==
     edf_ready_insert( edf_ready_set{Pre}( context ), node );
+  // Owner-frame
+  ensures \forall Scheduler_EDF_Node *n;
+    \valid_read( n ) ==> n->Base.owner == \old( n->Base.owner );
   ensures edf_ready_context_well_formed{Post}( context );
-  // Earliest-preservation/replacement under insertion is stated as the
-  // model-level lemmas `edf_ready_earliest_preserved_under_insert` and
-  // `edf_ready_new_earliest_under_insert` rather than baked in here --
-  // they're pure facts about `edf_ready_insert` + `edf_ready_earliest_node`
-  // and have no Pre/Post wiring concerns.
 */
 static inline void _Scheduler_EDF_Enqueue(
   Scheduler_EDF_Context *context,
@@ -236,6 +239,9 @@ static inline void _Scheduler_EDF_Enqueue(
 
   ensures edf_ready_set{Post}( context ) ==
     edf_ready_extract( edf_ready_set{Pre}( context ), node );
+  // Owner-frame
+  ensures \forall Scheduler_EDF_Node *n;
+    \valid_read( n ) ==> n->Base.owner == \old( n->Base.owner );
   ensures edf_ready_context_well_formed{Post}( context );
 */
 static inline void _Scheduler_EDF_Extract(
@@ -253,6 +259,29 @@ static inline void _Scheduler_EDF_Extract(
  * @param the_thread The thread is not used in this method.
  * @param[in, out] node The node to be extracted.
  */
+/*@
+  requires \valid_read( scheduler );
+  requires \valid( (Scheduler_EDF_Context *) scheduler->context );
+  requires edf_ready_context_well_formed{Pre}(
+    (Scheduler_EDF_Context *) scheduler->context );
+  requires \valid( node );
+  requires \valid( (Scheduler_EDF_Node *) node );
+  requires &((Scheduler_EDF_Node *) node)->Base == node;
+  requires edf_ready_member{Pre}(
+    (Scheduler_EDF_Context *) scheduler->context,
+    (Scheduler_EDF_Node *) node );
+
+  assigns ((Scheduler_EDF_Context *) scheduler->context)->Ready;
+
+  ensures edf_ready_set{Post}(
+            (Scheduler_EDF_Context *) scheduler->context ) ==
+          edf_ready_extract(
+            edf_ready_set{Pre}(
+              (Scheduler_EDF_Context *) scheduler->context ),
+            (Scheduler_EDF_Node *) node );
+  ensures edf_ready_context_well_formed{Post}(
+    (Scheduler_EDF_Context *) scheduler->context );
+*/
 static inline void _Scheduler_EDF_Extract_body(
   const Scheduler_Control *scheduler,
   Thread_Control          *the_thread,

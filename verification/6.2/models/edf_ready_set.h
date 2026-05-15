@@ -32,11 +32,20 @@
         \forall Scheduler_EDF_Node *node;
           node \in nodes ==> \valid_read( node );
 
+      // Owner-injective ready set: one ready node per thread
+      predicate edf_ready_owners_distinct{L}(
+        set<Scheduler_EDF_Node *> nodes
+      ) =
+        \forall Scheduler_EDF_Node *m1, *m2;
+          m1 \in nodes && m2 \in nodes &&
+            m1->Base.owner == m2->Base.owner ==> m1 == m2;
+
       predicate edf_ready_context_well_formed{L}(
         Scheduler_EDF_Context *context
       ) =
         \valid( context ) &&
-        edf_ready_valid_nodes{L}( edf_ready_set{L}( context ) );
+        edf_ready_valid_nodes{L}( edf_ready_set{L}( context ) ) &&
+        edf_ready_owners_distinct{L}( edf_ready_set{L}( context ) );
 
       // For every node in `nodes`, its EDF-cached `priority` agrees with
       // the scheduler-aggregation priority used for ordering decisions
@@ -74,6 +83,23 @@
         \forall Scheduler_EDF_Node *n;
           ( n \in edf_ready_extract( nodes, node ) ) <==>
           ( n != node && n \in nodes );
+
+      // --- Owner-distinct preservation lemmas ----------------------------
+      lemma edf_ready_owners_distinct_under_extract{L}:
+        \forall set<Scheduler_EDF_Node *> nodes;
+        \forall Scheduler_EDF_Node *removed;
+          edf_ready_owners_distinct{L}( nodes ) ==>
+            edf_ready_owners_distinct{L}(
+              edf_ready_extract( nodes, removed ) );
+
+      lemma edf_ready_owners_distinct_under_insert{L}:
+        \forall set<Scheduler_EDF_Node *> nodes;
+        \forall Scheduler_EDF_Node *added;
+          edf_ready_owners_distinct{L}( nodes ) &&
+          ( \forall Scheduler_EDF_Node *m;
+              m \in nodes ==> m->Base.owner != added->Base.owner ) ==>
+            edf_ready_owners_distinct{L}(
+              edf_ready_insert( nodes, added ) );
     }
 */
 

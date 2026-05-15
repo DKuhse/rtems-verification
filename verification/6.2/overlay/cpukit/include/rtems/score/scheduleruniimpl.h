@@ -47,9 +47,15 @@ extern "C" {
 
 #ifdef __FRAAMC__
 // Forward-declare scheduler-specific get_highest_ready callees so the
-// `calls` annotations on Uniprocessor_Schedule/Yield can name them.
+// `calls` annotations on Uniprocessor_Schedule/Yield/Block can name them.
 static inline Thread_Control *_Scheduler_EDF_Get_highest_ready(
   const Scheduler_Control *scheduler );
+// Forward-declare the EDF extract callee for the `calls` annotation in
+// Uniprocessor_Block.
+static inline void _Scheduler_EDF_Extract_body(
+  const Scheduler_Control *scheduler,
+  Thread_Control          *the_thread,
+  Scheduler_Node          *node );
 #endif
 
 /**
@@ -220,6 +226,9 @@ static inline void _Scheduler_uniprocessor_Block(
   Thread_Control       *( *get_highest_ready )( const Scheduler_Control * )
 )
 {
+  // Pin the indirect-call targets so WP can use their contracts. Only the
+  // EDF scheduler is in scope
+  /*@ calls _Scheduler_EDF_Extract_body; */
   ( *extract )( scheduler, the_thread, node );
 
   /* TODO: flash critical section? */
@@ -227,6 +236,7 @@ static inline void _Scheduler_uniprocessor_Block(
   if ( _Thread_Is_heir( the_thread ) ) {
     Thread_Control *highest_ready;
 
+    /*@ calls _Scheduler_EDF_Get_highest_ready; */
     highest_ready = ( *get_highest_ready )( scheduler );
     _Scheduler_uniprocessor_Update_heir( _Thread_Heir, highest_ready );
   }
