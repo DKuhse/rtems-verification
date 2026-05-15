@@ -26,6 +26,15 @@ This directory is for verification-only abstract models.
   heir-state property: the heir must be EDF-earliest unless it is
   non-preemptible.  This model intentionally does not state that a node
   priority represents a particular deadline.
+- `priority_aggregation.h` — introduces `priority_contributors{L}(aggregation)`
+  as an ACSL `set<Priority_Node *>` representation of
+  `Priority_Aggregation::Contributors`.  It mirrors the ready-set model style:
+  contributor membership is abstract, insert/extract are pure set operations,
+  and minimum-node predicates describe the cached aggregate priority without
+  exposing RBTree pointer or color mechanics.  Structural aggregation
+  well-formedness is kept separate from cached-minimum consistency so
+  release/cancel can model the temporary stale state between changing a
+  contributor priority and propagating the new aggregate minimum.
 
 These are not stubs for missing code. They are intentional abstraction
 boundaries used by the active RTEMS 6.2 proof.

@@ -73,6 +73,10 @@ typedef enum {
   PRIORITY_GROUP_LAST = 1
 } Priority_Group_order;
 
+#ifdef __FRAMAC__
+#include <priority_aggregation.h>
+#endif
+
 /**
  * @brief Initializes the priority actions empty.
  *
