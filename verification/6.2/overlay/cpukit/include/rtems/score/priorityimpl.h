@@ -275,6 +275,20 @@ static inline void _Priority_Initialize_one(
  * @retval true The priority aggregation is empty.
  * @retval false The priority aggregation is not empty.
  */
+/*@
+  requires \valid_read( aggregation );
+
+  assigns \result \from aggregation->Contributors;
+
+  ensures \result <==>
+    ( \forall Priority_Node *node;
+        !( node \in priority_contributors{Pre}(
+          (Priority_Aggregation *) aggregation ) ) );
+  ensures !\result ==>
+    ( \exists Priority_Node *node;
+        node \in priority_contributors{Pre}(
+          (Priority_Aggregation *) aggregation ) );
+*/
 static inline bool _Priority_Is_empty(
   const Priority_Aggregation *aggregation
 )
@@ -328,6 +342,20 @@ static inline const Scheduler_Control *_Priority_Get_scheduler(
  *
  * @return The minimum node of @a aggregation
  */
+/*@
+  requires priority_aggregation_well_formed{Pre}(
+    (Priority_Aggregation *) aggregation );
+  requires \exists Priority_Node *node;
+    node \in priority_contributors{Pre}(
+      (Priority_Aggregation *) aggregation );
+
+  assigns \result \from aggregation->Contributors;
+
+  ensures \result != \null;
+  ensures priority_contributors_minimum_node{Pre}(
+    priority_contributors{Pre}( (Priority_Aggregation *) aggregation ),
+    \result );
+*/
 static inline Priority_Node *_Priority_Get_minimum_node(
   const Priority_Aggregation *aggregation
 )
@@ -454,6 +482,35 @@ static inline bool _Priority_Less(
  * @retval true The inserted node with its priority is the minimum of the RBTree.
  * @retval false The inserted node with its priority is not the minimum of the RBTree.
  */
+/*@
+  requires priority_aggregation_well_formed{Pre}( aggregation );
+  requires \valid_read( node );
+  requires !priority_contributor_member{Pre}( aggregation, node );
+
+  assigns aggregation->Contributors;
+
+  ensures priority_contributors{Post}( aggregation ) ==
+    priority_contributors_insert(
+      priority_contributors{Pre}( aggregation ),
+      node
+    );
+  ensures priority_aggregation_well_formed{Post}( aggregation );
+  ensures \result ==>
+    priority_contributors_minimum_node{Post}(
+      priority_contributors{Post}( aggregation ),
+      node
+    );
+  ensures !\result ==>
+    ( \forall Priority_Node *old_minimum;
+        priority_contributors_minimum_node{Pre}(
+          priority_contributors{Pre}( aggregation ),
+          old_minimum
+        ) ==>
+        priority_contributors_minimum_node{Post}(
+          priority_contributors{Post}( aggregation ),
+          old_minimum
+        ) );
+*/
 static inline bool _Priority_Plain_insert(
   Priority_Aggregation *aggregation,
   Priority_Node        *node,
@@ -476,6 +533,29 @@ static inline bool _Priority_Plain_insert(
  * @param[in,  out] aggregation The aggregation to extract the node from.
  * @param node The node to be extracted.
  */
+/*@
+  requires priority_aggregation_well_formed{Pre}( aggregation );
+  requires priority_contributor_member{Pre}( aggregation, node );
+
+  assigns aggregation->Contributors;
+
+  ensures priority_contributors{Post}( aggregation ) ==
+    priority_contributors_extract(
+      priority_contributors{Pre}( aggregation ),
+      node
+    );
+  ensures priority_aggregation_well_formed{Post}( aggregation );
+  ensures \forall Priority_Node *old_minimum;
+    priority_contributors_minimum_node{Pre}(
+      priority_contributors{Pre}( aggregation ),
+      old_minimum
+    ) &&
+    old_minimum != node ==>
+      priority_contributors_minimum_node{Post}(
+        priority_contributors{Post}( aggregation ),
+        old_minimum
+      );
+*/
 static inline void _Priority_Plain_extract(
   Priority_Aggregation *aggregation,
   Priority_Node        *node
@@ -493,6 +573,16 @@ static inline void _Priority_Plain_extract(
  * @param[in, out] aggregation The aggregation to change the node in.
  * @param node The node that has a new priority and will be reinserted in the aggregation.
  */
+/*@
+  requires priority_aggregation_well_formed{Pre}( aggregation );
+  requires priority_contributor_member{Pre}( aggregation, node );
+
+  assigns aggregation->Contributors;
+
+  ensures priority_contributors{Post}( aggregation ) ==
+    priority_contributors{Pre}( aggregation );
+  ensures priority_aggregation_well_formed{Post}( aggregation );
+*/
 static inline void _Priority_Plain_changed(
   Priority_Aggregation *aggregation,
   Priority_Node        *node

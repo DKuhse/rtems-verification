@@ -35,6 +35,10 @@ This directory is for verification-only abstract models.
   well-formedness is kept separate from cached-minimum consistency so
   release/cancel can model the temporary stale state between changing a
   contributor priority and propagating the new aggregate minimum.
+  The assumed RBTree boundary is the small set of priority aggregation leaf
+  helpers in `priorityimpl.h`: `_Priority_Is_empty()`,
+  `_Priority_Get_minimum_node()`, `_Priority_Plain_insert()`,
+  `_Priority_Plain_extract()`, and `_Priority_Plain_changed()`.
 
 These are not stubs for missing code. They are intentional abstraction
 boundaries used by the active RTEMS 6.2 proof.
