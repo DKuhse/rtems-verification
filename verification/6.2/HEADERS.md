@@ -25,6 +25,7 @@ Copied from `rtems/src/rtems-6.2-pristine/`:
 - `overlay/cpukit/include/rtems/score/thread.h`
 - `overlay/cpukit/include/rtems/score/threadimpl.h`
 - `overlay/cpukit/score/src/scheduleredfunblock.c`
+- `overlay/cpukit/score/src/threadchangepriority.c`
 - `harnesses/thread-get-priority-harness.c`
 - `harnesses/scheduleruni-unblock-harness.c`
 - `models/edf_ready_set.h`
@@ -233,6 +234,30 @@ priority comparison to the non-SMP home scheduler node.
   returning `the_thread->Scheduler.nodes`.
 - Added an ACSL contract for `_Thread_Get_priority()`, requiring readable
   scheduler-node state and returning the pre-call home-node wait priority.
+- Added non-SMP ACSL contracts for `_Thread_Priority_add()`,
+  `_Thread_Priority_remove()`, and `_Thread_Priority_changed()`, used by EDF
+  release/cancel to describe contributor-set changes, cached-minimum repair,
+  and priority-update queuing. `_Thread_Priority_changed()` explicitly requires
+  a valid `Priority_Group_order` value.
+
+### threadchangepriority.c
+
+**Source**: `cpukit/score/src/threadchangepriority.c`
+
+**Status**: active contract slice.
+
+**Reason for import**: contains `_Thread_Priority_add()`,
+`_Thread_Priority_remove()`, and `_Thread_Priority_changed()`, which are the
+thread-priority operations called by EDF release/cancel.
+
+**Modified**:
+
+- Under `__FRAMAC__`, forward-declares timestamp helpers reachable through
+  `timestampimpl.h`, matching the other active FC 32 slices.
+- Adds an ACSL contract for the internal `_Thread_Priority_apply()` layer. The
+  public operations in `threadimpl.h` are verified against this contract by
+  `scripts/6.2/verify-thread-change-priority.sh`. Priority RBTree/plain
+  helpers remain permanently abstract and out of scope.
 
 ### scheduleredfunblock.c
 

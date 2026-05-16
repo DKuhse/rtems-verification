@@ -884,6 +884,8 @@ void _Thread_Priority_remove(
   requires priority_contributor_member{Pre}(
     &the_thread->Scheduler.nodes->Wait.Priority,
     priority_node );
+  requires priority_group_order == PRIORITY_GROUP_FIRST ||
+           priority_group_order == PRIORITY_GROUP_LAST;
 
   assigns the_thread->Scheduler.nodes->Wait.Priority,
           the_thread->Scheduler.nodes->Priority.value,
