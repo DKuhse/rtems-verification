@@ -25,11 +25,14 @@ Copied from `rtems/src/rtems-6.2-pristine/`:
 - `overlay/cpukit/include/rtems/score/thread.h`
 - `overlay/cpukit/include/rtems/score/threadimpl.h`
 - `overlay/cpukit/score/src/scheduleredfunblock.c`
+- `overlay/cpukit/score/src/scheduleredfreleasejob.c`
 - `overlay/cpukit/score/src/threadchangepriority.c`
 - `harnesses/thread-get-priority-harness.c`
 - `harnesses/scheduleruni-unblock-harness.c`
 - `models/edf_ready_set.h`
 - `models/edf_property.h`
+- `models/priority_aggregation.h`
+- `models/thread_priority_updates.h`
 
 The next implementation step is to connect `_Scheduler_EDF_Enqueue()` and
 eventually `_Scheduler_EDF_Extract()` / `_Scheduler_EDF_Get_highest_ready()` to
@@ -159,6 +162,23 @@ in the non-SMP `_Thread_Get_priority()` path.
 - Added an ACSL contract for `_Priority_Get_priority()` requiring a readable
   aggregation priority, assigning only the result, and returning the pre-call
   `aggregation->Node.priority`.
+- Added ACSL frame/result contracts for the local `Priority_Actions` helpers:
+  `_Priority_Actions_initialize_empty()`,
+  `_Priority_Actions_initialize_one()`, `_Priority_Actions_is_empty()`,
+  `_Priority_Actions_move()`, and `_Priority_Actions_add()`. These are used by
+  the thread-priority drill-down and do not alter the RBTree abstraction
+  boundary.
+- Added UP-only ACSL contracts for the priority combinators used by
+  `_Thread_Priority_do_perform_actions()`:
+  `_Priority_Non_empty_insert()`, `_Priority_Extract_non_empty()`, and
+  `_Priority_Changed()`. These contracts sit above the intentionally abstract
+  plain/RBTree helpers and prove contributor-set updates, cached-minimum
+  repair, and the action-list/scheduler-priority callback shape for the EDF
+  thread-priority slice.
+- Under `__FRAMAC__`, added a Frama-C-friendly scheduler-node helper for the
+  wait-priority aggregation and a forward contract for
+  `_Thread_Priority_action_change()` so `@calls` annotations on the combinators
+  can use the callback contract.
 
 ### schedulernodeimpl.h
 
@@ -175,6 +195,8 @@ purifying and storing it in the EDF node.
 - Added an ACSL contract for `_Scheduler_Node_get_priority()`. The contract
   requires a valid scheduler node, assigns only the scheduler-node priority
   subobject, preserves `node->Priority.value`, and returns its pre-call value.
+- Added an ACSL contract for `_Scheduler_Node_set_priority()` used by the
+  thread-priority callback drill-down.
 
 ### scheduleruniimpl.h
 
@@ -258,6 +280,27 @@ thread-priority operations called by EDF release/cancel.
   public operations in `threadimpl.h` are verified against this contract by
   `scripts/6.2/verify-thread-change-priority.sh`. Priority RBTree/plain
   helpers remain permanently abstract and out of scope.
+- Adds ACSL contracts for `_Thread_Set_scheduler_node_priority()` and
+  `_Thread_Priority_action_change()`. The code body remains the RTEMS
+  `SCHEDULER_NODE_OF_WAIT_PRIORITY_NODE()` expression; the Frama-C-only
+  scheduler-node helper is used only in ACSL annotations.
+
+### scheduleredfreleasejob.c
+
+**Source**: `cpukit/score/src/scheduleredfreleasejob.c`
+
+**Status**: active contract slice.
+
+**Reason for import**: contains `_Scheduler_EDF_Release_job()` and
+`_Scheduler_EDF_Cancel_job()`, the EDF release/cancel entry points that drive
+the thread-priority add/remove/changed chain.
+
+**Modified**:
+
+- Added ACSL contracts for EDF release/cancel and for the generic
+  `_Scheduler_Release_job()` wrapper.
+- Added local proof assertions preserving EDF ready-set canonical ownership
+  across the thread-priority propagation call.
 
 ### scheduleredfunblock.c
 

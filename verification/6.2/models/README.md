@@ -36,9 +36,12 @@ This directory is for verification-only abstract models.
   exposing RBTree pointer or color mechanics.  Structural aggregation
   well-formedness is kept separate from cached-minimum consistency so
   release/cancel can model the temporary stale state between changing a
-  contributor priority and propagating the new aggregate minimum.  It also
-  contains the narrow `priority_node_active{L}(node)` predicate used for the
-  release/cancel active-node branch condition.
+  contributor priority and propagating the new aggregate minimum.  Structural
+  well-formedness also requires contributor nodes to be separated from the
+  aggregation's cached `Node`, since the priority combinators update the cache
+  while preserving the contributor priorities.  It also contains the narrow
+  `priority_node_active{L}(node)` predicate used for the release/cancel
+  active-node branch condition.
   The assumed RBTree boundary is the small set of priority aggregation leaf
   helpers in `priorityimpl.h`: `_Priority_Is_empty()`,
   `_Priority_Get_minimum_node()`, `_Priority_Plain_insert()`,

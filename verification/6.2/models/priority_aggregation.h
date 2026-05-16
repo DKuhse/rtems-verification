@@ -43,6 +43,13 @@
         \forall Priority_Node *node;
           node \in nodes ==> \valid_read( node );
 
+      predicate priority_contributors_separated_from_cache{L}(
+        Priority_Aggregation *aggregation
+      ) =
+        \forall Priority_Node *node;
+          node \in priority_contributors{L}( aggregation ) ==>
+            \separated( node + (..), &aggregation->Node );
+
       // Structural aggregation invariant. The cached minimum stored in
       // aggregation->Node.priority is intentionally modeled separately
       // as it can be temporarily stale
@@ -51,7 +58,8 @@
       ) =
         \valid( aggregation ) &&
         priority_contributors_valid_nodes{L}(
-          priority_contributors{L}( aggregation ) );
+          priority_contributors{L}( aggregation ) ) &&
+        priority_contributors_separated_from_cache{L}( aggregation );
 
       predicate priority_node_not_after{L}(
         Priority_Node *left,

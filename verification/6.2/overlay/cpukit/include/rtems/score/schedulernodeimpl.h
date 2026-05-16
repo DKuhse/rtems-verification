@@ -230,6 +230,17 @@ static inline Priority_Control _Scheduler_Node_get_priority(
  * @param group_order is the priority group order, see #PRIORITY_GROUP_FIRST
  *   and #PRIORITY_GROUP_LAST.
  */
+/*@
+  requires \valid( node );
+  requires group_order == PRIORITY_GROUP_FIRST ||
+           group_order == PRIORITY_GROUP_LAST;
+
+  assigns node->Priority.value;
+
+  ensures node->Priority.value ==
+    ( new_priority | (Priority_Control) group_order );
+  ensures node->owner == \at( node->owner, Pre );
+*/
 static inline void _Scheduler_Node_set_priority(
   Scheduler_Node      *node,
   Priority_Control     new_priority,

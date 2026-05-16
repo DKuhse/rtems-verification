@@ -196,6 +196,24 @@ void _Scheduler_EDF_Release_job(
     _Thread_Priority_add( the_thread, priority_node, queue_context );
   }
 
+  /*@ assert \forall Scheduler_Node *node;
+        \valid_read( &node->owner ) ==>
+          node->owner == \at( node->owner, Pre ); */
+  /*@ assert \forall Thread_Control *thread;
+        \valid_read( &thread->Scheduler.nodes ) ==>
+          thread->Scheduler.nodes == \at( thread->Scheduler.nodes, Pre ); */
+  /*@ assert edf_ready_owners_canonical{Pre}(
+        edf_ready_set{Pre}(
+          (Scheduler_EDF_Context *) scheduler->context ) ); */
+  /*@ assert \forall Scheduler_EDF_Node *node;
+        node \in edf_ready_set{Pre}(
+          (Scheduler_EDF_Context *) scheduler->context ) ==>
+          node->Base.owner == \at( node->Base.owner, Pre ); */
+  /*@ assert \forall Scheduler_EDF_Node *node;
+        node \in edf_ready_set{Pre}(
+          (Scheduler_EDF_Context *) scheduler->context ) ==>
+          node->Base.owner->Scheduler.nodes ==
+            \at( node->Base.owner->Scheduler.nodes, Pre ); */
   /*@ assert edf_ready_owners_canonical{Here}(
         edf_ready_set{Pre}(
           (Scheduler_EDF_Context *) scheduler->context ) ); */

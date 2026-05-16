@@ -66,6 +66,32 @@ struct timeval   sbttotv( int64_t );
 #include <rtems/score/assert.h>
 #include <rtems/score/schedulerimpl.h>
 
+/*@
+  requires \valid( priority_aggregation );
+  requires \valid( _Priority_Verify_scheduler_node_of_aggregation(
+    priority_aggregation ) );
+  requires priority_aggregation ==
+    &_Priority_Verify_scheduler_node_of_aggregation(
+      priority_aggregation )->Wait.Priority;
+  requires priority_group_order == PRIORITY_GROUP_FIRST ||
+           priority_group_order == PRIORITY_GROUP_LAST;
+
+  assigns _Priority_Verify_scheduler_node_of_aggregation(
+    priority_aggregation )->Priority.value;
+
+  ensures _Priority_Verify_scheduler_node_of_aggregation(
+    priority_aggregation )->Priority.value ==
+      ( priority_aggregation->Node.priority |
+        (Priority_Control) priority_group_order );
+  ensures priority_aggregation->Node.priority ==
+    \at( priority_aggregation->Node.priority, Pre );
+  ensures priority_contributors{Post}( priority_aggregation ) ==
+    priority_contributors{Pre}( priority_aggregation );
+  ensures priority_aggregation_well_formed{Pre}( priority_aggregation ) ==>
+    priority_aggregation_well_formed{Post}( priority_aggregation );
+  ensures priority_aggregation_cached_minimum{Pre}( priority_aggregation ) ==>
+    priority_aggregation_cached_minimum{Post}( priority_aggregation );
+*/
 static void _Thread_Set_scheduler_node_priority(
   Priority_Aggregation *priority_aggregation,
   Priority_Group_order  priority_group_order
@@ -122,6 +148,40 @@ static void _Thread_Priority_action_remove(
 }
 #endif
 
+/*@
+  requires \valid( priority_aggregation );
+  requires \valid( priority_actions );
+  requires \valid( _Priority_Verify_scheduler_node_of_aggregation(
+    priority_aggregation ) );
+  requires priority_aggregation ==
+    &_Priority_Verify_scheduler_node_of_aggregation(
+      priority_aggregation )->Wait.Priority;
+  requires priority_group_order == PRIORITY_GROUP_FIRST ||
+           priority_group_order == PRIORITY_GROUP_LAST;
+  requires \separated(
+    priority_actions + (..),
+    _Priority_Verify_scheduler_node_of_aggregation(
+      priority_aggregation ) + (..)
+  );
+
+  assigns _Priority_Verify_scheduler_node_of_aggregation(
+            priority_aggregation )->Priority.value,
+          priority_actions->actions;
+
+  ensures priority_actions->actions == priority_aggregation;
+  ensures _Priority_Verify_scheduler_node_of_aggregation(
+    priority_aggregation )->Priority.value ==
+      ( priority_aggregation->Node.priority |
+        (Priority_Control) priority_group_order );
+  ensures priority_aggregation->Node.priority ==
+    \at( priority_aggregation->Node.priority, Pre );
+  ensures priority_contributors{Post}( priority_aggregation ) ==
+    priority_contributors{Pre}( priority_aggregation );
+  ensures priority_aggregation_well_formed{Pre}( priority_aggregation ) ==>
+    priority_aggregation_well_formed{Post}( priority_aggregation );
+  ensures priority_aggregation_cached_minimum{Pre}( priority_aggregation ) ==>
+    priority_aggregation_cached_minimum{Post}( priority_aggregation );
+*/
 static void _Thread_Priority_action_change(
   Priority_Aggregation *priority_aggregation,
   Priority_Group_order  priority_group_order,
