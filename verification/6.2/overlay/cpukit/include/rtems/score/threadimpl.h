@@ -56,6 +56,10 @@
 #include <rtems/score/watchdogimpl.h>
 #include <rtems/config.h>
 
+#ifdef __FRAMAC__
+#include <thread_priority_updates.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -724,6 +728,55 @@ void _Thread_Priority_perform_actions(
  *
  * @see _Thread_Wait_acquire().
  */
+#if !defined(RTEMS_SMP)
+/*@
+  requires \valid_read( &the_thread->Scheduler.nodes );
+  requires \valid( priority_node );
+  requires \valid( queue_context );
+  requires \valid( the_thread->Scheduler.nodes );
+  requires priority_aggregation_well_formed{Pre}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  requires priority_aggregation_cached_minimum{Pre}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  requires !priority_contributor_member{Pre}(
+    &the_thread->Scheduler.nodes->Wait.Priority,
+    priority_node );
+  requires \exists Priority_Node *node;
+    node \in priority_contributors{Pre}(
+      &the_thread->Scheduler.nodes->Wait.Priority );
+
+  assigns the_thread->Scheduler.nodes->Wait.Priority,
+          the_thread->Scheduler.nodes->Priority.value,
+          queue_context->Priority;
+
+  ensures priority_contributors{Post}(
+            &the_thread->Scheduler.nodes->Wait.Priority ) ==
+          priority_contributors_insert(
+            priority_contributors{Pre}(
+              &the_thread->Scheduler.nodes->Wait.Priority ),
+            priority_node );
+  ensures priority_aggregation_well_formed{Post}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  ensures priority_aggregation_cached_minimum{Post}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  ensures priority_node->priority == \at( priority_node->priority, Pre );
+  ensures the_thread->Scheduler.nodes->owner ==
+    \at( the_thread->Scheduler.nodes->owner, Pre );
+  ensures \forall Scheduler_Node *node;
+    \valid_read( &node->owner ) ==>
+      node->owner == \at( node->owner, Pre );
+  ensures \forall Thread_Control *thread;
+    \valid_read( &thread->Scheduler.nodes ) ==>
+      thread->Scheduler.nodes == \at( thread->Scheduler.nodes, Pre );
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) ||
+          queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) + 1;
+  ensures the_thread->Scheduler.nodes->Priority.value !=
+            \at( the_thread->Scheduler.nodes->Priority.value, Pre ) ==>
+          thread_priority_update_pending{Post}( queue_context, the_thread );
+*/
+#endif
 void _Thread_Priority_add(
   Thread_Control       *the_thread,
   Priority_Node        *priority_node,
@@ -745,6 +798,56 @@ void _Thread_Priority_add(
  *
  * @see _Thread_Wait_acquire().
  */
+#if !defined(RTEMS_SMP)
+/*@
+  requires \valid_read( &the_thread->Scheduler.nodes );
+  requires \valid( priority_node );
+  requires \valid( queue_context );
+  requires \valid( the_thread->Scheduler.nodes );
+  requires priority_aggregation_well_formed{Pre}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  requires priority_aggregation_cached_minimum{Pre}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  requires priority_contributor_member{Pre}(
+    &the_thread->Scheduler.nodes->Wait.Priority,
+    priority_node );
+  requires \exists Priority_Node *other;
+    other != priority_node &&
+    other \in priority_contributors{Pre}(
+      &the_thread->Scheduler.nodes->Wait.Priority );
+
+  assigns the_thread->Scheduler.nodes->Wait.Priority,
+          the_thread->Scheduler.nodes->Priority.value,
+          queue_context->Priority;
+
+  ensures priority_contributors{Post}(
+            &the_thread->Scheduler.nodes->Wait.Priority ) ==
+          priority_contributors_extract(
+            priority_contributors{Pre}(
+              &the_thread->Scheduler.nodes->Wait.Priority ),
+            priority_node );
+  ensures priority_aggregation_well_formed{Post}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  ensures priority_aggregation_cached_minimum{Post}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  ensures priority_node->priority == \at( priority_node->priority, Pre );
+  ensures the_thread->Scheduler.nodes->owner ==
+    \at( the_thread->Scheduler.nodes->owner, Pre );
+  ensures \forall Scheduler_Node *node;
+    \valid_read( &node->owner ) ==>
+      node->owner == \at( node->owner, Pre );
+  ensures \forall Thread_Control *thread;
+    \valid_read( &thread->Scheduler.nodes ) ==>
+      thread->Scheduler.nodes == \at( thread->Scheduler.nodes, Pre );
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) ||
+          queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) + 1;
+  ensures the_thread->Scheduler.nodes->Priority.value !=
+            \at( the_thread->Scheduler.nodes->Priority.value, Pre ) ==>
+          thread_priority_update_pending{Post}( queue_context, the_thread );
+*/
+#endif
 void _Thread_Priority_remove(
   Thread_Control       *the_thread,
   Priority_Node        *priority_node,
@@ -770,6 +873,48 @@ void _Thread_Priority_remove(
  *
  * @see _Thread_Wait_acquire().
  */
+#if !defined(RTEMS_SMP)
+/*@
+  requires \valid_read( &the_thread->Scheduler.nodes );
+  requires \valid( priority_node );
+  requires \valid( queue_context );
+  requires \valid( the_thread->Scheduler.nodes );
+  requires priority_aggregation_well_formed{Pre}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  requires priority_contributor_member{Pre}(
+    &the_thread->Scheduler.nodes->Wait.Priority,
+    priority_node );
+
+  assigns the_thread->Scheduler.nodes->Wait.Priority,
+          the_thread->Scheduler.nodes->Priority.value,
+          queue_context->Priority;
+
+  ensures priority_contributors{Post}(
+            &the_thread->Scheduler.nodes->Wait.Priority ) ==
+          priority_contributors{Pre}(
+            &the_thread->Scheduler.nodes->Wait.Priority );
+  ensures priority_aggregation_well_formed{Post}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  ensures priority_aggregation_cached_minimum{Post}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  ensures priority_node->priority == \at( priority_node->priority, Pre );
+  ensures the_thread->Scheduler.nodes->owner ==
+    \at( the_thread->Scheduler.nodes->owner, Pre );
+  ensures \forall Scheduler_Node *node;
+    \valid_read( &node->owner ) ==>
+      node->owner == \at( node->owner, Pre );
+  ensures \forall Thread_Control *thread;
+    \valid_read( &thread->Scheduler.nodes ) ==>
+      thread->Scheduler.nodes == \at( thread->Scheduler.nodes, Pre );
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) ||
+          queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) + 1;
+  ensures the_thread->Scheduler.nodes->Priority.value !=
+            \at( the_thread->Scheduler.nodes->Priority.value, Pre ) ==>
+          thread_priority_update_pending{Post}( queue_context, the_thread );
+*/
+#endif
 void _Thread_Priority_changed(
   Thread_Control       *the_thread,
   Priority_Node        *priority_node,
@@ -1994,6 +2139,11 @@ static inline void _Thread_Wait_release_queue_critical(
  * @param[in, out] queue_context The thread queue context for the corresponding
  *   _Thread_Wait_release_critical().
  */
+#if !defined(RTEMS_SMP)
+/*@
+  assigns \nothing;
+*/
+#endif
 static inline void _Thread_Wait_acquire_critical(
   Thread_Control       *the_thread,
   Thread_queue_Context *queue_context
@@ -2069,6 +2219,11 @@ static inline void _Thread_Wait_acquire(
  * @param[in, out] queue_context The thread queue context used for corresponding
  *   _Thread_Wait_acquire_critical().
  */
+#if !defined(RTEMS_SMP)
+/*@
+  assigns \nothing;
+*/
+#endif
 static inline void _Thread_Wait_release_critical(
   Thread_Control       *the_thread,
   Thread_queue_Context *queue_context

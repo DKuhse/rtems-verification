@@ -19,7 +19,9 @@ This directory is for verification-only abstract models.
   well-formed.  The two-label
   `edf_priority_cache_consistency_preserved{L1,L2}(nodes)` predicate captures
   the weaker update-priority guarantee that nodes which were already
-  cache-consistent remain so.
+  cache-consistent remain so.  The ready-set abstraction is derived from
+  `context->Ready.rbh_root`, so operations that leave the ready RBTree root
+  unchanged preserve the abstract set by ordinary congruence.
 - `edf_property.h` — introduces the scheduler-level EDF property that the
   selected thread owns a ready EDF node which is not after every other ready
   EDF node according to the EDF ordering predicate.  It also includes the RTEMS
@@ -34,11 +36,18 @@ This directory is for verification-only abstract models.
   exposing RBTree pointer or color mechanics.  Structural aggregation
   well-formedness is kept separate from cached-minimum consistency so
   release/cancel can model the temporary stale state between changing a
-  contributor priority and propagating the new aggregate minimum.
+  contributor priority and propagating the new aggregate minimum.  It also
+  contains the narrow `priority_node_active{L}(node)` predicate used for the
+  release/cancel active-node branch condition.
   The assumed RBTree boundary is the small set of priority aggregation leaf
   helpers in `priorityimpl.h`: `_Priority_Is_empty()`,
   `_Priority_Get_minimum_node()`, `_Priority_Plain_insert()`,
   `_Priority_Plain_extract()`, and `_Priority_Plain_changed()`.
+- `thread_priority_updates.h` — introduces the concrete
+  `thread_priority_update_pending{L}(queue_context, thread)` predicate over
+  the two-slot thread-priority update worklist in `Thread_queue_Context`.
+  It avoids an abstract set model because the implementation has exactly two
+  update slots.
 
 These are not stubs for missing code. They are intentional abstraction
 boundaries used by the active RTEMS 6.2 proof.

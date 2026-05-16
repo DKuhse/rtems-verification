@@ -24,6 +24,19 @@
       ) =
         node \in priority_contributors{L}( aggregation );
 
+      predicate priority_node_active{L}(
+        Priority_Node *node
+      ) =
+        \valid_read( node ) &&
+        node->Node.RBTree.Node.rbe_color != -1;
+
+      predicate priority_node_active_iff_contributor{L}(
+        Priority_Aggregation *aggregation,
+        Priority_Node        *node
+      ) =
+        priority_node_active{L}( node ) <==>
+          priority_contributor_member{L}( aggregation, node );
+
       predicate priority_contributors_valid_nodes{L}(
         set<Priority_Node *> nodes
       ) =

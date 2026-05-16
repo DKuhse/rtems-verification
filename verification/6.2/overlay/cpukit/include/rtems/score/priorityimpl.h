@@ -190,6 +190,15 @@ static inline void _Priority_Node_initialize(
  * @param[out] node The priority node to set the priority of.
  * @param priority The new priority for @a node.
  */
+/*@
+  requires \valid( node );
+
+  assigns node->priority;
+
+  ensures node->priority == priority;
+  ensures priority_node_active{Post}( node ) <==>
+    priority_node_active{Pre}( node );
+*/
 static inline void _Priority_Node_set_priority(
   Priority_Node    *node,
   Priority_Control  priority
@@ -203,6 +212,14 @@ static inline void _Priority_Node_set_priority(
  *
  * @param[in, out] node The priority node to set inactive.
  */
+/*@
+  requires \valid( node );
+
+  assigns node->Node.RBTree.Node.rbe_color;
+
+  ensures !priority_node_active{Post}( node );
+  ensures node->priority == \at( node->priority, Pre );
+*/
 static inline void _Priority_Node_set_inactive(
   Priority_Node *node
 )
@@ -218,6 +235,13 @@ static inline void _Priority_Node_set_inactive(
  * @retval true The priority node is active.
  * @retval false The priority node is inactive.
  */
+/*@
+  requires \valid_read( node );
+
+  assigns \result \from node->Node.RBTree.Node.rbe_color;
+
+  ensures \result <==> priority_node_active{Pre}( (Priority_Node *) node );
+*/
 static inline bool _Priority_Node_is_active(
   const Priority_Node *node
 )

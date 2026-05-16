@@ -92,6 +92,76 @@ Priority_Control _Scheduler_EDF_Unmap_priority(
   return SCHEDULER_PRIORITY_UNMAP( priority & ~SCHEDULER_EDF_PRIO_MSB );
 }
 
+/*@
+  requires \valid_read( scheduler );
+  requires deadline < SCHEDULER_EDF_PRIO_MSB;
+  requires \valid( (Scheduler_EDF_Context *) scheduler->context );
+  requires edf_ready_context_well_formed{Pre}(
+    (Scheduler_EDF_Context *) scheduler->context );
+  requires \valid_read( &the_thread->Scheduler.nodes );
+  requires \valid( priority_node );
+  requires \valid( queue_context );
+  requires \valid( the_thread->Scheduler.nodes );
+  requires priority_aggregation_well_formed{Pre}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  requires priority_aggregation_cached_minimum{Pre}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  requires priority_node_active_iff_contributor{Pre}(
+    &the_thread->Scheduler.nodes->Wait.Priority,
+    priority_node );
+  requires \exists Priority_Node *node;
+    node \in priority_contributors{Pre}(
+      &the_thread->Scheduler.nodes->Wait.Priority );
+  requires \separated(
+    scheduler + (..),
+    (Scheduler_EDF_Context *) scheduler->context + (..),
+    the_thread + (..),
+    the_thread->Scheduler.nodes + (..),
+    priority_node + (..),
+    queue_context + (..)
+  );
+
+  assigns priority_node->priority,
+          the_thread->Scheduler.nodes->Wait.Priority,
+          the_thread->Scheduler.nodes->Priority.value,
+          queue_context->Priority;
+
+  ensures priority_node->priority == SCHEDULER_PRIORITY_MAP( deadline );
+  ensures priority_aggregation_well_formed{Post}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  ensures priority_aggregation_cached_minimum{Post}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  ensures ((Scheduler_EDF_Context *) scheduler->context)->Ready.rbh_root ==
+    \at( ((Scheduler_EDF_Context *) scheduler->context)->Ready.rbh_root, Pre );
+  ensures edf_ready_set{Post}(
+            (Scheduler_EDF_Context *) scheduler->context ) ==
+          edf_ready_set{Pre}(
+            (Scheduler_EDF_Context *) scheduler->context );
+  ensures edf_ready_context_well_formed{Post}(
+    (Scheduler_EDF_Context *) scheduler->context );
+  ensures the_thread->Scheduler.nodes->Priority.value !=
+            \at( the_thread->Scheduler.nodes->Priority.value, Pre ) ==>
+          thread_priority_update_pending{Post}( queue_context, the_thread );
+
+  behavior active:
+    assumes priority_node_active{Pre}( priority_node );
+    ensures priority_contributors{Post}(
+              &the_thread->Scheduler.nodes->Wait.Priority ) ==
+            priority_contributors{Pre}(
+              &the_thread->Scheduler.nodes->Wait.Priority );
+
+  behavior inactive:
+    assumes !priority_node_active{Pre}( priority_node );
+    ensures priority_contributors{Post}(
+              &the_thread->Scheduler.nodes->Wait.Priority ) ==
+            priority_contributors_insert(
+              priority_contributors{Pre}(
+                &the_thread->Scheduler.nodes->Wait.Priority ),
+              priority_node );
+
+  complete behaviors;
+  disjoint behaviors;
+*/
 void _Scheduler_EDF_Release_job(
   const Scheduler_Control *scheduler,
   Thread_Control          *the_thread,
@@ -126,9 +196,85 @@ void _Scheduler_EDF_Release_job(
     _Thread_Priority_add( the_thread, priority_node, queue_context );
   }
 
+  /*@ assert edf_ready_owners_canonical{Here}(
+        edf_ready_set{Pre}(
+          (Scheduler_EDF_Context *) scheduler->context ) ); */
+  /*@ assert edf_ready_context_well_formed{Here}(
+        (Scheduler_EDF_Context *) scheduler->context ); */
   _Thread_Wait_release_critical( the_thread, queue_context );
 }
 
+/*@
+  requires \valid_read( scheduler );
+  requires \valid( (Scheduler_EDF_Context *) scheduler->context );
+  requires edf_ready_context_well_formed{Pre}(
+    (Scheduler_EDF_Context *) scheduler->context );
+  requires \valid_read( &the_thread->Scheduler.nodes );
+  requires \valid( priority_node );
+  requires \valid( queue_context );
+  requires \valid( the_thread->Scheduler.nodes );
+  requires priority_aggregation_well_formed{Pre}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  requires priority_aggregation_cached_minimum{Pre}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  requires priority_node_active_iff_contributor{Pre}(
+    &the_thread->Scheduler.nodes->Wait.Priority,
+    priority_node );
+  requires priority_node_active{Pre}( priority_node ) ==>
+    ( \exists Priority_Node *other;
+        other != priority_node &&
+        other \in priority_contributors{Pre}(
+          &the_thread->Scheduler.nodes->Wait.Priority ) );
+  requires \separated(
+    scheduler + (..),
+    (Scheduler_EDF_Context *) scheduler->context + (..),
+    the_thread + (..),
+    the_thread->Scheduler.nodes + (..),
+    priority_node + (..),
+    queue_context + (..)
+  );
+
+  assigns priority_node->Node.RBTree.Node.rbe_color,
+          the_thread->Scheduler.nodes->Wait.Priority,
+          the_thread->Scheduler.nodes->Priority.value,
+          queue_context->Priority;
+
+  ensures !priority_node_active{Post}( priority_node );
+  ensures priority_aggregation_well_formed{Post}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  ensures priority_aggregation_cached_minimum{Post}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  ensures ((Scheduler_EDF_Context *) scheduler->context)->Ready.rbh_root ==
+    \at( ((Scheduler_EDF_Context *) scheduler->context)->Ready.rbh_root, Pre );
+  ensures edf_ready_set{Post}(
+            (Scheduler_EDF_Context *) scheduler->context ) ==
+          edf_ready_set{Pre}(
+            (Scheduler_EDF_Context *) scheduler->context );
+  ensures edf_ready_context_well_formed{Post}(
+    (Scheduler_EDF_Context *) scheduler->context );
+  ensures the_thread->Scheduler.nodes->Priority.value !=
+            \at( the_thread->Scheduler.nodes->Priority.value, Pre ) ==>
+          thread_priority_update_pending{Post}( queue_context, the_thread );
+
+  behavior active:
+    assumes priority_node_active{Pre}( priority_node );
+    ensures priority_contributors{Post}(
+              &the_thread->Scheduler.nodes->Wait.Priority ) ==
+            priority_contributors_extract(
+              priority_contributors{Pre}(
+                &the_thread->Scheduler.nodes->Wait.Priority ),
+              priority_node );
+
+  behavior inactive:
+    assumes !priority_node_active{Pre}( priority_node );
+    ensures priority_contributors{Post}(
+              &the_thread->Scheduler.nodes->Wait.Priority ) ==
+            priority_contributors{Pre}(
+              &the_thread->Scheduler.nodes->Wait.Priority );
+
+  complete behaviors;
+  disjoint behaviors;
+*/
 void _Scheduler_EDF_Cancel_job(
   const Scheduler_Control *scheduler,
   Thread_Control          *the_thread,
