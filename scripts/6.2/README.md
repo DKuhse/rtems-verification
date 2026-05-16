@@ -102,6 +102,11 @@ to `-c11` so quick compatibility checks can run on `verify-6.2-active`.
   replaces the legacy `release_cancel_stubs.h` harness with the active overlay
   and leaves priority aggregation/thread-priority contracts as the proof
   boundary.
+- `verify-scheduler-release-job.sh` — runs Frama-C/WP on the generic
+  `_Scheduler_Release_job()` inline wrapper, pins the indirect scheduler
+  operation to `_Scheduler_EDF_Release_job()` with `@calls`, and verifies the
+  wrapper-level priority-update clearing step before the EDF operation
+  contract is applied.
 - `verify-scheduleruni-unblock.sh` — runs Frama-C/WP on the header harness for
   `_Scheduler_uniprocessor_Update_heir_if_necessary()`,
   `_Scheduler_uniprocessor_Update_heir_if_preemptible()`, and

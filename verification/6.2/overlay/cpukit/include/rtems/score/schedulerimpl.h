@@ -46,6 +46,11 @@
 #include <rtems/score/status.h>
 #include <rtems/score/threadimpl.h>
 
+#ifdef __FRAMAC__
+extern const Scheduler_Control _Scheduler_Table[ 1 ];
+#include <rtems/score/scheduleredf.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -498,6 +503,84 @@ static inline void _Scheduler_Node_destroy(
  * @param queue_context The thread queue context to provide the set of
  *   threads for _Thread_Priority_update().
  */
+#if !defined(RTEMS_SMP)
+/*@
+  requires \valid_read( _Scheduler_Table + ( 0 .. 0 ) );
+  requires _Scheduler_Table[ 0 ].Operations.release_job ==
+    _Scheduler_EDF_Release_job;
+  requires deadline < 0x8000000000000000;
+  requires \valid( (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
+  requires edf_ready_context_well_formed{Pre}(
+    (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
+  requires \valid_read( &the_thread->Scheduler.nodes );
+  requires \valid( priority_node );
+  requires \valid( queue_context );
+  requires \valid( the_thread->Scheduler.nodes );
+  requires priority_aggregation_well_formed{Pre}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  requires priority_aggregation_cached_minimum{Pre}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  requires priority_node_active_iff_contributor{Pre}(
+    &the_thread->Scheduler.nodes->Wait.Priority,
+    priority_node );
+  requires \exists Priority_Node *node;
+    node \in priority_contributors{Pre}(
+      &the_thread->Scheduler.nodes->Wait.Priority );
+  requires \forall Priority_Node *node;
+    node \in priority_contributors{Pre}(
+      &the_thread->Scheduler.nodes->Wait.Priority ) ==>
+        \separated( queue_context + (..), node + (..) );
+  requires \separated(
+    _Scheduler_Table + ( 0 .. 0 ),
+    (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context + (..),
+    the_thread + (..),
+    the_thread->Scheduler.nodes + (..),
+    priority_node + (..),
+    queue_context + (..)
+  );
+
+  assigns priority_node->priority,
+          the_thread->Scheduler.nodes->Wait.Priority,
+          the_thread->Scheduler.nodes->Priority.value,
+          queue_context->Priority;
+
+  ensures priority_node->priority == SCHEDULER_PRIORITY_MAP( deadline );
+  ensures priority_aggregation_well_formed{Post}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  ensures priority_aggregation_cached_minimum{Post}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  ensures ((Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context)->Ready.rbh_root ==
+    \at( ((Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context)->Ready.rbh_root, Pre );
+  ensures edf_ready_set{Post}(
+            (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context ) ==
+          edf_ready_set{Pre}(
+            (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
+  ensures edf_ready_context_well_formed{Post}(
+    (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
+  ensures the_thread->Scheduler.nodes->Priority.value !=
+            \at( the_thread->Scheduler.nodes->Priority.value, Pre ) ==>
+          thread_priority_update_pending{Post}( queue_context, the_thread );
+
+  behavior active:
+    assumes priority_node_active{Pre}( priority_node );
+    ensures priority_contributors{Post}(
+              &the_thread->Scheduler.nodes->Wait.Priority ) ==
+            priority_contributors{Pre}(
+              &the_thread->Scheduler.nodes->Wait.Priority );
+
+  behavior inactive:
+    assumes !priority_node_active{Pre}( priority_node );
+    ensures priority_contributors{Post}(
+              &the_thread->Scheduler.nodes->Wait.Priority ) ==
+            priority_contributors_insert(
+              priority_contributors{Pre}(
+                &the_thread->Scheduler.nodes->Wait.Priority ),
+              priority_node );
+
+  complete behaviors;
+  disjoint behaviors;
+*/
+#endif
 static inline void _Scheduler_Release_job(
   Thread_Control       *the_thread,
   Priority_Node        *priority_node,
@@ -508,6 +591,7 @@ static inline void _Scheduler_Release_job(
   const Scheduler_Control *scheduler = _Thread_Scheduler_get_home( the_thread );
 
   _Thread_queue_Context_clear_priority_updates( queue_context );
+  /*@ calls _Scheduler_EDF_Release_job; */
   ( *scheduler->Operations.release_job )(
     scheduler,
     the_thread,

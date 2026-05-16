@@ -111,11 +111,20 @@ slice.
 
 **Source**: `cpukit/include/rtems/score/schedulerimpl.h`
 
-**Status**: pristine copy, no verification changes.
+**Status**: active verification patch.
 
-**Reason for import**: directly included by `scheduleredfunblock.c` and by
+**Reason for import**: directly included by EDF scheduler slices and by
 `scheduleruniimpl.h`; provides scheduler helper APIs used by the uniprocessor
 scheduler path.
+
+**Modified**:
+
+- Under `__FRAMAC__`, completes `_Scheduler_Table` as a one-entry table for the
+  UP proof scope and includes the EDF scheduler model predicates needed by the
+  `_Scheduler_Release_job()` wrapper contract.
+- Adds a UP-only ACSL contract for `_Scheduler_Release_job()` and pins the
+  indirect `scheduler->Operations.release_job` call to
+  `_Scheduler_EDF_Release_job()` with `@calls`.
 
 ### percpu.h
 
