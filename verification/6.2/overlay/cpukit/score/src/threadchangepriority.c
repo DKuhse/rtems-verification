@@ -1149,11 +1149,56 @@ void _Thread_Priority_update( Thread_queue_Context *queue_context )
    * Update the priority of all threads of the set.  Do not care to clear the
    * set, since the thread queue context will soon get destroyed anyway.
    */
+  if ( n == 0 ) {
+    return;
+  }
+
+  /*@ assert n == 1; */
+  /*@
+    loop invariant 0 <= i <= n;
+    loop invariant n == 1;
+    loop invariant n == queue_context->Priority.update_count;
+    loop invariant n == \at( queue_context->Priority.update_count, Pre );
+    loop invariant queue_context->Priority.update[ 0 ] ==
+      \at( queue_context->Priority.update[ 0 ], Pre );
+    loop invariant edf_ready_context_well_formed{Here}(
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
+    loop invariant edf_ready_set{Here}(
+              (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context ) ==
+            edf_ready_set{Pre}(
+              (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
+    loop invariant edf_priority_cache_consistency_preserved{Pre,Here}(
+      edf_ready_set{Pre}(
+        (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context ) );
+    loop invariant edf_preemptible_heir_is_earliest_ready{Here}(
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+      _Thread_Heir,
+      _Thread_Heir->is_preemptible );
+    loop invariant i == 1 &&
+      queue_context->Priority.update[ 0 ]->current_state == STATES_READY ==>
+        edf_ready_node_cache_consistent{Here}(
+          (Scheduler_EDF_Node *)
+            queue_context->Priority.update[ 0 ]->Scheduler.nodes );
+    loop assigns i,
+      ((Scheduler_EDF_Node *)
+        queue_context->Priority.update[ 0 ]->Scheduler.nodes)->priority,
+      ((Scheduler_EDF_Node *)
+        queue_context->Priority.update[ 0 ]->Scheduler.nodes)->Base.Priority,
+      ((Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context)->Ready,
+      _Per_CPU_Information[ 0 ].per_cpu.heir,
+      _Per_CPU_Information[ 0 ].per_cpu.dispatch_necessary,
+      _Thread_Heir->cpu_time_used,
+      _Per_CPU_Information[ 0 ].per_cpu.heir->cpu_time_used,
+      _Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp;
+    loop variant n - i;
+  */
   for ( i = 0; i < n ; ++i ) {
     Thread_Control   *the_thread;
     ISR_lock_Context  lock_context;
 
     the_thread = queue_context->Priority.update[ i ];
+    /*@ assert i == 0; */
+    /*@ assert the_thread == queue_context->Priority.update[ 0 ]; */
     _Thread_State_acquire( the_thread, &lock_context );
     _Scheduler_Update_priority( the_thread );
     _Thread_State_release( the_thread, &lock_context );

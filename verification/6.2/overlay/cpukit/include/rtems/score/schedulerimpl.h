@@ -371,6 +371,78 @@ static inline void _Scheduler_Unblock( Thread_Control *the_thread )
  *
  * @see _Scheduler_Node_get_priority().
  */
+#if !defined(RTEMS_SMP)
+/*@
+  requires \valid_read( _Scheduler_Table + ( 0 .. 0 ) );
+  requires _Scheduler_Table[ 0 ].Operations.update_priority ==
+    _Scheduler_EDF_Update_priority;
+  requires \valid( (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
+  requires edf_ready_context_well_formed{Pre}(
+    (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
+  requires thread_priority_edf_node_valid{Pre}( the_thread );
+  requires thread_priority_edf_heir_valid{Pre}( _Thread_Heir );
+  requires edf_preemptible_heir_is_earliest_ready{Pre}(
+    (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+    _Thread_Heir,
+    _Thread_Heir->is_preemptible );
+  requires thread_priority_edf_update_ready_pre{Pre}(
+    (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+    the_thread );
+  requires thread_priority_edf_update_separated{Pre}(
+    (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+    the_thread );
+  requires \separated(
+    (Per_CPU_Control_envelope *) _Per_CPU_Information + (..),
+    (Scheduler_Control const *) _Scheduler_Table + (..),
+    &((Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context)->Ready
+  );
+  requires \separated(
+    (Per_CPU_Control_envelope *) _Per_CPU_Information + (..),
+    (Scheduler_Control const *) _Scheduler_Table + (..),
+    &((Scheduler_EDF_Node *) the_thread->Scheduler.nodes)->Base.Priority
+  );
+  requires \separated(
+    (Per_CPU_Control_envelope *) _Per_CPU_Information + (..),
+    (Scheduler_Control const *) _Scheduler_Table + (..),
+    &((Scheduler_EDF_Node *) the_thread->Scheduler.nodes)->priority
+  );
+  requires \separated(
+    (Per_CPU_Control_envelope *) _Per_CPU_Information + (..),
+    (Scheduler_Control const *) _Scheduler_Table + (..),
+    &(_Per_CPU_Information[ 0 ].per_cpu.heir)->cpu_time_used
+  );
+  requires \separated(
+    the_thread + (..),
+    (Per_CPU_Control_envelope *) _Per_CPU_Information + (..),
+    (Scheduler_Control const *) _Scheduler_Table + (..)
+  );
+
+  assigns ((Scheduler_EDF_Node *) the_thread->Scheduler.nodes)->priority,
+          ((Scheduler_EDF_Node *) the_thread->Scheduler.nodes)->Base.Priority,
+          ((Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context)->Ready,
+          _Per_CPU_Information[ 0 ].per_cpu.heir,
+          _Per_CPU_Information[ 0 ].per_cpu.dispatch_necessary,
+          _Thread_Heir->cpu_time_used,
+          _Per_CPU_Information[ 0 ].per_cpu.heir->cpu_time_used,
+          _Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp;
+
+  ensures edf_preemptible_heir_is_earliest_ready{Post}(
+    (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+    _Thread_Heir,
+    _Thread_Heir->is_preemptible );
+  ensures edf_ready_context_well_formed{Post}(
+    (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
+  ensures edf_ready_set{Post}(
+            (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context ) ==
+          edf_ready_set{Pre}(
+            (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
+  ensures edf_priority_cache_consistency_preserved{Pre,Post}(
+    edf_ready_set{Pre}( (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context ) );
+  ensures the_thread->current_state == STATES_READY ==>
+    edf_ready_node_cache_consistent{Post}(
+      (Scheduler_EDF_Node *) the_thread->Scheduler.nodes );
+*/
+#endif
 static inline void _Scheduler_Update_priority( Thread_Control *the_thread )
 {
 #if defined(RTEMS_SMP)

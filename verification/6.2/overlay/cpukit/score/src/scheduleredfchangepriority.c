@@ -156,6 +156,10 @@ struct timeval   sbttotv( int64_t );
   // EDF API boundary.
   ensures edf_ready_context_well_formed{Post}(
     (Scheduler_EDF_Context *) scheduler->context );
+  ensures edf_ready_set{Post}(
+            (Scheduler_EDF_Context *) scheduler->context ) ==
+          edf_ready_set{Pre}(
+            (Scheduler_EDF_Context *) scheduler->context );
   ensures edf_priority_cache_consistency_preserved{Pre,Post}(
     edf_ready_set{Pre}( (Scheduler_EDF_Context *) scheduler->context ) );
   ensures the_thread->current_state == STATES_READY ==>
