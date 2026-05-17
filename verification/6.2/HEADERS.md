@@ -24,6 +24,7 @@ Copied from `rtems/src/rtems-6.2-pristine/`:
 - `overlay/cpukit/include/rtems/score/scheduleruniimpl.h`
 - `overlay/cpukit/include/rtems/score/thread.h`
 - `overlay/cpukit/include/rtems/score/threadimpl.h`
+- `overlay/cpukit/include/rtems/score/threadqimpl.h`
 - `overlay/cpukit/score/src/scheduleredfunblock.c`
 - `overlay/cpukit/score/src/scheduleredfreleasejob.c`
 - `overlay/cpukit/score/src/threadchangepriority.c`
@@ -262,6 +263,27 @@ priority comparison to the non-SMP home scheduler node.
   and priority-update queuing. `_Thread_Priority_changed()` explicitly requires
   a valid `Priority_Group_order` value.
 
+### threadqimpl.h
+
+**Source**: `cpukit/include/rtems/score/threadqimpl.h`
+
+**Status**: active compatibility patch.
+
+**Reason for import**: provides `_Thread_queue_Context_add_priority_update()`,
+the inline helper called by `_Thread_Priority_do_perform_actions()` when a
+priority action changes a scheduler node priority and the affected thread must
+be queued for `_Thread_Priority_update()`.
+
+**Modified**:
+
+- Added an ACSL contract for `_Thread_queue_Context_add_priority_update()`.
+  The contract frames the helper to `Priority.update_count` and the selected
+  two-slot update entry, records that the current thread pointer is stored, and
+  preserves `Priority.Actions.actions`. This lets the
+  `_Thread_Priority_do_perform_actions()` do-nothing-callback scaffold prove
+  that the callback target and pending action list are not clobbered by the
+  update-list helper.
+
 ### threadchangepriority.c
 
 **Source**: `cpukit/score/src/threadchangepriority.c`
@@ -284,6 +306,12 @@ thread-priority operations called by EDF release/cancel.
   `_Thread_Priority_action_change()`. The code body remains the RTEMS
   `SCHEDULER_NODE_OF_WAIT_PRIORITY_NODE()` expression; the Frama-C-only
   scheduler-node helper is used only in ACSL annotations.
+- Adds a first-pass non-SMP scaffold contract for
+  `_Thread_Priority_do_perform_actions()` under the
+  `_Thread_queue_Do_nothing_priority_actions` callback. The scaffold currently
+  proves that the local one-action add/remove/change path drains the priority
+  action list; contributor-set and cached-minimum postconditions are intended
+  to be added back incrementally.
 
 ### scheduleredfreleasejob.c
 

@@ -66,6 +66,20 @@ struct timeval   sbttotv( int64_t );
 #include <rtems/score/assert.h>
 #include <rtems/score/schedulerimpl.h>
 
+#ifdef __FRAMAC__
+/*@
+  requires \valid( priority_actions );
+  terminates \true;
+  exits \false;
+  assigns priority_actions->actions \from \nothing;
+  ensures priority_actions->actions == \null;
+*/
+void _Thread_queue_Do_nothing_priority_actions(
+  Thread_queue_Queue *queue,
+  Priority_Actions   *priority_actions
+);
+#endif
+
 /*@
   requires \valid( priority_aggregation );
   requires \valid( _Priority_Verify_scheduler_node_of_aggregation(
@@ -231,6 +245,122 @@ static void _Thread_Priority_action_change(
   _Priority_Actions_add( priority_actions, priority_aggregation );
 }
 
+#if !defined(RTEMS_SMP)
+/*@
+  requires \valid_read( &the_thread->Scheduler.nodes );
+  requires \valid( the_thread->Scheduler.nodes );
+  requires \valid( queue_context );
+  requires \valid( operations );
+  requires operations->priority_actions ==
+    _Thread_queue_Do_nothing_priority_actions;
+  requires priority_group_order == PRIORITY_GROUP_FIRST ||
+           priority_group_order == PRIORITY_GROUP_LAST;
+  requires queue_context->Priority.update_count <= 1;
+  requires queue_context->Priority.Actions.actions ==
+    &the_thread->Scheduler.nodes->Wait.Priority;
+  requires \valid( queue_context->Priority.Actions.actions );
+  requires \valid( queue_context->Priority.Actions.actions->Action.node );
+  requires queue_context->Priority.Actions.actions->Action.type ==
+             PRIORITY_ACTION_ADD ||
+           queue_context->Priority.Actions.actions->Action.type ==
+             PRIORITY_ACTION_REMOVE ||
+           queue_context->Priority.Actions.actions->Action.type ==
+             PRIORITY_ACTION_CHANGE;
+  requires \valid( _Priority_Verify_scheduler_node_of_aggregation(
+    &the_thread->Scheduler.nodes->Wait.Priority ) );
+  requires &the_thread->Scheduler.nodes->Wait.Priority ==
+    &_Priority_Verify_scheduler_node_of_aggregation(
+      &the_thread->Scheduler.nodes->Wait.Priority )->Wait.Priority;
+  requires (uintptr_t) &the_thread->Scheduler.nodes->Wait.Priority >=
+    _Priority_Verify_wait_priority_node_offset;
+  requires (uintptr_t) &the_thread->Scheduler.nodes->Wait.Priority
+    <= UINTPTR_MAX;
+  requires \separated(
+    &queue_context->Priority.Actions,
+    queue_context->Priority.Actions.actions->Action.node + (..),
+    _Priority_Verify_scheduler_node_of_aggregation(
+      &the_thread->Scheduler.nodes->Wait.Priority ) + (..)
+  );
+  requires \separated(
+    &queue_context->Priority.Actions.actions,
+    &queue_context->Priority.update_count,
+    queue_context->Priority.update + (0 .. 1),
+    &queue_context->Priority.Actions.actions->Action.node->priority,
+    &the_thread->Scheduler.nodes->Wait.Priority.Contributors,
+    &the_thread->Scheduler.nodes->Wait.Priority.Node.priority,
+    &_Priority_Verify_scheduler_node_of_aggregation(
+      &the_thread->Scheduler.nodes->Wait.Priority )->Priority.value
+  );
+  requires \separated(
+    operations + (..),
+    queue_context + (..),
+    the_thread->Scheduler.nodes + (..),
+    queue_context->Priority.Actions.actions->Action.node + (..)
+  );
+  requires \forall Priority_Node *contributor;
+    contributor \in priority_contributors{Pre}(
+      &the_thread->Scheduler.nodes->Wait.Priority ) ==>
+      \separated(
+        contributor + (..),
+        &queue_context->Priority.Actions.actions,
+        &_Priority_Verify_scheduler_node_of_aggregation(
+          &the_thread->Scheduler.nodes->Wait.Priority )->Priority.value
+      );
+
+  assigns the_thread->Scheduler.nodes->Wait.Priority,
+          the_thread->Scheduler.nodes->Priority.value,
+          queue_context->Priority;
+
+  ensures queue_context->Priority.Actions.actions == \null;
+
+  behavior add:
+    assumes queue_context->Priority.Actions.actions->Action.type ==
+      PRIORITY_ACTION_ADD;
+    requires priority_aggregation_well_formed{Pre}(
+      &the_thread->Scheduler.nodes->Wait.Priority );
+    requires priority_aggregation_cached_minimum{Pre}(
+      &the_thread->Scheduler.nodes->Wait.Priority );
+    requires !priority_contributor_member{Pre}(
+      &the_thread->Scheduler.nodes->Wait.Priority,
+      queue_context->Priority.Actions.actions->Action.node );
+    requires \exists Priority_Node *node;
+      node \in priority_contributors{Pre}(
+        &the_thread->Scheduler.nodes->Wait.Priority );
+
+  behavior remove:
+    assumes queue_context->Priority.Actions.actions->Action.type ==
+      PRIORITY_ACTION_REMOVE;
+    requires priority_aggregation_well_formed{Pre}(
+      &the_thread->Scheduler.nodes->Wait.Priority );
+    requires priority_aggregation_cached_minimum{Pre}(
+      &the_thread->Scheduler.nodes->Wait.Priority );
+    requires priority_contributor_member{Pre}(
+      &the_thread->Scheduler.nodes->Wait.Priority,
+      queue_context->Priority.Actions.actions->Action.node );
+    requires \exists Priority_Node *other;
+      other != queue_context->Priority.Actions.actions->Action.node &&
+      other \in priority_contributors{Pre}(
+        &the_thread->Scheduler.nodes->Wait.Priority );
+    requires \exists Priority_Node *remaining;
+      remaining \in priority_contributors_extract(
+        priority_contributors{Pre}(
+          &the_thread->Scheduler.nodes->Wait.Priority ),
+        queue_context->Priority.Actions.actions->Action.node
+      );
+
+  behavior change:
+    assumes queue_context->Priority.Actions.actions->Action.type ==
+      PRIORITY_ACTION_CHANGE;
+    requires priority_aggregation_well_formed{Pre}(
+      &the_thread->Scheduler.nodes->Wait.Priority );
+    requires priority_contributor_member{Pre}(
+      &the_thread->Scheduler.nodes->Wait.Priority,
+      queue_context->Priority.Actions.actions->Action.node );
+
+  complete behaviors;
+  disjoint behaviors;
+*/
+#endif
 static void _Thread_Priority_do_perform_actions(
   Thread_Control                *the_thread,
   Thread_queue_Queue            *queue,
@@ -243,6 +373,12 @@ static void _Thread_Priority_do_perform_actions(
 
   _Assert( !_Priority_Actions_is_empty( &queue_context->Priority.Actions ) );
   priority_aggregation = _Priority_Actions_move( &queue_context->Priority.Actions );
+  /*@ assert priority_aggregation ==
+        &the_thread->Scheduler.nodes->Wait.Priority; */
+  /*@ assert priority_contributors{Here}( priority_aggregation ) ==
+        priority_contributors{Pre}( priority_aggregation ); */
+  /*@ assert operations->priority_actions ==
+        _Thread_queue_Do_nothing_priority_actions; */
 
   do {
 #if defined(RTEMS_SMP)
@@ -278,6 +414,8 @@ static void _Thread_Priority_do_perform_actions(
           NULL
         );
 #endif
+        /*@ assert operations->priority_actions ==
+              _Thread_queue_Do_nothing_priority_actions; */
         break;
       case PRIORITY_ACTION_REMOVE:
 #if defined(RTEMS_SMP)
@@ -290,6 +428,16 @@ static void _Thread_Priority_do_perform_actions(
           the_thread
         );
 #else
+        /*@ assert priority_contributors{Here}( priority_aggregation ) ==
+              priority_contributors{Pre}( priority_aggregation ); */
+        /*@ assert \exists Priority_Node *other;
+              other != priority_action_node &&
+              other \in priority_contributors{Here}( priority_aggregation ); */
+        /*@ assert \exists Priority_Node *remaining;
+              remaining \in priority_contributors_extract(
+                priority_contributors{Here}( priority_aggregation ),
+                priority_action_node
+              ); */
         _Priority_Extract_non_empty(
           priority_aggregation,
           priority_action_node,
@@ -298,6 +446,8 @@ static void _Thread_Priority_do_perform_actions(
           NULL
         );
 #endif
+        /*@ assert operations->priority_actions ==
+              _Thread_queue_Do_nothing_priority_actions; */
         break;
       default:
         _Assert( priority_action_type == PRIORITY_ACTION_CHANGE );
@@ -309,6 +459,8 @@ static void _Thread_Priority_do_perform_actions(
           _Thread_Priority_action_change,
           NULL
         );
+        /*@ assert operations->priority_actions ==
+              _Thread_queue_Do_nothing_priority_actions; */
         break;
     }
 
@@ -321,7 +473,10 @@ static void _Thread_Priority_do_perform_actions(
 
   if ( !_Priority_Actions_is_empty( &queue_context->Priority.Actions ) ) {
     _Thread_queue_Context_add_priority_update( queue_context, the_thread );
+    /*@ assert operations->priority_actions ==
+          _Thread_queue_Do_nothing_priority_actions; */
 
+    /*@ calls _Thread_queue_Do_nothing_priority_actions; */
     ( *operations->priority_actions )(
       queue,
       &queue_context->Priority.Actions
