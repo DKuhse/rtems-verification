@@ -31,6 +31,9 @@ contracts appear strong enough for the release side of the chain:
   same conditional fact is exposed by the generic `_Scheduler_Release_job()`
   wrapper, which is the intended boundary for the release/update composition
   proof.
+- the same no-op conditional is exposed for the inactive EDF release branch:
+  the job priority node is inserted into the thread scheduler-node wait
+  priority aggregation and the priority action list is drained.
 
 The intended follow-up property is therefore not an end-to-end proof of the
 rate-monotonic release path. It is a small composition proof showing that the

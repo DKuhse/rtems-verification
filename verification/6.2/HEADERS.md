@@ -315,17 +315,17 @@ thread-priority operations called by EDF release/cancel.
   `_Thread_Priority_do_perform_actions()` under the
   `_Thread_queue_Do_nothing_priority_actions` callback. The scaffold proves
   that the local one-action add/remove/change path drains the priority action
-  list. For `PRIORITY_ACTION_CHANGE`, it also proves that the pre-state action
-  aggregation preserves its contributor set and returns well formed with a
-  cached minimum. Add/remove postconditions remain incremental follow-up work.
-- Adds a no-op-callback subcase to `_Thread_Priority_apply()`'s
-  `PRIORITY_ACTION_CHANGE` behavior. Local bridge assertions show that the
-  pre-state action-list aggregation consumed by
-  `_Thread_Priority_do_perform_actions()` is the thread scheduler node
-  wait-priority aggregation used by the public wrapper contracts. This proves
-  contributor-set preservation, well-formedness, cached-minimum preservation,
-  and action-list drain for the no-op `CHANGE` path without attempting the
-  generic priority-inheritance queue case.
+  list. For `PRIORITY_ACTION_ADD` and `PRIORITY_ACTION_CHANGE`, it also proves
+  the corresponding contributor-set postcondition and returns the aggregation
+  well formed with a cached minimum.
+- Adds no-op-callback subcases to `_Thread_Priority_apply()`'s `ADD` and
+  `CHANGE` behaviors. Local bridge assertions show that the pre-state
+  action-list aggregation consumed by `_Thread_Priority_do_perform_actions()`
+  is the thread scheduler node wait-priority aggregation used by the public
+  wrapper contracts. This proves contributor insertion for the no-op `ADD`
+  path, contributor-set preservation for the no-op `CHANGE` path,
+  well-formedness, cached-minimum preservation, and action-list drain without
+  attempting the generic priority-inheritance queue case.
 
 ### scheduleredfreleasejob.c
 
@@ -345,10 +345,18 @@ the thread-priority add/remove/changed chain.
   `_Scheduler_Release_job()` wrapper. It lifts the EDF active no-op release
   fact to the release/update composition boundary and proves that the priority
   action list is drained after the wrapper call.
+- Added an overlapping `inactive_noop` behavior to the generic
+  `_Scheduler_Release_job()` wrapper. It lifts the EDF inactive no-op release
+  fact to the same boundary, proving both job-priority-node insertion and
+  action-list drain.
 - Added an overlapping `active_noop` behavior to `_Scheduler_EDF_Release_job()`.
   It captures the active release branch under the no-op thread-queue callback
   assumptions and proves that the priority action list is drained after the
   release call.
+- Added an overlapping `inactive_noop` behavior to
+  `_Scheduler_EDF_Release_job()`. It captures the inactive release branch under
+  the same no-op assumptions and proves that the job priority node is inserted
+  while the action list is drained.
 - Added local proof assertions preserving EDF ready-set canonical ownership
   across the thread-priority propagation call.
 
