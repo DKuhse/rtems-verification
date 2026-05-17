@@ -234,7 +234,6 @@ static void _Rate_monotonic_Release_postponed_job(
     owner + (..),
     owner->Scheduler.nodes + (..),
     owner->Wait.operations + (..),
-    &the_period->Priority,
     lock_context
   );
   requires \separated(
@@ -300,6 +299,25 @@ static void _Rate_monotonic_Release_postponed_job(
             (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context ) ==
           edf_ready_set{Pre}(
             (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
+
+  behavior active:
+    assumes priority_node_active{Pre}( &the_period->Priority );
+    ensures priority_contributors{Post}(
+              &owner->Scheduler.nodes->Wait.Priority ) ==
+            priority_contributors{Pre}(
+              &owner->Scheduler.nodes->Wait.Priority );
+
+  behavior inactive:
+    assumes !priority_node_active{Pre}( &the_period->Priority );
+    ensures priority_contributors{Post}(
+              &owner->Scheduler.nodes->Wait.Priority ) ==
+            priority_contributors_insert(
+              priority_contributors{Pre}(
+                &owner->Scheduler.nodes->Wait.Priority ),
+              &the_period->Priority );
+
+  complete behaviors active, inactive;
+  disjoint behaviors active, inactive;
 */
 static void _Rate_monotonic_Release_job(
   Rate_monotonic_Control *the_period,
