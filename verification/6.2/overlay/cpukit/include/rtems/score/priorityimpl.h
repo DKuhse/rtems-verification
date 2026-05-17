@@ -77,15 +77,13 @@ typedef enum {
 #include <priority_aggregation.h>
 #include <rtems/score/schedulernode.h>
 
-enum {
-  _Priority_Verify_wait_priority_offset =
-    offsetof( Scheduler_Node, Wait.Priority )
-};
+static const uintptr_t _Priority_Verify_wait_priority_node_offset =
+  offsetof( Scheduler_Node, Wait.Priority.Node.Node.Chain );
 
 #define _Priority_Verify_scheduler_node_of_aggregation( aggregation ) \
   ( (Scheduler_Node *) ( \
     (uintptr_t) ( aggregation ) - \
-    _Priority_Verify_wait_priority_offset \
+    _Priority_Verify_wait_priority_node_offset \
   ) )
 #endif
 

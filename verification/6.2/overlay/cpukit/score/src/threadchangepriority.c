@@ -73,16 +73,29 @@ struct timeval   sbttotv( int64_t );
   requires priority_aggregation ==
     &_Priority_Verify_scheduler_node_of_aggregation(
       priority_aggregation )->Wait.Priority;
+  requires (uintptr_t) priority_aggregation >=
+    _Priority_Verify_wait_priority_node_offset;
+  requires (uintptr_t) priority_aggregation <= UINTPTR_MAX;
+  requires \forall Priority_Node *node;
+    node \in priority_contributors{Pre}( priority_aggregation ) ==>
+      \separated(
+        node + (..),
+        &_Priority_Verify_scheduler_node_of_aggregation(
+          priority_aggregation )->Priority.value
+      );
   requires priority_group_order == PRIORITY_GROUP_FIRST ||
            priority_group_order == PRIORITY_GROUP_LAST;
 
   assigns _Priority_Verify_scheduler_node_of_aggregation(
     priority_aggregation )->Priority.value;
 
+  // set scheduler node priority to priority aggregation minimum
   ensures _Priority_Verify_scheduler_node_of_aggregation(
     priority_aggregation )->Priority.value ==
       ( priority_aggregation->Node.priority |
         (Priority_Control) priority_group_order );
+
+  // preservation
   ensures priority_aggregation->Node.priority ==
     \at( priority_aggregation->Node.priority, Pre );
   ensures priority_contributors{Post}( priority_aggregation ) ==
