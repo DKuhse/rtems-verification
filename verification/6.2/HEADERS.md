@@ -262,6 +262,11 @@ priority comparison to the non-SMP home scheduler node.
   release/cancel to describe contributor-set changes, cached-minimum repair,
   and priority-update queuing. `_Thread_Priority_changed()` explicitly requires
   a valid `Priority_Group_order` value.
+- Under `__FRAMAC__`, declares `_Thread_queue_Do_nothing_priority_actions()` so
+  `_Thread_Priority_changed()` can expose a conditional no-op callback behavior
+  without changing the production include graph. The behavior preserves the
+  existing public postconditions and additionally proves that the priority
+  action list is drained when the EDF no-op callback assumptions hold.
 
 ### threadqimpl.h
 
@@ -308,10 +313,19 @@ thread-priority operations called by EDF release/cancel.
   scheduler-node helper is used only in ACSL annotations.
 - Adds a first-pass non-SMP scaffold contract for
   `_Thread_Priority_do_perform_actions()` under the
-  `_Thread_queue_Do_nothing_priority_actions` callback. The scaffold currently
-  proves that the local one-action add/remove/change path drains the priority
-  action list; contributor-set and cached-minimum postconditions are intended
-  to be added back incrementally.
+  `_Thread_queue_Do_nothing_priority_actions` callback. The scaffold proves
+  that the local one-action add/remove/change path drains the priority action
+  list. For `PRIORITY_ACTION_CHANGE`, it also proves that the pre-state action
+  aggregation preserves its contributor set and returns well formed with a
+  cached minimum. Add/remove postconditions remain incremental follow-up work.
+- Adds a no-op-callback subcase to `_Thread_Priority_apply()`'s
+  `PRIORITY_ACTION_CHANGE` behavior. Local bridge assertions show that the
+  pre-state action-list aggregation consumed by
+  `_Thread_Priority_do_perform_actions()` is the thread scheduler node
+  wait-priority aggregation used by the public wrapper contracts. This proves
+  contributor-set preservation, well-formedness, cached-minimum preservation,
+  and action-list drain for the no-op `CHANGE` path without attempting the
+  generic priority-inheritance queue case.
 
 ### scheduleredfreleasejob.c
 
@@ -327,6 +341,14 @@ the thread-priority add/remove/changed chain.
 
 - Added ACSL contracts for EDF release/cancel and for the generic
   `_Scheduler_Release_job()` wrapper.
+- Added an overlapping `active_noop` behavior to the generic
+  `_Scheduler_Release_job()` wrapper. It lifts the EDF active no-op release
+  fact to the release/update composition boundary and proves that the priority
+  action list is drained after the wrapper call.
+- Added an overlapping `active_noop` behavior to `_Scheduler_EDF_Release_job()`.
+  It captures the active release branch under the no-op thread-queue callback
+  assumptions and proves that the priority action list is drained after the
+  release call.
 - Added local proof assertions preserving EDF ready-set canonical ownership
   across the thread-priority propagation call.
 
