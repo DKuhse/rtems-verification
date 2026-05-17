@@ -5,9 +5,8 @@
 #
 # The priority RBTree/plain operations remain an intentional abstraction
 # boundary for this project. This script targets the priority combinators plus
-# the scheduler-node setter helper and the public thread-priority wrappers.
-# The callback helper contracts are used through @calls; their bodies are a
-# later drill-down slice.
+# the action-list helper, change callback, scheduler-node setter helper, and
+# the public thread-priority wrappers.
 #
 # Usage:
 #   verify-thread-change-priority.sh                 # default proof
@@ -16,7 +15,7 @@
 #
 set -e
 
-WP_FCTS="${WP_FCTS:-_Priority_Non_empty_insert,_Priority_Extract_non_empty,_Priority_Changed,_Thread_Set_scheduler_node_priority,_Thread_Priority_add,_Thread_Priority_changed,_Thread_Priority_remove}"
+WP_FCTS="${WP_FCTS:-_Priority_Actions_add,_Priority_Non_empty_insert,_Priority_Extract_non_empty,_Priority_Changed,_Thread_Set_scheduler_node_priority,_Thread_Priority_action_change,_Thread_Priority_add,_Thread_Priority_changed,_Thread_Priority_remove}"
 
 WP_FCT_DEFAULTS="${WP_FCT_DEFAULTS:--wp -wp-fct ${WP_FCTS} -wp-model Typed+Cast -wp-timeout 30}"
 

@@ -201,10 +201,24 @@ static inline Priority_Aggregation *_Priority_Actions_move(
 /*@
   requires \valid( actions );
   requires \valid( aggregation );
+  requires \separated(
+    &actions->actions,
+    &aggregation->Contributors,
+    &aggregation->Node.priority
+  );
+  requires \forall Priority_Node *node;
+    node \in priority_contributors{Pre}( aggregation ) ==>
+      \separated( node + (..), &actions->actions );
 
-  assigns actions->actions;
+  assigns actions->actions \from aggregation;
 
   ensures actions->actions == aggregation;
+  ensures priority_contributors{Post}( aggregation ) ==
+    priority_contributors{Pre}( aggregation );
+  ensures priority_aggregation_well_formed{Pre}( aggregation ) ==>
+    priority_aggregation_well_formed{Post}( aggregation );
+  ensures priority_aggregation_cached_minimum{Pre}( aggregation ) ==>
+    priority_aggregation_cached_minimum{Post}( aggregation );
 */
 static inline void _Priority_Actions_add(
   Priority_Actions     *actions,
@@ -698,8 +712,26 @@ typedef void ( *Priority_Remove_handler )(
   requires priority_aggregation ==
     &_Priority_Verify_scheduler_node_of_aggregation(
       priority_aggregation )->Wait.Priority;
+  requires (uintptr_t) priority_aggregation >=
+    _Priority_Verify_wait_priority_node_offset;
+  requires (uintptr_t) priority_aggregation <= UINTPTR_MAX;
+  requires \forall Priority_Node *node;
+    node \in priority_contributors{Pre}( priority_aggregation ) ==>
+      \separated(
+        node + (..),
+        &_Priority_Verify_scheduler_node_of_aggregation(
+          priority_aggregation )->Priority.value,
+        &priority_actions->actions
+      );
   requires priority_group_order == PRIORITY_GROUP_FIRST ||
            priority_group_order == PRIORITY_GROUP_LAST;
+  requires \separated(
+    &priority_actions->actions,
+    &priority_aggregation->Contributors,
+    &priority_aggregation->Node.priority,
+    &_Priority_Verify_scheduler_node_of_aggregation(
+      priority_aggregation )->Priority.value
+  );
   requires \separated(
     priority_actions + (..),
     _Priority_Verify_scheduler_node_of_aggregation(
@@ -809,6 +841,9 @@ static inline void _Priority_Remove_nothing(
   requires aggregation ==
     &_Priority_Verify_scheduler_node_of_aggregation(
       aggregation )->Wait.Priority;
+  requires (uintptr_t) aggregation >=
+    _Priority_Verify_wait_priority_node_offset;
+  requires (uintptr_t) aggregation <= UINTPTR_MAX;
   requires \separated(
     actions + (..),
     node + (..),
@@ -822,6 +857,14 @@ static inline void _Priority_Remove_nothing(
     &_Priority_Verify_scheduler_node_of_aggregation(
       aggregation )->Priority.value
   );
+  requires \forall Priority_Node *contributor;
+    contributor \in priority_contributors{Pre}( aggregation ) ==>
+      \separated(
+        contributor + (..),
+        &actions->actions,
+        &_Priority_Verify_scheduler_node_of_aggregation(
+          aggregation )->Priority.value
+      );
 
   assigns aggregation->Contributors,
           aggregation->Node.priority,
@@ -975,6 +1018,9 @@ static inline void _Priority_Extract(
   requires aggregation ==
     &_Priority_Verify_scheduler_node_of_aggregation(
       aggregation )->Wait.Priority;
+  requires (uintptr_t) aggregation >=
+    _Priority_Verify_wait_priority_node_offset;
+  requires (uintptr_t) aggregation <= UINTPTR_MAX;
   requires \separated(
     actions + (..),
     node + (..),
@@ -988,6 +1034,14 @@ static inline void _Priority_Extract(
     &_Priority_Verify_scheduler_node_of_aggregation(
       aggregation )->Priority.value
   );
+  requires \forall Priority_Node *contributor;
+    contributor \in priority_contributors{Pre}( aggregation ) ==>
+      \separated(
+        contributor + (..),
+        &actions->actions,
+        &_Priority_Verify_scheduler_node_of_aggregation(
+          aggregation )->Priority.value
+      );
 
   assigns aggregation->Contributors,
           aggregation->Node.priority,
@@ -1088,6 +1142,9 @@ static inline void _Priority_Extract_non_empty(
   requires aggregation ==
     &_Priority_Verify_scheduler_node_of_aggregation(
       aggregation )->Wait.Priority;
+  requires (uintptr_t) aggregation >=
+    _Priority_Verify_wait_priority_node_offset;
+  requires (uintptr_t) aggregation <= UINTPTR_MAX;
   requires \separated(
     actions + (..),
     node + (..),
@@ -1101,6 +1158,14 @@ static inline void _Priority_Extract_non_empty(
     &_Priority_Verify_scheduler_node_of_aggregation(
       aggregation )->Priority.value
   );
+  requires \forall Priority_Node *contributor;
+    contributor \in priority_contributors{Pre}( aggregation ) ==>
+      \separated(
+        contributor + (..),
+        &actions->actions,
+        &_Priority_Verify_scheduler_node_of_aggregation(
+          aggregation )->Priority.value
+      );
 
   assigns aggregation->Contributors,
           aggregation->Node.priority,

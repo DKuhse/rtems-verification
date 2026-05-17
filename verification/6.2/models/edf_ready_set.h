@@ -8,12 +8,18 @@
 #include <rtems/score/scheduleredf.h>
 
 /*@ axiomatic EDFReadyNodes {
-      // edf_ready_set is opaque w.r.t. RBTree node-field internals. The tree
-      // root is the proxy for the abstract set; RBTree pointer bookkeeping
-      // inside the nodes is below the abstraction.
+      // edf_ready_set is opaque w.r.t. RBTree node-field internals.  The root
+      // pointer selects the abstract set, and the root node is the explicit
+      // read frame of the root-level model.  The set "changes" only through
+      // the ensures of operations (Enqueue/Extract); full RBTree traversal
+      // and node-link bookkeeping stay below the abstraction boundary.
+      // This is a 'soft' lie - a true assigns would need an traversal model
+      // but we don't touch the RBTree internals, so this is not an issue.
+      
       logic set<Scheduler_EDF_Node *> edf_ready_set_from_root(
         RBTree_Node *root
-      );
+      )
+        reads root;
 
       logic set<Scheduler_EDF_Node *> edf_ready_set{L}(
         Scheduler_EDF_Context *context

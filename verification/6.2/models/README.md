@@ -31,6 +31,7 @@ This directory is for verification-only abstract models.
 - `priority_aggregation.h` — introduces `priority_contributors{L}(aggregation)`
   as an ACSL `set<Priority_Node *>` representation of
   `Priority_Aggregation::Contributors`.  It mirrors the ready-set model style:
+  the abstract set is derived from `aggregation->Contributors.rbh_root`,
   contributor membership is abstract, insert/extract are pure set operations,
   and minimum-node predicates describe the cached aggregate priority without
   exposing RBTree pointer or color mechanics.  Structural aggregation

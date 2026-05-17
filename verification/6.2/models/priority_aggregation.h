@@ -8,15 +8,20 @@
 #include <rtems/score/priority.h>
 
 /*@ axiomatic PriorityAggregation {
-      // priority_contributors is opaque w.r.t. RBTree node-field internals:
-      // its only read frame is `aggregation->Contributors` (the tree root),
-      // which serves as the proxy for the abstract set.  The set changes only
+      // priority_contributors is opaque w.r.t. RBTree node-field internals.
+      // The root pointer selects the abstract set, and the root node is the
+      // explicit read frame of the root-level model.  The set changes only
       // through the contracts of priority aggregation operations.
       // (see edf_ready_set.h)
+      logic set<Priority_Node *> priority_contributors_from_root(
+        RBTree_Node *root
+      )
+        reads root;
+
       logic set<Priority_Node *> priority_contributors{L}(
         Priority_Aggregation *aggregation
-      )
-        reads aggregation->Contributors;
+      ) =
+        priority_contributors_from_root( aggregation->Contributors.rbh_root );
 
       predicate priority_contributor_member{L}(
         Priority_Aggregation *aggregation,

@@ -169,8 +169,26 @@ static void _Thread_Priority_action_remove(
   requires priority_aggregation ==
     &_Priority_Verify_scheduler_node_of_aggregation(
       priority_aggregation )->Wait.Priority;
+  requires (uintptr_t) priority_aggregation >=
+    _Priority_Verify_wait_priority_node_offset;
+  requires (uintptr_t) priority_aggregation <= UINTPTR_MAX;
+  requires \forall Priority_Node *node;
+    node \in priority_contributors{Pre}( priority_aggregation ) ==>
+      \separated(
+        node + (..),
+        &_Priority_Verify_scheduler_node_of_aggregation(
+          priority_aggregation )->Priority.value,
+        &priority_actions->actions
+      );
   requires priority_group_order == PRIORITY_GROUP_FIRST ||
            priority_group_order == PRIORITY_GROUP_LAST;
+  requires \separated(
+    &priority_actions->actions,
+    &priority_aggregation->Contributors,
+    &priority_aggregation->Node.priority,
+    &_Priority_Verify_scheduler_node_of_aggregation(
+      priority_aggregation )->Priority.value
+  );
   requires \separated(
     priority_actions + (..),
     _Priority_Verify_scheduler_node_of_aggregation(
