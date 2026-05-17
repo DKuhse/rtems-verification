@@ -428,6 +428,13 @@ static inline bool _RBTree_Is_root(
  *
  * @param[out] the_rbtree The rbtree to initialize.
  */
+/*@
+  requires \valid( the_rbtree );
+
+  assigns the_rbtree->rbh_root;
+
+  ensures the_rbtree->rbh_root == \null;
+*/
 static inline void _RBTree_Initialize_empty(
   RBTree_Control *the_rbtree
 )

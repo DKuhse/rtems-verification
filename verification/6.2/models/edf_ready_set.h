@@ -15,11 +15,15 @@
       // and node-link bookkeeping stay below the abstraction boundary.
       // This is a 'soft' lie - a true assigns would need an traversal model
       // but we don't touch the RBTree internals, so this is not an issue.
-      
+
       logic set<Scheduler_EDF_Node *> edf_ready_set_from_root(
         RBTree_Node *root
       )
         reads root;
+
+      axiom edf_ready_set_from_null_empty:
+        \forall Scheduler_EDF_Node *node;
+          !( node \in edf_ready_set_from_root( \null ) );
 
       logic set<Scheduler_EDF_Node *> edf_ready_set{L}(
         Scheduler_EDF_Context *context

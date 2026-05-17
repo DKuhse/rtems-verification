@@ -97,11 +97,18 @@ to `-c11` so quick compatibility checks can run on `verify-6.2-active`.
 - `verify-edf-unblock.sh` — runs Frama-C on the active
   `_Scheduler_EDF_Unblock()` slice with `__FRAMAC__` defined so
   `scheduleredf.h` includes `verification/6.2/models/edf_ready_set.h`.
+- `verify-edf-initialize.sh` — runs Frama-C/WP on the active
+  `_Scheduler_EDF_Initialize()` slice and checks that initialization produces
+  an empty, well-formed EDF ready context.
 - `verify-edf-release-cancel.sh` — runs Frama-C/WP on the active
   `_Scheduler_EDF_Release_job()` and `_Scheduler_EDF_Cancel_job()` slice. This
   replaces the legacy `release_cancel_stubs.h` harness with the active overlay
   and consumes the thread-priority operation contracts checked by
   `verify-thread-change-priority.sh`.
+- `verify-ratemon-release-job.sh` and `verify-ratemon-cancel.sh` — run
+  Frama-C/WP on the Rate Monotonic release/cancel overlay callers, assuming
+  watchdog, dispatch, and locking helpers while verifying the EDF
+  release/cancel and `_Thread_Priority_update()` composition.
 - `verify-scheduler-release-job.sh` — runs Frama-C/WP on the generic
   `_Scheduler_Release_job()` inline wrapper, pins the indirect scheduler
   operation to `_Scheduler_EDF_Release_job()` with `@calls`, and verifies the
