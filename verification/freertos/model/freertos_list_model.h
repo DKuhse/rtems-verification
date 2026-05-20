@@ -68,6 +68,11 @@
   ensures pxListItem->xItemValue == xValue;
   ensures Detached(pxListItem);
   ensures pxListItem->pvOwner == \old(pxListItem->pvOwner);
+  ensures \forall ListItem_t *item;
+    \valid{Pre}(item) && item != pxListItem ==>
+      item->xItemValue == \old(item->xItemValue);
+  ensures \forall ListItem_t *item;
+    \valid{Pre}(item) ==> item->pvOwner == \old(item->pvOwner);
 
   ensures \forall List_t *list;
     \valid{Pre}(list) && ListInv{Pre}(list) ==> ListInv(list);
@@ -104,6 +109,10 @@ void vListItemSetValue_abs(ListItem_t * const pxListItem,
     (UBaseType_t)(\old(pxList->uxNumberOfItems) + 1U);
   ensures pxNewListItem->xItemValue == \old(pxNewListItem->xItemValue);
   ensures pxNewListItem->pvOwner == \old(pxNewListItem->pvOwner);
+  ensures \forall ListItem_t *item;
+    \valid{Pre}(item) ==> item->xItemValue == \old(item->xItemValue);
+  ensures \forall ListItem_t *item;
+    \valid{Pre}(item) ==> item->pvOwner == \old(item->pvOwner);
 
   ensures \forall ListItem_t *item;
     \valid{Pre}(item) && item != pxNewListItem ==>
@@ -143,6 +152,10 @@ void vListInsertSorted_abs(List_t * const pxList,
   ensures Detached(pxItemToRemove);
   ensures pxItemToRemove->xItemValue == \old(pxItemToRemove->xItemValue);
   ensures pxItemToRemove->pvOwner == \old(pxItemToRemove->pvOwner);
+  ensures \forall ListItem_t *item;
+    \valid{Pre}(item) ==> item->xItemValue == \old(item->xItemValue);
+  ensures \forall ListItem_t *item;
+    \valid{Pre}(item) ==> item->pvOwner == \old(item->pvOwner);
   // The count transition keeps Head unconstrained by its pre-state on the
   // changed list; HeadIsMinimum plus !In below rule out a stale removed head.
   ensures \at(pxItemToRemove->pxContainer, Pre)->uxNumberOfItems ==

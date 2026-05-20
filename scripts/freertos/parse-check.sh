@@ -23,6 +23,12 @@ cat > "${CHECK}" <<'EOF'
 #include "FreeRTOS.h"
 #include "list.h"
 #include "freertos_list_model.h"
+struct tskTaskControlBlock {
+    ListItem_t xStateListItem;
+    ListItem_t xEventListItem;
+    TickType_t xDeadline;
+};
+#include "scheduler_model.h"
 int main(void) { return 0; }
 EOF
 
