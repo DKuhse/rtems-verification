@@ -32,6 +32,7 @@ CPP_CMD="gcc -C -E \
     -D__FRAMAC__ \
     -DEDF_SCHEDULER=1 \
     -DSANITY_PROBE=1 \
+    -I${OVERLAY}/model \
     -I${OVERLAY}/overlay/include \
     -I${OVERLAY}/stubs \
     -I${FREERTOS_SRC}/include \
@@ -146,10 +147,6 @@ check_probe "vTaskSwitchContext (overlay/tasks.c)" \
 check_probe "vTaskSwitchContext (reference/taskswitchcontext.c)" \
     "${OVERLAY}/reference/taskswitchcontext.c" \
     "vTaskSwitchContext"
-
-check_probe "prvProcessUnblockedTask (reference/incrementtick.c)" \
-    "${OVERLAY}/reference/incrementtick.c" \
-    "prvProcessUnblockedTask"
 
 check_probe "xTaskIncrementTick (reference/incrementtick.c)" \
     "${OVERLAY}/reference/incrementtick.c" \
