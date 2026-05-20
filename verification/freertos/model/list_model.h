@@ -30,8 +30,14 @@
     logic ListItem_t *Head{L}(List_t *list)
       reads list->uxNumberOfItems;
 
+    predicate ContainerMembershipConsistent{L}(List_t *list) =
+      \valid(list) &&
+      \forall ListItem_t *item;
+        \valid(item) ==>
+          (In(item, list) <==> item->pxContainer == list);
+
     predicate ListInv{L}(List_t *list) =
-      \valid(list) && ListRep(list);
+      \valid(list) && ListRep(list) && ContainerMembershipConsistent(list);
 
     predicate Detached{L}(ListItem_t *item) =
       \valid(item) && item->pxContainer == \null;

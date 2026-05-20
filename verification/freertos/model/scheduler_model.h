@@ -45,6 +45,46 @@
   predicate DelayedList{L}(List_t *delayed) =
     TaskList(delayed);
 
+  predicate TaskEventListLinkValid{L}(struct tskTaskControlBlock *task,
+                                      List_t *readyList,
+                                      List_t *delayedList,
+                                      List_t *overflowDelayedList) =
+    \valid(task) &&
+    \valid(&task->xEventListItem) &&
+    (task->xEventListItem.pxContainer == \null ||
+      (ListInv(task->xEventListItem.pxContainer) &&
+       In(&task->xEventListItem, task->xEventListItem.pxContainer) &&
+       task->xEventListItem.pxContainer != readyList &&
+       task->xEventListItem.pxContainer != delayedList &&
+       task->xEventListItem.pxContainer != overflowDelayedList));
+
+  predicate DelayedTasksHaveValidEventListLinks{L}(List_t *delayed,
+                                                   List_t *readyList,
+                                                   List_t *overflowDelayedList) =
+    \forall ListItem_t *stateItem;
+      \valid(stateItem) && In(stateItem, delayed) ==>
+        TaskItem(stateItem) &&
+        TaskEventListLinkValid(
+          (struct tskTaskControlBlock *)stateItem->pvOwner,
+          readyList,
+          delayed,
+          overflowDelayedList);
+
+  predicate SchedulerListContext{L}(List_t *ready,
+                                    List_t *delayed,
+                                    List_t *overflowDelayed) =
+    ready != delayed &&
+    ready != overflowDelayed &&
+    delayed != overflowDelayed &&
+    ReadyList(ready) &&
+    DelayedList(delayed) &&
+    DelayedList(overflowDelayed) &&
+    Disjoint(ready, delayed) &&
+    Disjoint(ready, overflowDelayed) &&
+    Disjoint(delayed, overflowDelayed) &&
+    DelayedTasksHaveValidEventListLinks(delayed, ready, overflowDelayed) &&
+    DelayedTasksHaveValidEventListLinks(overflowDelayed, ready, delayed);
+
   predicate ReadyInsertPre{L}(List_t *ready, ListItem_t *item) =
     ReadyList(ready) &&
     Detached(item) &&

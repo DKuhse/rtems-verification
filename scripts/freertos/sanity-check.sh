@@ -86,7 +86,7 @@ check_probe() {
     # Read the machine-readable WP report. Frama-C 32 only prints failed
     # goals in the normal text output, so a proved probe may have no
     # human-readable goal line at all.
-    probe_line=$(awk -v fct="${fct}" '
+    probe_lines=$(awk -v fct="${fct}" '
         /"goal":/ {
             goal = $0
             is_probe = ($0 ~ fct "_assert")
@@ -97,19 +97,16 @@ check_probe() {
             sub(/".*$/, "", goal)
             sub(/^.*"verdict": "/, "", verdict)
             sub(/".*$/, "", verdict)
-            # Some functions have ordinary assertions before the sanity probe.
-            # The guarded probe is placed last, so keep the last matching goal.
-            found = goal " : " verdict
+            found = 1
+            print goal " : " verdict
         }
         END {
-            if (found != "") {
-                print found
-            }
+            if (!found) exit 1
         }
     ' "${report}" 2>/dev/null || true)
     rm -f "${report}"
 
-    if [ -z "${probe_line}" ]; then
+    if [ -z "${probe_lines}" ]; then
         echo "  ERROR: probe goal for ${fct} not found in WP output"
         echo "         (was -DSANITY_PROBE=1 picked up? did the function name match?)"
         echo "${output}" | tail -20
@@ -117,17 +114,31 @@ check_probe() {
         return
     fi
 
-    echo "  ${probe_line}"
+    local function_failed=0
+    local function_passed=0
+    while IFS= read -r probe_line; do
+        [ -n "${probe_line}" ] || continue
+        echo "  ${probe_line}"
 
-    # Sanity check passes when the probe is NOT proved.
-    if echo "${probe_line}" | grep -qE ' : valid$'; then
-        echo "  FAIL: probe proved \\false — hypothesis set is contradictory"
+        # Sanity check passes when the probe is NOT proved.
+        if echo "${probe_line}" | grep -qE ' : valid$'; then
+            echo "  FAIL: probe proved \\false — hypothesis set is contradictory"
+            function_failed=1
+        elif echo "${probe_line}" | grep -qE ' : (timeout|unknown|failed)$'; then
+            function_passed=1
+        else
+            echo "  ERROR: unexpected probe status — please inspect manually"
+            function_failed=1
+        fi
+    done <<< "${probe_lines}"
+
+    if [ "${function_failed}" -ne 0 ]; then
         FAIL=$((FAIL + 1))
-    elif echo "${probe_line}" | grep -qE ' : (timeout|unknown|failed)$'; then
-        echo "  PASS: probe did not prove (model consistent at probe point)"
+    elif [ "${function_passed}" -ne 0 ]; then
+        echo "  PASS: no probe proved (model consistent at checked probe points)"
         PASS=$((PASS + 1))
     else
-        echo "  ERROR: unexpected probe status — please inspect manually"
+        echo "  ERROR: no usable probe verdicts found"
         FAIL=$((FAIL + 1))
     fi
 }

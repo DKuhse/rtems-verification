@@ -5,6 +5,7 @@
 
 struct tskTaskControlBlock {
     ListItem_t xStateListItem;
+    ListItem_t xEventListItem;
     TickType_t xDeadline;
 };
 typedef struct tskTaskControlBlock TCB_t;

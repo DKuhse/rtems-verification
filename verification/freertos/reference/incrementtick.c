@@ -20,6 +20,9 @@ struct tskTaskControlBlock {
 };
 typedef struct tskTaskControlBlock TCB_t;
 
+#define FREERTOS_USE_ABSTRACT_LIST_MODEL
+#include "scheduler_model.h"
+
 /* Hack: Frama-C can't handle volatile. */
 #ifdef __FRAMAC__
     TCB_t *           pxCurrentTCB;
@@ -47,92 +50,6 @@ typedef struct tskTaskControlBlock TCB_t;
     List_t            xDelayedTaskList2;
     List_t * volatile pxDelayedTaskList;
     List_t * volatile pxOverflowDelayedTaskList;
-#endif
-
-/* Frama-C-only wrappers for source-level list macros.  These are deliberately
- * weaker than the abstract scheduler model: this file only proves tick
- * arithmetic, not list correctness. */
-/*@
-  requires \valid(pxList);
-  requires pxList->uxNumberOfItems > (UBaseType_t)0;
-
-  terminates \true;
-  allocates \nothing;
-  frees \nothing;
-  exits \false;
-
-  assigns \result \from pxList, pxList->uxNumberOfItems;
-
-  ensures \valid(\result);
-  ensures \result->xStateListItem.pxContainer == pxList;
-*/
-static TCB_t * prvTickHeadOwner(List_t *pxList);
-
-/*@
-  requires \valid(pxListItem);
-
-  terminates \true;
-  allocates \nothing;
-  frees \nothing;
-  exits \false;
-
-  assigns pxListItem->xItemValue;
-
-  ensures pxListItem->xItemValue == xValue;
-  ensures pxListItem->pxContainer == \old(pxListItem->pxContainer);
-*/
-static void prvTickListItemSetValue(ListItem_t *pxListItem,
-                                    TickType_t xValue);
-
-/*@
-  requires \valid(pxList);
-  requires \valid(pxNewListItem);
-
-  terminates \true;
-  allocates \nothing;
-  frees \nothing;
-  exits \false;
-
-  assigns pxList->uxNumberOfItems,
-          pxNewListItem->pxContainer;
-
-  ensures pxList->uxNumberOfItems ==
-    (UBaseType_t)(\old(pxList->uxNumberOfItems) + 1U);
-  ensures pxNewListItem->pxContainer == pxList;
-*/
-static void prvTickListInsert(List_t *pxList,
-                              ListItem_t *pxNewListItem);
-
-/*@
-  requires \valid(pxItemToRemove);
-
-  terminates \true;
-  allocates \nothing;
-  frees \nothing;
-  exits \false;
-
-  assigns pxItemToRemove->pxContainer;
-
-  ensures pxItemToRemove->pxContainer == \null;
-*/
-static UBaseType_t prvTickListRemove(ListItem_t *pxItemToRemove);
-
-#ifdef __FRAMAC__
-    #undef listGET_OWNER_OF_HEAD_ENTRY
-    #define listGET_OWNER_OF_HEAD_ENTRY(pxList) \
-        prvTickHeadOwner((pxList))
-
-    #undef listSET_LIST_ITEM_VALUE
-    #define listSET_LIST_ITEM_VALUE(pxListItem, xValue) \
-        prvTickListItemSetValue((pxListItem), (xValue))
-
-    #undef vListInsert
-    #define vListInsert(pxList, pxNewListItem) \
-        prvTickListInsert((pxList), (pxNewListItem))
-
-    #undef listREMOVE_ITEM
-    #define listREMOVE_ITEM(pxItemToRemove) \
-        ((void)prvTickListRemove((pxItemToRemove)))
 #endif
 
 /* prvResetNextTaskUnblockTime is a static helper in tasks.c that scans the
@@ -166,9 +83,17 @@ static void prvResetNextTaskUnblockTime(void);
     } while (0)
 
 /*@
+  requires SchedulerListContext(&xReadyTasksList,
+                                pxDelayedTaskList,
+                                pxOverflowDelayedTaskList);
+
   // Termination of the delayed-list drain depends on list-count semantics.
   // This reset proves tick arithmetic only; termination is a later ADT proof.
   terminates \false;
+
+  ensures SchedulerListContext(&xReadyTasksList,
+                               pxDelayedTaskList,
+                               pxOverflowDelayedTaskList);
 
   behavior suspended:
     assumes uxSchedulerSuspended != (UBaseType_t)0U;
@@ -181,8 +106,6 @@ static void prvResetNextTaskUnblockTime(void);
   behavior running:
     assumes uxSchedulerSuspended == (UBaseType_t)0U;
     requires \valid(pxCurrentTCB);
-    requires \valid(pxDelayedTaskList);
-    requires \valid(pxOverflowDelayedTaskList);
 
     exits \false;
 
@@ -228,14 +151,16 @@ BaseType_t xTaskIncrementTick(void) {
               loop invariant xTickCount == (TickType_t)(\at(xTickCount, Pre) + 1U);
               loop invariant pxCurrentTCB == \at(pxCurrentTCB, Pre);
               loop invariant \valid(pxCurrentTCB);
-              loop invariant \valid(pxDelayedTaskList);
+              loop invariant SchedulerListContext(&xReadyTasksList,
+                                                  pxDelayedTaskList,
+                                                  pxOverflowDelayedTaskList);
               loop invariant xSwitchRequired == pdTRUE || xSwitchRequired == pdFALSE;
 
               loop assigns pxTCB,
                            xItemValue,
                            xSwitchRequired,
                            xNextTaskUnblockTime,
-                           xReadyTasksList.uxNumberOfItems,
+                           { list->uxNumberOfItems | List_t *list; \valid(list) },
                            { item->xItemValue | ListItem_t *item; \valid(item) },
                            { item->pxContainer | ListItem_t *item; \valid(item) };
             */
@@ -280,6 +205,11 @@ BaseType_t xTaskIncrementTick(void) {
                     }
 
                     /* Place the unblocked task into the appropriate ready list. */
+#ifdef SANITY_PROBE
+                    /* Branch-local sanity probe - must NOT prove.  This catches
+                     * contradictory assumptions specifically on the unblock path. */
+                    //@ assert \false;
+#endif
                     prvAddTaskToReadyList(pxTCB);
 
 /* A task being unblocked cannot cause an immediate context switch if
