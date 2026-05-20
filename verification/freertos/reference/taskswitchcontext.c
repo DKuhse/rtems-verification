@@ -4,11 +4,13 @@
 #undef MPU_WRAPPERS_INCLUDED_FROM_API_FILE
 
 struct tskTaskControlBlock {
+    ListItem_t xStateListItem;
     TickType_t xDeadline;
 };
 typedef struct tskTaskControlBlock TCB_t;
 
-#include "edf.h"
+#define FREERTOS_USE_ABSTRACT_LIST_MODEL
+#include "scheduler_model.h"
 
 /* Hack: Frama-C can't handle volatile */
 #ifdef __FRAMAC__
@@ -28,9 +30,7 @@ typedef struct tskTaskControlBlock TCB_t;
 
 /*@
   requires xReadyTasksList.uxNumberOfItems > 0;
-  requires \valid_read( xReadyTasksList.xListEnd.pxNext );
-  requires sorted( &xReadyTasksList );
-  requires xItemValue_matches_deadline( &xReadyTasksList );
+  requires ReadyList( &xReadyTasksList );
 
   assigns pxCurrentTCB, xYieldPendings[ 0 ];
 
@@ -44,9 +44,9 @@ typedef struct tskTaskControlBlock TCB_t;
     assumes uxSchedulerSuspended == (UBaseType_t)0U;
     assigns pxCurrentTCB, xYieldPendings[ 0 ];
     ensures xYieldPendings[0] == pdFALSE;
-    ensures (void*) pxCurrentTCB ==
-              \nth( list_contents( &xReadyTasksList ), 0 )->pvOwner;
-    ensures edf_property( &xReadyTasksList, pxCurrentTCB );
+    ensures pxCurrentTCB ==
+              (TCB_t *) Head( &xReadyTasksList )->pvOwner;
+    ensures EDFProperty( &xReadyTasksList, pxCurrentTCB );
 
   complete behaviors suspended, running;
   disjoint behaviors suspended, running;
@@ -106,7 +106,7 @@ void vTaskSwitchContext(void) {
         taskSELECT_HIGHEST_PRIORITY_TASK();
 #ifdef SANITY_PROBE
         /* Sanity probe — must NOT prove. Checks that the hypothesis
-         * set at the point where edf_property must hold is not
+         * set at the point where EDFProperty must hold is not
          * vacuous. Enabled only by sanity-check.sh. */
         //@ assert \false;
 #endif
