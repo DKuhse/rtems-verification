@@ -8,8 +8,8 @@ The legacy hand-port inventory lives at:
 
 ## Current State
 
-The active tree contains RTEMS 6.2 overlays for the first EDF unblock
-verification slice plus the first abstract ready-set model. Some files remain
+The active tree contains RTEMS 6.2 overlays for the EDF scheduler entry-point
+verification slices plus the abstract ready-set model. Some files remain
 pristine imports, while the scheduler, priority, and thread helper path now has
 active ACSL contracts.
 
@@ -25,7 +25,11 @@ Copied from `rtems/src/rtems-6.2-pristine/`:
 - `overlay/cpukit/include/rtems/score/thread.h`
 - `overlay/cpukit/include/rtems/score/threadimpl.h`
 - `overlay/cpukit/include/rtems/score/threadqimpl.h`
+- `overlay/cpukit/score/src/scheduleredfblock.c`
+- `overlay/cpukit/score/src/scheduleredfchangepriority.c`
+- `overlay/cpukit/score/src/scheduleredfschedule.c`
 - `overlay/cpukit/score/src/scheduleredfunblock.c`
+- `overlay/cpukit/score/src/scheduleredfyield.c`
 - `overlay/cpukit/score/src/scheduleredfreleasejob.c`
 - `overlay/cpukit/score/src/threadchangepriority.c`
 - `harnesses/thread-get-priority-harness.c`
@@ -35,10 +39,11 @@ Copied from `rtems/src/rtems-6.2-pristine/`:
 - `models/priority_aggregation.h`
 - `models/thread_priority_updates.h`
 
-The next implementation step is to connect `_Scheduler_EDF_Enqueue()` and
-eventually `_Scheduler_EDF_Extract()` / `_Scheduler_EDF_Get_highest_ready()` to
-the abstract ready-set model, then annotate only the EDF scheduler helpers
-needed to verify `_Scheduler_EDF_Unblock()`.
+The current scheduler-entry proofs cover the EDF ready-order property and the
+dispatch-request relationship between the executing thread and heir. The next
+implementation step is to keep reducing the abstract RBTree boundary around
+`_Scheduler_EDF_Enqueue()`, `_Scheduler_EDF_Extract()`, and
+`_Scheduler_EDF_Get_highest_ready()`.
 
 ## Intended Categories
 
@@ -149,6 +154,10 @@ contracts.
   array with the alignment attribute after the declarator. This mirrors the
   legacy 6.2 workaround and lets WP reason about `_Per_CPU_Information[0]` in
   the non-SMP proof. The non-Frama-C path keeps the pristine RTEMS declaration.
+- Added a Frama-C volatile binding for
+  `_Per_CPU_Information[0].per_cpu.dispatch_necessary`. The binding writes the
+  ghost mirror `_Thread_Dispatch_necessary_ghost`, which scheduler contracts use
+  instead of reading the volatile flag in postconditions.
 
 ### priorityimpl.h
 
@@ -206,8 +215,9 @@ purifying and storing it in the EDF node.
 
 **Status**: active compatibility patch.
 
-**Reason for import**: contains `_Scheduler_uniprocessor_Unblock()` and heir
-update helpers called by `_Scheduler_EDF_Unblock()`.
+**Reason for import**: contains the uniprocessor block, schedule, unblock, and
+yield helpers plus the heir update helpers called by the EDF scheduler entry
+proofs.
 
 **Modified**:
 
@@ -219,10 +229,9 @@ update helpers called by `_Scheduler_EDF_Unblock()`.
   equal/non-preemptible cases. `_Scheduler_uniprocessor_Unblock()` expresses
   the current heir priority via the non-SMP home scheduler node path used by
   `_Thread_Get_priority()`. Update branches keep `_Thread_Dispatch_necessary`
-  in their assigns clauses because the code writes it, but the current
-  EDF-facing contract does not prove dispatch-state postconditions. This
-  mirrors the legacy 6.2 port: `_Thread_Dispatch_necessary` is volatile, so
-  postconditions about its final value are intentionally omitted.
+  in their assigns clauses because the code writes it, and also update the
+  ghost mirror used to prove that dispatch is requested whenever the executing
+  thread differs from the heir.
 - Under `__FRAMAC__`, `_Scheduler_uniprocessor_Unblock()` expands the
   preemptible-heir condition locally and calls `_Scheduler_uniprocessor_Update_heir()`
   only in the branch where the heir can actually change. The production RTEMS
@@ -230,8 +239,9 @@ update helpers called by `_Scheduler_EDF_Unblock()`.
 
 **Expected verification result**: `scripts/6.2/verify-scheduleruni-unblock.sh
 -wp-model 'Typed+Cast' -wp-timeout 30` proves all goals for the helper harness.
-The volatile dispatch flag remains in frame clauses, but there is no
-postcondition about its final value.
+The script runs WP on the project produced by Frama-C's Volatile plugin so the
+dispatch-state postcondition talks about the ghost mirror instead of the
+volatile field directly.
 
 ### thread.h
 
@@ -371,14 +381,21 @@ the thread-priority add/remove/changed chain.
 - Added local proof assertions preserving EDF ready-set canonical ownership
   across the thread-priority propagation call.
 
-### scheduleredfunblock.c
+### scheduleredfblock.c / scheduleredfschedule.c / scheduleredfunblock.c / scheduleredfchangepriority.c / scheduleredfyield.c
 
-**Source**: `cpukit/score/src/scheduleredfunblock.c`
+**Source**: `cpukit/score/src/scheduleredf*.c`
 
-**Status**: pristine copy, no verification changes.
+**Status**: active contract slices.
 
-**Reason for import**: first active EDF verification target for the new 6.2
-port.
+**Reason for import**: EDF scheduler entry points that update the ready set,
+select the heir, or both.
+
+**Modified**:
+
+- Added ACSL contracts for the EDF ready-set property at the entry-point
+  boundary.
+- Added the dispatch/heir property via
+  `edf_dispatch_set_if_heir_differs()` using the volatile dispatch ghost mirror.
 
 ### scheduleruni-unblock-harness.c
 
@@ -493,6 +510,7 @@ abstract ready set.
 - `predicate edf_thread_owns_earliest_ready_node{L}(nodes, heir)`
 - `predicate edf_thread_is_earliest_ready{L}(context, thread)`
 - `predicate edf_preemptible_heir_is_earliest_ready{L}(context, heir)`
+- `predicate edf_dispatch_set_if_heir_differs(executing, heir, dispatch)`
 
 `edf_thread_is_earliest_ready{L}(context, thread)` states that `thread` owns a
 ready EDF node which satisfies `edf_ready_node_not_after{L}(node, other)` for
@@ -503,6 +521,12 @@ heir-state property: if `heir` is preemptible, then it must be EDF-earliest;
 if it is not preemptible, RTEMS may intentionally leave it as the heir even
 when another ready thread has an earlier EDF priority.
 
-**Current scope**: EDF ordering over ready nodes and the scheduler heir. This
-model intentionally does not state that a priority value represents a
-particular deadline and does not model equal-priority FIFO/tie order.
+`edf_dispatch_set_if_heir_differs(executing, heir, dispatch)` states the
+dispatch side of the scheduler property: if the currently executing thread is
+not the heir, then dispatch has been requested. In proofs, `dispatch` is the
+non-volatile ghost mirror maintained through the Volatile plugin binding.
+
+**Current scope**: EDF ordering over ready nodes, the scheduler heir, and the
+dispatch-request relationship between executing and heir. This model
+intentionally does not state that a priority value represents a particular
+deadline and does not model equal-priority FIFO/tie order.

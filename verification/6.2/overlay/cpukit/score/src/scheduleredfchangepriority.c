@@ -91,6 +91,10 @@ struct timeval   sbttotv( int64_t );
     (Scheduler_EDF_Context *) scheduler->context,
     _Thread_Heir,
     _Thread_Heir->is_preemptible );
+  requires edf_dispatch_set_if_heir_differs(
+    _Per_CPU_Information[ 0 ].per_cpu.executing,
+    _Thread_Heir,
+    _Thread_Dispatch_necessary_ghost );
 
   // The node belongs to the_thread.
   requires ((Scheduler_EDF_Node *) node)->Base.owner == the_thread;
@@ -142,6 +146,7 @@ struct timeval   sbttotv( int64_t );
           ((Scheduler_EDF_Context *) scheduler->context)->Ready,
           _Per_CPU_Information[ 0 ].per_cpu.heir,
           _Per_CPU_Information[ 0 ].per_cpu.dispatch_necessary,
+          _Thread_Dispatch_necessary_ghost,
           _Thread_Heir->cpu_time_used,
           _Per_CPU_Information[ 0 ].per_cpu.heir->cpu_time_used,
           _Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp;
@@ -151,6 +156,10 @@ struct timeval   sbttotv( int64_t );
     (Scheduler_EDF_Context *) scheduler->context,
     _Thread_Heir,
     _Thread_Heir->is_preemptible );
+  ensures edf_dispatch_set_if_heir_differs(
+    _Per_CPU_Information[ 0 ].per_cpu.executing,
+    _Thread_Heir,
+    _Thread_Dispatch_necessary_ghost );
 
   // Inductive invariant: the ready context remains well-formed at every
   // EDF API boundary.
@@ -200,6 +209,10 @@ void _Scheduler_EDF_Update_priority(
 
   if ( !_Thread_Is_ready( the_thread ) ) {
     /* Nothing to do */
+    /*@ assert edf_dispatch_set_if_heir_differs(
+          _Per_CPU_Information[ 0 ].per_cpu.executing,
+          _Thread_Heir,
+          _Thread_Dispatch_necessary_ghost ); */
     return;
   }
 
@@ -209,6 +222,10 @@ void _Scheduler_EDF_Update_priority(
 
   if ( priority == the_node->priority ) {
     /* Nothing to do */
+    /*@ assert edf_dispatch_set_if_heir_differs(
+          _Per_CPU_Information[ 0 ].per_cpu.executing,
+          _Thread_Heir,
+          _Thread_Dispatch_necessary_ghost ); */
     return;
   }
 
@@ -229,6 +246,10 @@ void _Scheduler_EDF_Update_priority(
     scheduler,
     _Scheduler_EDF_Get_highest_ready
   );
+  /*@ assert edf_dispatch_set_if_heir_differs(
+        _Per_CPU_Information[ 0 ].per_cpu.executing,
+        _Thread_Heir,
+        _Thread_Dispatch_necessary_ghost ); */
 
   // Pin the witness for the post-condition existentials
   /*@ assert \at( _Thread_Heir, Pre )->is_preemptible ==>

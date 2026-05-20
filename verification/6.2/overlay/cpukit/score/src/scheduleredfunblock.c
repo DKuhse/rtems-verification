@@ -109,6 +109,10 @@ struct timeval   sbttotv( int64_t );
     (Scheduler_EDF_Context *) scheduler->context,
     _Thread_Heir,
     _Thread_Heir->is_preemptible );
+  requires edf_dispatch_set_if_heir_differs(
+    _Per_CPU_Information[ 0 ].per_cpu.executing,
+    _Thread_Heir,
+    _Thread_Dispatch_necessary_ghost );
 
   // The new node belongs to the_thread; needed to make the_thread the
   // owner of the earliest-ready node in the update_heir case.
@@ -164,6 +168,7 @@ struct timeval   sbttotv( int64_t );
           ((Scheduler_EDF_Context *) scheduler->context)->Ready,
           _Per_CPU_Information[ 0 ].per_cpu.heir,
           _Per_CPU_Information[ 0 ].per_cpu.dispatch_necessary,
+          _Thread_Dispatch_necessary_ghost,
           _Thread_Heir->cpu_time_used,
           _Per_CPU_Information[ 0 ].per_cpu.heir->cpu_time_used,
           _Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp;
@@ -191,6 +196,10 @@ struct timeval   sbttotv( int64_t );
     (Scheduler_EDF_Context *) scheduler->context,
     _Thread_Heir,
     _Thread_Heir->is_preemptible );
+  ensures edf_dispatch_set_if_heir_differs(
+    _Per_CPU_Information[ 0 ].per_cpu.executing,
+    _Thread_Heir,
+    _Thread_Dispatch_necessary_ghost );
 
   behavior keep_due_to_priority:
     assumes SCHEDULER_PRIORITY_PURIFY( node->Priority.value ) >=

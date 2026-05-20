@@ -94,9 +94,13 @@ All run against the FC 32 stack via `docker compose run --rm verify-6.2-active-f
 The scripts also detect FC 25 and switch the C standard flag from `-std c11`
 to `-c11` so quick compatibility checks can run on `verify-6.2-active`.
 
-- `verify-edf-unblock.sh` — runs Frama-C on the active
-  `_Scheduler_EDF_Unblock()` slice with `__FRAMAC__` defined so
-  `scheduleredf.h` includes `verification/6.2/models/edf_ready_set.h`.
+- `verify-edf-block.sh`, `verify-edf-release-cancel.sh`,
+  `verify-edf-schedule.sh`, `verify-edf-unblock.sh`,
+  `verify-edf-update-priority.sh`, and `verify-edf-yield.sh` — run Frama-C/WP on
+  the active EDF scheduler entry slices with `__FRAMAC__` defined so
+  `scheduleredf.h` includes `verification/6.2/models/edf_ready_set.h`. These
+  proofs run WP on the project produced by Frama-C's Volatile plugin so the
+  dispatch/heir property uses the ghost mirror of `_Thread_Dispatch_necessary`.
 - `verify-edf-initialize.sh` — runs Frama-C/WP on the active
   `_Scheduler_EDF_Initialize()` slice and checks that initialization produces
   an empty, well-formed EDF ready context.
@@ -108,7 +112,8 @@ to `-c11` so quick compatibility checks can run on `verify-6.2-active`.
 - `verify-ratemon-release-job.sh` and `verify-ratemon-cancel.sh` — run
   Frama-C/WP on the Rate Monotonic release/cancel overlay callers, assuming
   watchdog, dispatch, and locking helpers while verifying the EDF
-  release/cancel and `_Thread_Priority_update()` composition.
+  release/cancel and `_Thread_Priority_update()` composition. These wrappers
+  also run WP on the Volatile plugin project.
 - `verify-scheduler-release-job.sh` — runs Frama-C/WP on the generic
   `_Scheduler_Release_job()` inline wrapper, pins the indirect scheduler
   operation to `_Scheduler_EDF_Release_job()` with `@calls`, and verifies the
@@ -121,11 +126,13 @@ to `-c11` so quick compatibility checks can run on `verify-6.2-active`.
   contract used by EDF release/cancel. Priority RBTree/plain helpers remain
   permanently abstract and out of scope for this project.
 - `verify-scheduleruni-unblock.sh` — runs Frama-C/WP on the header harness for
+  `_Scheduler_uniprocessor_Update_heir()`,
   `_Scheduler_uniprocessor_Update_heir_if_necessary()`,
   `_Scheduler_uniprocessor_Update_heir_if_preemptible()`, and
-  `_Scheduler_uniprocessor_Unblock()`, using the contract of
-  `_Scheduler_uniprocessor_Update_heir()` as the CPU-state boundary. Expected
-  result with `-wp-model 'Typed+Cast' -wp-timeout 30`: all goals proved.
+  `_Scheduler_uniprocessor_Unblock()`. It runs WP on the project produced by
+  Frama-C's Volatile plugin so `_Scheduler_uniprocessor_Update_heir()` can prove
+  the dispatch ghost mirror update. Expected result with
+  `-wp-model 'Typed+Cast' -wp-timeout 30`: all goals proved.
 - `tmp-verify-thread-get-priority.sh` — temporary isolation script for
   `_Thread_Get_priority()` and its immediate priority/home-node helper
   contracts.

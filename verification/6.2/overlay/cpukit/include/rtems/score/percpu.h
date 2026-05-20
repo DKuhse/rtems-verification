@@ -663,6 +663,21 @@ typedef struct {
  * Hack: Non-SMP, so we define it as an array of size 1.
  */
 extern Per_CPU_Control_envelope _Per_CPU_Information[1U] CPU_STRUCTURE_ALIGNMENT;
+
+/*@ ghost bool _Thread_Dispatch_necessary_ghost; */
+
+/*@
+  assigns *dispatch_necessary, _Thread_Dispatch_necessary_ghost;
+  ensures _Thread_Dispatch_necessary_ghost == value;
+*/
+bool _Thread_Dispatch_necessary_write(
+  volatile bool *dispatch_necessary,
+  bool           value
+);
+
+/*@ volatile _Per_CPU_Information[0].per_cpu.dispatch_necessary
+      writes _Thread_Dispatch_necessary_write;
+*/
 #else
 extern CPU_STRUCTURE_ALIGNMENT Per_CPU_Control_envelope _Per_CPU_Information[];
 #endif

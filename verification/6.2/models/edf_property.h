@@ -94,6 +94,13 @@
       ) =
         !is_preemptible || edf_thread_is_earliest_ready{L}( context, heir );
 
+      predicate edf_dispatch_set_if_heir_differs(
+        Thread_Control *executing,
+        Thread_Control *heir,
+        boolean         dispatch_necessary
+      ) =
+        executing == heir || dispatch_necessary;
+
       // --- Bridge ------------------------------------------------------
       // Existential introduction: a concrete witness satisfying the
       // witness-explicit form discharges the existential form. Proves

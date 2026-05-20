@@ -67,6 +67,8 @@ run_fc() {
             -nostdinc" \
         -machdep gcc_x86_64 -cpp-frama-c-compliant "${C_STD_FLAGS[@]}" \
         "${SRC}" \
+        -volatile \
+        -then-on Volatile \
         ${defaults} \
         "$@"
 }

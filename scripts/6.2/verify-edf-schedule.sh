@@ -61,6 +61,8 @@ run_fc() {
         -machdep gcc_x86_64 -cpp-frama-c-compliant "${C_STD_FLAGS[@]}" \
         -inline-calls "_Scheduler_uniprocessor_Schedule,_Scheduler_uniprocessor_Update_heir_if_preemptible" \
         "${SRC}" \
+        -volatile \
+        -then-on Volatile \
         ${defaults} \
         "$@"
 }

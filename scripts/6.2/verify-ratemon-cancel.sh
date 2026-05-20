@@ -68,5 +68,7 @@ ${FRAMA_C_CMD} \
     "${INLINE_ARGS[@]}" \
     "${EDF_RELEASE_SRC}" \
     "${SRC}" \
+    -volatile \
+    -then-on Volatile \
     ${WP_FCT_DEFAULTS} \
     "$@"

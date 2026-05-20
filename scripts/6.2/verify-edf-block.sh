@@ -61,6 +61,8 @@ run_fc() {
         -machdep gcc_x86_64 -cpp-frama-c-compliant "${C_STD_FLAGS[@]}" \
         -inline-calls "_Scheduler_uniprocessor_Block,_Thread_Is_heir,_Scheduler_EDF_Extract_body" \
         "${SRC}" \
+        -volatile \
+        -then-on Volatile \
         ${defaults} \
         "$@"
 }
