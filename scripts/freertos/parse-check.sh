@@ -22,6 +22,7 @@ trap 'rm -f "${CHECK}"' EXIT
 cat > "${CHECK}" <<'EOF'
 #include "FreeRTOS.h"
 #include "list.h"
+#include "freertos_list_model.h"
 int main(void) { return 0; }
 EOF
 
@@ -29,6 +30,7 @@ CPP_CMD="gcc -C -E \
     -D__LARGE_DATA_MODEL__ \
     -D__FRAMAC__ \
     -DEDF_SCHEDULER=1 \
+    -I${OVERLAY}/model \
     -I${OVERLAY}/overlay/include \
     -I${OVERLAY}/stubs \
     -I${FREERTOS_SRC}/include \

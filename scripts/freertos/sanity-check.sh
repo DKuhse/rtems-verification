@@ -60,6 +60,7 @@ check_probe() {
     local label="$1"
     local source_path="$2"
     local fct="$3"
+    local report
 
     [ -f "${source_path}" ] || {
         echo "  ERROR: missing source ${source_path}"
@@ -72,16 +73,40 @@ check_probe() {
     # Allow `-wp-prop` etc. through ${EXTRA_ARGS}. We deliberately do
     # NOT add -wp-prop=@assert here — restricting goals would hide
     # real failures elsewhere; we want to see them too.
+    report=$(mktemp --suffix=.json)
     output=$(frama-c \
         -cpp-command "${CPP_CMD}" \
         ${COMMON} \
         -wp -wp-fct "${fct}" -wp-model "Typed+Cast" \
+        -wp-report-json "${report}" \
         ${EXTRA_ARGS} \
         "${source_path}" 2>&1) || true
 
-    # Look for the probe goal line. Frama-C names it like:
-    #   typed_cast_<fct>_assert : Valid|Timeout|Unknown|...
-    probe_line=$(echo "${output}" | grep -E "Goal typed.*${fct}_assert" | head -1 || true)
+    # Read the machine-readable WP report. Frama-C 32 only prints failed
+    # goals in the normal text output, so a proved probe may have no
+    # human-readable goal line at all.
+    probe_line=$(awk -v fct="${fct}" '
+        /"goal":/ {
+            goal = $0
+            is_probe = ($0 ~ fct "_assert")
+        }
+        is_probe && /"verdict":/ {
+            verdict = $0
+            sub(/^.*"goal": "/, "", goal)
+            sub(/".*$/, "", goal)
+            sub(/^.*"verdict": "/, "", verdict)
+            sub(/".*$/, "", verdict)
+            # Some functions have ordinary assertions before the sanity probe.
+            # The guarded probe is placed last, so keep the last matching goal.
+            found = goal " : " verdict
+        }
+        END {
+            if (found != "") {
+                print found
+            }
+        }
+    ' "${report}" 2>/dev/null || true)
+    rm -f "${report}"
 
     if [ -z "${probe_line}" ]; then
         echo "  ERROR: probe goal for ${fct} not found in WP output"
@@ -94,10 +119,10 @@ check_probe() {
     echo "  ${probe_line}"
 
     # Sanity check passes when the probe is NOT proved.
-    if echo "${probe_line}" | grep -qE 'Valid|Qed[^:]*$'; then
+    if echo "${probe_line}" | grep -qE ' : valid$'; then
         echo "  FAIL: probe proved \\false — hypothesis set is contradictory"
         FAIL=$((FAIL + 1))
-    elif echo "${probe_line}" | grep -qE 'Timeout|Unknown|Failed|Stronger'; then
+    elif echo "${probe_line}" | grep -qE ' : (timeout|unknown|failed)$'; then
         echo "  PASS: probe did not prove (model consistent at probe point)"
         PASS=$((PASS + 1))
     else
