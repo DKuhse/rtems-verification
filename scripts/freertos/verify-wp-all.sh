@@ -17,7 +17,7 @@ eval $(opam env)
 FREERTOS_SRC="${FREERTOS_SRC:-/workspace/source/freertos-edf-msp430}"
 OVERLAY="${OVERLAY:-/workspace/verification/freertos}"
 
-# Frama-C 25 has no native MSP430 machdep. gcc_x86_16 is the closest stock
+# Frama-C has no native MSP430 machdep. gcc_x86_16 is the closest stock
 # match: 16-bit int/short, 32-bit long, signed char — same scalar layout as
 # MSP430 with the large data model (__MSP430X_LARGE__ / __LARGE_DATA_MODEL__),
 # which is what FreeRTOSConfig.h's heap-size branch assumes.
@@ -35,7 +35,7 @@ CPP_CMD="gcc -C -E \
     -isystem /usr/include/x86_64-linux-gnu \
     -isystem /usr/lib/gcc/x86_64-linux-gnu/11/include"
 
-COMMON="-machdep ${MACHDEP} -cpp-frama-c-compliant -c11"
+COMMON="-machdep ${MACHDEP} -cpp-frama-c-compliant -std c11"
 
 PASS=0
 FAIL=0

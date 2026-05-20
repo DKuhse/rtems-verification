@@ -46,6 +46,7 @@ RUN ../source-builder/sb-set-builder --prefix=${RTEMS_PREFIX} 5/rtems-x86_64
 FROM ubuntu:22.04 AS final
 
 ARG FRAMA_C_VERSION=25.0
+ARG INSTALL_COQ=false
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV HOME=/root
@@ -82,6 +83,15 @@ RUN echo 'eval $(opam env)' >> ${HOME}/.bashrc
 COPY --from=toolchain-builder /opt/rtems5/ /opt/rtems5/
 
 ENV PATH=/opt/rtems5/bin:/opt/scripts:${PATH}
+
+# Optional interactive prover support for WP.  Why3 1.8.2's Coq package
+# supports the Coq 8.x line directly; Coq/Rocq 9.x is not detected cleanly by
+# this Frama-C/Why3 stack.
+RUN if [ "${INSTALL_COQ}" = "true" ]; then \
+      eval $(opam env) \
+      && opam install coq.8.16.1 why3-coq.1.8.2 -y \
+      && why3 config detect; \
+    fi
 
 WORKDIR /workspace
 CMD ["/bin/bash"]

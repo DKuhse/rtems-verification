@@ -41,7 +41,7 @@ echo "--- xTaskIncrementTick helper (reference) ---"
 
 frama-c \
     -cpp-command "${CPP_CMD}" \
-    -machdep "${MACHDEP}" -cpp-frama-c-compliant -c11 \
+    -machdep "${MACHDEP}" -cpp-frama-c-compliant -std c11 \
     -wp \
     -wp-fct prvProcessUnblockedTask \
     -wp-model "Typed+Cast" \

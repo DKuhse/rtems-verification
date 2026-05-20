@@ -71,6 +71,7 @@ services:
       dockerfile: Dockerfile
       args:
         FRAMA_C_VERSION: "32.0"
+        INSTALL_COQ: "true"
     image: rtems-edf-toolchain-fc32
     working_dir: /workspace/rtems/src/rtems-6.2-pristine/cpukit
     volumes:
@@ -86,7 +87,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: rtems-edf-toolchain
+      args:
+        FRAMA_C_VERSION: "32.0"
+        INSTALL_COQ: "true"
+    image: rtems-edf-toolchain-fc32
     working_dir: /workspace/source/freertos-edf-msp430
     volumes:
       - ./source:/workspace/source
@@ -103,7 +107,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: rtems-edf-toolchain
+      args:
+        FRAMA_C_VERSION: "32.0"
+        INSTALL_COQ: "true"
+    image: rtems-edf-toolchain-fc32
     working_dir: /workspace/source/freertos-edf-msp430
     environment:
       - DISPLAY=${DISPLAY}

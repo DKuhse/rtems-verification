@@ -54,7 +54,7 @@ echo ""
 
 frama-c \
     -cpp-command "${CPP_CMD}" \
-    -machdep "${MACHDEP}" -cpp-frama-c-compliant -c11 \
+    -machdep "${MACHDEP}" -cpp-frama-c-compliant -std c11 \
     -wp -wp-fct __test_cons_mem_soundness -wp-model "Typed+Cast" \
     "$@" \
     "${OVERLAY}/reference/incrementtick.c"

@@ -41,7 +41,7 @@ frama-c \
     -cpp-command "${CPP_CMD}" \
     -machdep gcc_x86_16 \
     -cpp-frama-c-compliant \
-    -c11 \
+    -std c11 \
     -kernel-warn-key annot-error=active \
     "${CHECK}"
 

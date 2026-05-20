@@ -27,18 +27,18 @@ instead of extending the legacy ghost-stub hand-port.
 ## Reproduce
 
 ```sh
-docker compose build                    # Frama-C 25 + RSB cross-toolchain
+docker compose build                    # legacy Frama-C 25 plus modern Frama-C 32 images
 ./setup.sh                              # download/extract sources, build BSP, apply 5.1 patches
 docker compose run --rm verify          # RTEMS 5.1 — runs verify-wp-all.sh
 docker compose run --rm verify-6.2      # legacy RTEMS 6.2 hand-port
-docker compose run --rm verify-6.2-active # active RTEMS 6.2 abstract RBTree port
+docker compose run --rm verify-6.2-active-fc32 # active RTEMS 6.2 abstract RBTree port
 docker compose run --rm verify-freertos # FreeRTOS EDF (MSP430) — smoke test only for now
 ```
 
 Run the active 6.2 unblock slice:
 
 ```sh
-docker compose run --rm verify-6.2-active
+docker compose run --rm verify-6.2-active-fc32
 ```
 
 Run a single legacy 6.2 function:
@@ -62,6 +62,6 @@ Want to play around with the code and Frama-C? Get a shell in the container:
 
 ```sh
 docker compose run --rm --entrypoint bash verify-6.2
-docker compose run --rm --entrypoint bash verify-6.2-active
+docker compose run --rm --entrypoint bash verify-6.2-active-fc32
 docker compose run --rm --entrypoint bash verify-freertos
 ```

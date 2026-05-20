@@ -38,6 +38,6 @@ fi
 
 exec frama-c-gui \
     -cpp-command "${CPP_CMD}" \
-    -machdep "${MACHDEP}" -cpp-frama-c-compliant -c11 \
+    -machdep "${MACHDEP}" -cpp-frama-c-compliant -std c11 \
     -wp -wp-model "Typed+Cast" \
     "$@"

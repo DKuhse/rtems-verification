@@ -40,7 +40,7 @@ CPP_CMD="gcc -C -E \
     -isystem /usr/include/x86_64-linux-gnu \
     -isystem /usr/lib/gcc/x86_64-linux-gnu/11/include"
 
-COMMON="-machdep ${MACHDEP} -cpp-frama-c-compliant -c11"
+COMMON="-machdep ${MACHDEP} -cpp-frama-c-compliant -std c11"
 
 # Short default timeout: a contradictory hypothesis set lets Qed
 # discharge \false instantly. If Alt-Ergo can't prove it in 10s, we
