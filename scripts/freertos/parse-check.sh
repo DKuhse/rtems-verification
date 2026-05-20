@@ -22,7 +22,7 @@ trap 'rm -f "${CHECK}"' EXIT
 cat > "${CHECK}" <<'EOF'
 #include "FreeRTOS.h"
 #include "list.h"
-#include "freertos_list_model.h"
+#include "list_model.h"
 struct tskTaskControlBlock {
     ListItem_t xStateListItem;
     ListItem_t xEventListItem;

@@ -1,23 +1,23 @@
 /*
- * Abstract FreeRTOS list model for scheduler-facing proofs.
+ * Abstract list model for scheduler-facing proofs.
  *
  * This header is intentionally an ADT boundary.  Scheduler proofs should use
  * ListInv/In/HeadIsMinimum and the *_abs wrappers below instead of reasoning
  * about the concrete pxNext/pxPrevious sentinel representation.
  */
 
-#ifndef VERIFICATION_FREERTOS_MODEL_FREERTOS_LIST_MODEL_H
-#define VERIFICATION_FREERTOS_MODEL_FREERTOS_LIST_MODEL_H
+#ifndef VERIFICATION_FREERTOS_MODEL_LIST_MODEL_H
+#define VERIFICATION_FREERTOS_MODEL_LIST_MODEL_H
 
 #include "FreeRTOS.h"
 #include "list.h"
 
 #ifndef __FRAMAC__
-    #error "freertos_list_model.h is a Frama-C verification-only model."
+    #error "list_model.h is a Frama-C verification-only model."
 #endif
 
 /*@
-  axiomatic FreeRTOS_Abstract_List_Model {
+  axiomatic Abstract_List_Model {
     predicate ListRep{L}(List_t *list)
       reads list->uxNumberOfItems;
 
@@ -253,4 +253,4 @@ void *vListHeadOwner_abs(List_t * const pxList);
         vListHeadOwner_abs((pxList))
 #endif /* FREERTOS_USE_ABSTRACT_LIST_MODEL */
 
-#endif /* VERIFICATION_FREERTOS_MODEL_FREERTOS_LIST_MODEL_H */
+#endif /* VERIFICATION_FREERTOS_MODEL_LIST_MODEL_H */

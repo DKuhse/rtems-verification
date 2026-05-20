@@ -2,14 +2,14 @@
  * Scheduler-level predicates layered on the abstract FreeRTOS list model.
  *
  * Include this after struct tskTaskControlBlock is complete.  This layer may
- * talk about TCB ownership and deadlines; freertos_list_model.h must stay
+ * talk about TCB ownership and deadlines; list_model.h must stay
  * generic and task-agnostic.
  */
 
 #ifndef VERIFICATION_FREERTOS_MODEL_SCHEDULER_MODEL_H
 #define VERIFICATION_FREERTOS_MODEL_SCHEDULER_MODEL_H
 
-#include "freertos_list_model.h"
+#include "list_model.h"
 
 #ifndef __FRAMAC__
     #error "scheduler_model.h is a Frama-C verification-only model."
