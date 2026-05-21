@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Headless WP run for the standalone reference extraction of
-# vTaskDelay (verification/freertos/reference/delay.c).
+# vTaskDelay and xTaskDelayUntil (verification/freertos/reference/delay.c).
 #
 # Usage:
 #   verify-delay-reference.sh                       # default flags
@@ -32,11 +32,12 @@ echo "========================================"
 echo " WP Verification (FreeRTOS reference)"
 echo "========================================"
 echo ""
-echo "--- vTaskDelay (reference) ---"
+echo "--- vTaskDelay / xTaskDelayUntil (reference) ---"
 
 frama-c \
     -cpp-command "${CPP_CMD}" \
     -machdep "${MACHDEP}" -cpp-frama-c-compliant -std c11 \
-    -wp -wp-fct vTaskDelay,prvAddCurrentTaskToDelayedList,xTaskResumeAll,vPortYield -wp-model "Typed+Cast" \
+    -wp -wp-fct vTaskDelay,xTaskDelayUntil,prvAddCurrentTaskToDelayedList,xTaskResumeAll,vPortYield -wp-model "Typed+Cast" \
+    -wp-timeout 10 \
     "$@" \
     "${OVERLAY}/reference/delay.c"
