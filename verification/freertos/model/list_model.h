@@ -78,11 +78,18 @@
         \valid(item) && In(item, list) ==>
           ListItemStorageSeparatedFromList(list, item);
 
+    predicate ListMembershipCountPositive{L}(List_t *list) =
+      \valid(list) &&
+      \forall ListItem_t *item;
+        \valid(item) && In(item, list) ==>
+          list->uxNumberOfItems > (UBaseType_t)0;
+
     predicate ListInv{L}(List_t *list) =
       \valid(list) &&
       ListRep(list) &&
       ContainerMembershipConsistent(list) &&
-      ListStorageSeparated(list);
+      ListStorageSeparated(list) &&
+      ListMembershipCountPositive(list);
 
     predicate Detached{L}(ListItem_t *item) =
       \valid(item) && item->pxContainer == \null;
