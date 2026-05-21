@@ -32,6 +32,9 @@ CPP_CMD="gcc -C -E \
 DELAY_SOURCE="${OVERLAY}/reference/delay.c"
 
 run_soundness_probe() {
+    local function_name="$1"
+    shift
+
     local probe_source
     local report
     local output
@@ -55,23 +58,23 @@ run_soundness_probe() {
         }
     ' "${DELAY_SOURCE}" > "${probe_source}" || {
         rm -f "${probe_source}" "${report}"
-        echo "ERROR: could not inject xTaskDelayUntil soundness probe"
+        echo "ERROR: could not inject ${function_name} soundness probe"
         exit 1
     }
 
     output=$(frama-c \
         -cpp-command "${CPP_CMD}" \
         -machdep "${MACHDEP}" -cpp-frama-c-compliant -std c11 \
-        -wp -wp-fct xTaskDelayUntil -wp-model "Typed+Cast" \
+        -wp -wp-fct "${function_name}" -wp-model "Typed+Cast" \
         -wp-report-json "${report}" \
         -wp-timeout 10 \
         "$@" \
         "${probe_source}" 2>&1) || true
 
-    probe_lines=$(awk '
+    probe_lines=$(awk -v function_name="${function_name}" '
         /"goal":/ {
             goal = $0
-            is_probe = ($0 ~ /xTaskDelayUntil_assert/)
+            is_probe = (index($0, function_name "_assert") > 0)
         }
         is_probe && /"verdict":/ {
             verdict = $0
@@ -90,25 +93,25 @@ run_soundness_probe() {
     rm -f "${probe_source}" "${report}"
 
     if [ -z "${probe_lines}" ]; then
-        echo "ERROR: xTaskDelayUntil soundness probe goal was not found"
+        echo "ERROR: ${function_name} soundness probe goal was not found"
         echo "${output}" | tail -20
         exit 1
     fi
 
-    echo "--- xTaskDelayUntil soundness probe ---"
+    echo "--- ${function_name} soundness probe ---"
     echo "${probe_lines}" | sed 's/^/  /'
 
     if echo "${probe_lines}" | grep -vqE ' : (valid|timeout|unknown|failed)$'; then
-        echo "ERROR: unexpected xTaskDelayUntil probe verdict"
+        echo "ERROR: unexpected ${function_name} probe verdict"
         exit 1
     fi
 
     if ! echo "${probe_lines}" | grep -qE ' : (timeout|unknown|failed)$'; then
-        echo "FAIL: all xTaskDelayUntil probe goals proved \\false; its hypotheses are contradictory"
+        echo "FAIL: all ${function_name} probe goals proved \\false; its hypotheses are contradictory"
         exit 1
     fi
 
-    echo "PASS: at least one xTaskDelayUntil probe goal did not prove \\false"
+    echo "PASS: at least one ${function_name} probe goal did not prove \\false"
     echo ""
 }
 
@@ -118,7 +121,8 @@ echo "========================================"
 echo ""
 
 if [ "${RUN_SOUNDNESS_PROBE:-1}" != "0" ]; then
-    run_soundness_probe "$@"
+    run_soundness_probe xTaskDelayUntil "$@"
+    run_soundness_probe xTaskDelayUntilReadyRefresh "$@"
 fi
 
 echo "--- vTaskDelay / xTaskDelayUntil (reference) ---"
@@ -126,7 +130,7 @@ echo "--- vTaskDelay / xTaskDelayUntil (reference) ---"
 frama-c \
     -cpp-command "${CPP_CMD}" \
     -machdep "${MACHDEP}" -cpp-frama-c-compliant -std c11 \
-    -wp -wp-fct vTaskDelay,xTaskDelayUntil,prvAddCurrentTaskToDelayedList,xTaskResumeAll,vPortYield -wp-model "Typed+Cast" \
+    -wp -wp-fct vTaskDelay,xTaskDelayUntil,xTaskDelayUntilReadyRefresh,prvAddCurrentTaskToDelayedList,xTaskResumeAll,vPortYield -wp-model "Typed+Cast" \
     -wp-timeout 10 \
     "$@" \
     "${DELAY_SOURCE}"
