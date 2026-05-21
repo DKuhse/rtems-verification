@@ -208,23 +208,50 @@ void vSchedulerListItemSetValue_abs(ListItem_t * const pxListItem,
     ListInv{Pre}(other) && other != pxList && \valid{Pre}(item) ==>
       (In(item, other) <==> In{Pre}(item, other));
 
-  ensures \forall List_t *list;
-    ListInv{Pre}(list) ==> ListInv(list);
-  ensures \forall List_t *list;
-    HeadIsMinimum{Pre}(list) ==> HeadIsMinimum(list);
-  ensures \forall List_t *list;
-    ReadyList{Pre}(list) ==> ReadyList(list);
-  ensures \forall List_t *list;
-    DelayedList{Pre}(list) ==> DelayedList(list);
-  ensures \forall List_t *left, *right;
-    Disjoint{Pre}(left, right) ==> Disjoint(left, right);
+  // Per-other-list frame: lists distinct from pxList keep their invariants.
+  // The modified list's invariants are stated by ReadyList(pxList) above
+  // (which implies ListInv, HeadIsMinimum, TaskList, and DelayedList for pxList).
+  ensures \forall List_t *other;
+    other != pxList && ListInv{Pre}(other) ==> ListInv(other);
+  ensures \forall List_t *other;
+    other != pxList && HeadIsMinimum{Pre}(other) ==> HeadIsMinimum(other);
+  ensures \forall List_t *other;
+    other != pxList && ReadyList{Pre}(other) ==> ReadyList(other);
+  ensures \forall List_t *other;
+    other != pxList && DelayedList{Pre}(other) ==> DelayedList(other);
+
+  // Disjoint preservation, split by whether pxList is involved.
+  // Inserting a Detached item cannot break disjointness with any other list.
+  ensures \forall List_t *other;
+    other != pxList && Disjoint{Pre}(pxList, other) ==> Disjoint(pxList, other);
+  ensures \forall List_t *other;
+    other != pxList && Disjoint{Pre}(other, pxList) ==> Disjoint(other, pxList);
+  ensures \forall List_t *o1, *o2;
+    o1 != pxList && o2 != pxList && Disjoint{Pre}(o1, o2) ==> Disjoint(o1, o2);
+
+  // DelayedTasksHaveValidEventListLinks preservation, split by pxList role.
+  // Case A: pxList does not appear in the predicate (nothing the predicate
+  // observes was modified).
   ensures \forall List_t *delayed, *ready, *overflowDelayed;
+    delayed != pxList && ready != pxList && overflowDelayed != pxList &&
     DelayedTasksHaveValidEventListLinks{Pre}(delayed,
                                              ready,
                                              overflowDelayed) ==>
       DelayedTasksHaveValidEventListLinks(delayed,
                                           ready,
                                           overflowDelayed);
+  // Case B: pxList is the ready-list argument (the scheduler-context case
+  // in incrementtick.c). delayed/overflow are untouched, and the predicate's
+  // !=readyList check held before insert.
+  ensures \forall List_t *delayed, *overflowDelayed;
+    delayed != pxList && overflowDelayed != pxList &&
+    DelayedTasksHaveValidEventListLinks{Pre}(delayed,
+                                             pxList,
+                                             overflowDelayed) ==>
+      DelayedTasksHaveValidEventListLinks(delayed,
+                                          pxList,
+                                          overflowDelayed);
+
   ensures ListInsertValueFrame{Pre,Here}(pxList, pxNewListItem);
   ensures \forall struct tskTaskControlBlock *task;
     \valid{Pre}(task) ==>
