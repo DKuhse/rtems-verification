@@ -85,10 +85,15 @@
     DelayedTasksHaveValidEventListLinks(delayed, ready, overflowDelayed) &&
     DelayedTasksHaveValidEventListLinks(overflowDelayed, ready, delayed);
 
-  predicate ReadyInsertPre{L}(List_t *ready, ListItem_t *item) =
-    ReadyList(ready) &&
+  predicate TaskListInsertPre{L}(List_t *list, ListItem_t *item) =
+    TaskList(list) &&
     Detached(item) &&
-    ReadyItemDeadlineMatches(item);
+    TaskItem(item);
+
+  predicate ListValueLowerBound{L}(List_t *list, TickType_t bound) =
+    \forall ListItem_t *item;
+      \valid(item) && In(item, list) ==>
+        bound <= item->xItemValue;
 
   // EDFProperty is intentionally stated over ready-list item values.
   // ReadyListDeadlineMatches is the separate invariant that ties those
@@ -97,9 +102,7 @@
                            struct tskTaskControlBlock *running) =
     \valid(running) &&
     In(&running->xStateListItem, ready) &&
-    \forall ListItem_t *item;
-      \valid(item) && In(item, ready) ==>
-        running->xDeadline <= item->xItemValue;
+    ListValueLowerBound(ready, running->xDeadline);
 
   predicate ListValueFrame{Before,After}(List_t *list) =
     (\forall ListItem_t *item;
@@ -173,6 +176,22 @@
   // pxListItem is detached, so no list's membership, count, or contents
   // change — every list-level fact is uniformly framed.
   ensures ListPredicatesPreserved{Pre,Here};
+  ensures \forall List_t *list, ListItem_t *item;
+    ListInv{Pre}(list) &&
+    \valid{Pre}(item) &&
+    \valid(item) ==>
+      (In(item, list) <==> In{Pre}(item, list));
+  ensures \forall List_t *list, ListItem_t *item;
+    ListInv{Pre}(list) &&
+    \valid{Pre}(item) &&
+    In{Pre}(item, list) ==>
+      \valid(item) &&
+      In(item, list) &&
+      item->xItemValue == \at(item->xItemValue, Pre);
+  ensures \forall List_t *list, TickType_t bound;
+    ListInv{Pre}(list) &&
+    ListValueLowerBound{Pre}(list, bound) ==>
+      ListValueLowerBound(list, bound);
   ensures \forall List_t *list;
     ReadyList{Pre}(list) &&
     ReadyList(list) ==>
@@ -186,11 +205,7 @@ void vSchedulerListItemSetValue_abs(ListItem_t * const pxListItem,
                                     TickType_t xValue);
 
 /*@
-  requires ReadyList(pxList);
-  requires TaskList(pxList);
-  requires \valid(pxNewListItem);
-  requires Detached(pxNewListItem);
-  requires ReadyItemDeadlineMatches(pxNewListItem);
+  requires TaskListInsertPre(pxList, pxNewListItem);
 
   terminates \true;
   allocates \nothing;
@@ -200,7 +215,11 @@ void vSchedulerListItemSetValue_abs(ListItem_t * const pxListItem,
   assigns pxList->uxNumberOfItems,
           pxNewListItem->pxContainer;
 
-  ensures ReadyList(pxList);
+  ensures TaskList(pxList);
+  ensures DelayedList(pxList);
+  ensures ReadyList{Pre}(pxList) &&
+          ReadyItemDeadlineMatches{Pre}(pxNewListItem) ==>
+            ReadyList(pxList);
   ensures In(pxNewListItem, pxList);
   ensures pxNewListItem->pxContainer == pxList;
   ensures pxList->uxNumberOfItems ==
@@ -211,13 +230,20 @@ void vSchedulerListItemSetValue_abs(ListItem_t * const pxListItem,
   ensures \forall ListItem_t *item;
     \valid{Pre}(item) && item != pxNewListItem ==>
       (In(item, pxList) <==> In{Pre}(item, pxList));
+  ensures \forall ListItem_t *item;
+    \valid{Pre}(item) &&
+    In{Pre}(item, pxList) ==>
+      \valid(item) &&
+      In(item, pxList) &&
+      item->xItemValue == \at(item->xItemValue, Pre);
+  ensures \forall TickType_t bound;
+    ListValueLowerBound{Pre}(pxList, bound) &&
+    bound <= \at(pxNewListItem->xItemValue, Pre) ==>
+      ListValueLowerBound(pxList, bound);
   ensures \forall List_t *other, ListItem_t *item;
     ListInv{Pre}(other) && other != pxList && \valid{Pre}(item) ==>
       (In(item, other) <==> In{Pre}(item, other));
 
-  // Per-other-list frame: lists distinct from pxList keep their invariants.
-  // The modified list's invariants are stated by ReadyList(pxList) above
-  // (which implies ListInv, HeadIsMinimum, TaskList, and DelayedList for pxList).
   ensures \forall List_t *other;
     other != pxList && ListInv{Pre}(other) ==> ListInv(other);
   ensures \forall List_t *other;
@@ -227,8 +253,6 @@ void vSchedulerListItemSetValue_abs(ListItem_t * const pxListItem,
   ensures \forall List_t *other;
     other != pxList && DelayedList{Pre}(other) ==> DelayedList(other);
 
-  // Disjoint preservation, split by whether pxList is involved.
-  // Inserting a Detached item cannot break disjointness with any other list.
   ensures \forall List_t *other;
     other != pxList && Disjoint{Pre}(pxList, other) ==> Disjoint(pxList, other);
   ensures \forall List_t *other;
@@ -236,9 +260,6 @@ void vSchedulerListItemSetValue_abs(ListItem_t * const pxListItem,
   ensures \forall List_t *o1, *o2;
     o1 != pxList && o2 != pxList && Disjoint{Pre}(o1, o2) ==> Disjoint(o1, o2);
 
-  // DelayedTasksHaveValidEventListLinks preservation, split by pxList role.
-  // Case A: pxList does not appear in the predicate (nothing the predicate
-  // observes was modified).
   ensures \forall List_t *delayed, *ready, *overflowDelayed;
     delayed != pxList && ready != pxList && overflowDelayed != pxList &&
     DelayedTasksHaveValidEventListLinks{Pre}(delayed,
@@ -247,9 +268,6 @@ void vSchedulerListItemSetValue_abs(ListItem_t * const pxListItem,
       DelayedTasksHaveValidEventListLinks(delayed,
                                           ready,
                                           overflowDelayed);
-  // Case B: pxList is the ready-list argument (the scheduler-context case
-  // in incrementtick.c). delayed/overflow are untouched, and the predicate's
-  // !=readyList check held before insert.
   ensures \forall List_t *delayed, *overflowDelayed;
     delayed != pxList && overflowDelayed != pxList &&
     DelayedTasksHaveValidEventListLinks{Pre}(delayed,
@@ -258,6 +276,27 @@ void vSchedulerListItemSetValue_abs(ListItem_t * const pxListItem,
       DelayedTasksHaveValidEventListLinks(delayed,
                                           pxList,
                                           overflowDelayed);
+  ensures \forall List_t *ready, *overflowDelayed;
+    ready != pxList && overflowDelayed != pxList &&
+    DelayedTasksHaveValidEventListLinks{Pre}(pxList,
+                                             ready,
+                                             overflowDelayed) &&
+    TaskEventListLinkValid{Pre}(
+      (struct tskTaskControlBlock *)pxNewListItem->pvOwner,
+      ready,
+      pxList,
+      overflowDelayed) ==>
+      DelayedTasksHaveValidEventListLinks(pxList,
+                                          ready,
+                                          overflowDelayed);
+  ensures \forall List_t *delayed, *ready;
+    delayed != pxList && ready != pxList &&
+    DelayedTasksHaveValidEventListLinks{Pre}(delayed,
+                                             ready,
+                                             pxList) ==>
+      DelayedTasksHaveValidEventListLinks(delayed,
+                                          ready,
+                                          pxList);
 
   ensures ListInsertValueFrame{Pre,Here}(pxList, pxNewListItem);
   ensures \forall struct tskTaskControlBlock *task;
@@ -265,8 +304,8 @@ void vSchedulerListItemSetValue_abs(ListItem_t * const pxListItem,
       \valid(task) &&
       task->xDeadline == \at(task->xDeadline, Pre);
 */
-void vSchedulerReadyListInsert_abs(List_t * const pxList,
-                                   ListItem_t * const pxNewListItem);
+void vSchedulerListInsert_abs(List_t * const pxList,
+                              ListItem_t * const pxNewListItem);
 
 /*@
   requires \valid(pxItemToRemove);
@@ -286,6 +325,7 @@ void vSchedulerReadyListInsert_abs(List_t * const pxList,
   ensures Detached(pxItemToRemove);
   ensures pxItemToRemove->xItemValue == \old(pxItemToRemove->xItemValue);
   ensures pxItemToRemove->pvOwner == \old(pxItemToRemove->pvOwner);
+  ensures TaskItem{Pre}(pxItemToRemove) ==> TaskItem(pxItemToRemove);
   ensures \at(pxItemToRemove->pxContainer, Pre)->uxNumberOfItems ==
     (UBaseType_t)(\old(\at(pxItemToRemove->pxContainer, Pre)->uxNumberOfItems) - 1U);
   ensures \result == \at(pxItemToRemove->pxContainer, Pre)->uxNumberOfItems;
@@ -349,7 +389,7 @@ struct tskTaskControlBlock *vTaskListHeadOwner_abs(List_t * const pxList);
 
     #undef vListInsert
     #define vListInsert(pxList, pxNewListItem) \
-        vSchedulerReadyListInsert_abs((pxList), (pxNewListItem))
+        vSchedulerListInsert_abs((pxList), (pxNewListItem))
 
     /*
      * Temporary proof-performance wrapper.  The typed owner fact is derivable
