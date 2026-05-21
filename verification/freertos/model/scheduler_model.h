@@ -127,6 +127,27 @@
         \at(item->xItemValue, After) ==
           \at(item->xItemValue, Before));
 
+  // Every list-level predicate is preserved over every list (no list was
+  // modified). Used by mutators that only touch detached items.
+  predicate ListPredicatesPreserved{Before,After} =
+    (\forall List_t *list;
+      ListInv{Before}(list) ==> ListInv{After}(list)) &&
+    (\forall List_t *list;
+      HeadIsMinimum{Before}(list) ==> HeadIsMinimum{After}(list)) &&
+    (\forall List_t *list;
+      ReadyList{Before}(list) ==> ReadyList{After}(list)) &&
+    (\forall List_t *list;
+      DelayedList{Before}(list) ==> DelayedList{After}(list)) &&
+    (\forall List_t *l, *r;
+      Disjoint{Before}(l, r) ==> Disjoint{After}(l, r)) &&
+    (\forall List_t *delayed, *ready, *overflowDelayed;
+      DelayedTasksHaveValidEventListLinks{Before}(delayed,
+                                                  ready,
+                                                  overflowDelayed) ==>
+        DelayedTasksHaveValidEventListLinks{After}(delayed,
+                                                   ready,
+                                                   overflowDelayed));
+
 */
 
 /*@
@@ -149,23 +170,9 @@
             ((struct tskTaskControlBlock *)pxListItem->pvOwner)->xDeadline ==>
             ReadyItemDeadlineMatches(pxListItem);
 
-  ensures \forall List_t *list;
-    ListInv{Pre}(list) ==> ListInv(list);
-  ensures \forall List_t *list;
-    HeadIsMinimum{Pre}(list) ==> HeadIsMinimum(list);
-  ensures \forall List_t *list;
-    ReadyList{Pre}(list) ==> ReadyList(list);
-  ensures \forall List_t *list;
-    DelayedList{Pre}(list) ==> DelayedList(list);
-  ensures \forall List_t *left, *right;
-    Disjoint{Pre}(left, right) ==> Disjoint(left, right);
-  ensures \forall List_t *delayed, *ready, *overflowDelayed;
-    DelayedTasksHaveValidEventListLinks{Pre}(delayed,
-                                             ready,
-                                             overflowDelayed) ==>
-      DelayedTasksHaveValidEventListLinks(delayed,
-                                          ready,
-                                          overflowDelayed);
+  // pxListItem is detached, so no list's membership, count, or contents
+  // change — every list-level fact is uniformly framed.
+  ensures ListPredicatesPreserved{Pre,Here};
   ensures \forall List_t *list;
     ReadyList{Pre}(list) &&
     ReadyList(list) ==>
@@ -293,23 +300,13 @@ void vSchedulerReadyListInsert_abs(List_t * const pxList,
     \valid{Pre}(item) ==>
       (In(item, other) <==> In{Pre}(item, other));
 
-  ensures \forall List_t *list;
-    ListInv{Pre}(list) ==> ListInv(list);
-  ensures \forall List_t *list;
-    HeadIsMinimum{Pre}(list) ==> HeadIsMinimum(list);
-  ensures \forall List_t *list;
-    ReadyList{Pre}(list) ==> ReadyList(list);
-  ensures \forall List_t *list;
-    DelayedList{Pre}(list) ==> DelayedList(list);
-  ensures \forall List_t *left, *right;
-    Disjoint{Pre}(left, right) ==> Disjoint(left, right);
-  ensures \forall List_t *delayed, *ready, *overflowDelayed;
-    DelayedTasksHaveValidEventListLinks{Pre}(delayed,
-                                             ready,
-                                             overflowDelayed) ==>
-      DelayedTasksHaveValidEventListLinks(delayed,
-                                          ready,
-                                          overflowDelayed);
+  // Item-removal is monotone: the modified list only shrinks and the
+  // removed item becomes Detached, so every list-level predicate that
+  // held before still holds. No conflation here — the universals over
+  // arbitrary lists in ListPredicatesPreserved are stating uniform
+  // preservation, not a modified-list obligation in disguise.
+  ensures ListPredicatesPreserved{Pre,Here};
+
   ensures \forall List_t *list;
     ReadyList{Pre}(list) &&
     ReadyList(list) &&
