@@ -547,6 +547,18 @@ static void prvAddCurrentTaskToDelayedList(TickType_t xTicksToWait,
     (tickCount >= previousWakeTime &&
      ((TickType_t)(previousWakeTime + timeIncrement) < previousWakeTime ||
       (TickType_t)(previousWakeTime + timeIncrement) > tickCount));
+
+  predicate TickSeparatedFromListItem(TickType_t *tick, ListItem_t *item) =
+    \separated(tick, item) &&
+    \separated(tick, &item->xItemValue) &&
+    \separated(tick, &item->pvOwner) &&
+    \separated(tick, &item->pxContainer);
+
+  predicate TickSeparatedFromTask(TickType_t *tick, TCB_t *task) =
+    \separated(tick, task) &&
+    \separated(tick, &task->xStateListItem) &&
+    \separated(tick, &task->xEventListItem) &&
+    \separated(tick, &task->xDeadline);
 */
 
 /*@
@@ -585,16 +597,41 @@ static void prvAddCurrentTaskToDelayedList(TickType_t xTicksToWait,
                  &((TCB_t *)item->pvOwner)->xDeadline);
   requires \forall ListItem_t *item;
     \valid(item) ==>
-      \separated(pxPreviousWakeTime,
-                 &item->xItemValue,
-                 &item->pvOwner,
-                 &item->pxContainer);
+      TickSeparatedFromListItem(pxPreviousWakeTime, item);
   requires \forall ListItem_t *item;
     \valid(item) ==>
-      \separated(&pxCurrentTCB->xDeadline,
-                 &item->xItemValue,
-                 &item->pvOwner,
-                 &item->pxContainer);
+      TickSeparatedFromListItem(&pxCurrentTCB->xDeadline, item);
+  requires \forall ListItem_t *item;
+    \valid(item) &&
+    In(item, &xReadyTasksList) &&
+    item != &pxCurrentTCB->xStateListItem ==>
+      TickSeparatedFromTask(&pxCurrentTCB->xDeadline,
+                            (TCB_t *)item->pvOwner);
+  requires \forall ListItem_t *item;
+    \valid(item) &&
+    In(item, pxDelayedTaskList) ==>
+      TickSeparatedFromTask(&pxCurrentTCB->xDeadline,
+                            (TCB_t *)item->pvOwner);
+  requires \forall ListItem_t *item;
+    \valid(item) &&
+    In(item, pxOverflowDelayedTaskList) ==>
+      TickSeparatedFromTask(&pxCurrentTCB->xDeadline,
+                            (TCB_t *)item->pvOwner);
+  requires \forall ListItem_t *item;
+    \valid(item) &&
+    In(item, &xReadyTasksList) ==>
+      TickSeparatedFromTask(pxPreviousWakeTime,
+                            (TCB_t *)item->pvOwner);
+  requires \forall ListItem_t *item;
+    \valid(item) &&
+    In(item, pxDelayedTaskList) ==>
+      TickSeparatedFromTask(pxPreviousWakeTime,
+                            (TCB_t *)item->pvOwner);
+  requires \forall ListItem_t *item;
+    \valid(item) &&
+    In(item, pxOverflowDelayedTaskList) ==>
+      TickSeparatedFromTask(pxPreviousWakeTime,
+                            (TCB_t *)item->pvOwner);
   requires \separated(&pxCurrentTCB->xDeadline, &xPendingReadyList);
   requires \separated(&pxCurrentTCB->xDeadline, &xReadyTasksList);
   requires \separated(&pxCurrentTCB->xDeadline, pxDelayedTaskList);

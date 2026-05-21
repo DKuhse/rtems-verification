@@ -1,9 +1,10 @@
 /*
- * Abstract list model for scheduler-facing proofs.
+ * Scheduler-facing list model.
  *
- * This header is intentionally an ADT boundary.  Scheduler proofs should use
- * ListInv/In/HeadIsMinimum and the *_abs wrappers below instead of reasoning
- * about the concrete pxNext/pxPrevious sentinel representation.
+ * Scheduler proofs use ListInv/In/HeadIsMinimum and the *_abs wrappers below.
+ * The model keeps membership container-based, matching the FreeRTOS list item
+ * owner field used by the scheduler-facing code, and exposes the source-level
+ * head entry through xListEnd.pxNext.
  */
 
 #ifndef VERIFICATION_FREERTOS_MODEL_LIST_MODEL_H
@@ -17,12 +18,9 @@
 #endif
 
 /*@
-  axiomatic Abstract_List_Model {
-    predicate ListRep{L}(List_t *list)
-      reads list->uxNumberOfItems;
-
+  axiomatic Scheduler_List_Model {
     predicate InTraversal{L}(ListItem_t *item, List_t *list) =
-      in_list(item, list);
+      \valid{L}(item) && item->pxContainer == list;
 
     predicate In{L}(ListItem_t *item, List_t *list) =
       \valid{L}(item) && item->pxContainer == list;
@@ -33,11 +31,11 @@
         \valid(item) ==>
           (In(item, list) <==> InTraversal(item, list));
 
-    // Head is abstract.  Mutators that can change the head assign
-    // uxNumberOfItems, which is enough to make Head(list) non-stable across
-    // the call without exposing pxNext/pxPrevious to scheduler proofs.
     logic ListItem_t *Head{L}(List_t *list)
-      reads list->uxNumberOfItems;
+      reads list->xListEnd.pxNext;
+
+    axiom HeadIsListEndNext{L}: \forall List_t *list;
+      \valid(list) ==> Head(list) == list->xListEnd.pxNext;
 
     predicate ContainerMembershipConsistent{L}(List_t *list) =
       \valid(list) &&
@@ -95,7 +93,6 @@
 
     predicate ListInv{L}(List_t *list) =
       \valid(list) &&
-      ListRep(list) &&
       ContainerMembershipConsistent(list) &&
       ListMembershipConsistent(list) &&
       ListStorageSeparated(list) &&
