@@ -330,9 +330,14 @@ TickReadySetBeforeUnblock:
 #ifdef SANITY_PROBE
                     /* Branch-local sanity probe - must NOT prove.  This catches
                      * contradictory assumptions specifically on the unblock path. */
-                    //@ assert \false;
+                    //@ assert sanity_tick_unblock_probe: \false;
 #endif
-                    //@ assert xSwitchRequired == pdTRUE || EDFProperty(&xReadyTasksList, pxCurrentTCB);
+                    /*@ assert xSwitchRequired == pdTRUE ||
+                               In(&pxCurrentTCB->xStateListItem,
+                                  &xReadyTasksList); */
+                    /*@ assert xSwitchRequired == pdTRUE ||
+                               ListValueLowerBound(&xReadyTasksList,
+                                                   pxCurrentTCB->xDeadline); */
                     prvAddTaskToReadyList(pxTCB);
                     /* Carry the delayed-removal/readied relation across this
                      * unblock: previous removals stay accounted for, and the
@@ -395,7 +400,7 @@ TickReadySetBeforeUnblock:
 
 #ifdef SANITY_PROBE
         /* Sanity probe - must NOT prove. */
-        //@ assert \false;
+        //@ assert sanity_tick_exit_probe: \false;
 #endif
 
 #if (configUSE_PREEMPTION == 1)

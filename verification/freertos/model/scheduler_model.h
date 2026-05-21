@@ -47,6 +47,16 @@
     TaskList(ready) &&
     ReadyListDeadlineMatches(ready);
 
+  predicate ReadyListIgnoringItemDeadline{L}(List_t *ready,
+                                             ListItem_t *ignored) =
+    TaskList(ready) &&
+    \valid(ignored) &&
+    In(ignored, ready) &&
+    TaskItem(ignored) &&
+    \forall ListItem_t *item;
+      \valid(item) && In(item, ready) && item != ignored ==>
+        ReadyItemDeadlineMatches(item);
+
   predicate DelayedList{L}(List_t *delayed) =
     TaskList(delayed);
 
@@ -85,6 +95,23 @@
     ready != overflowDelayed &&
     delayed != overflowDelayed &&
     ReadyList(ready) &&
+    DelayedList(delayed) &&
+    DelayedList(overflowDelayed) &&
+    Disjoint(ready, delayed) &&
+    Disjoint(ready, overflowDelayed) &&
+    Disjoint(delayed, overflowDelayed) &&
+    DelayedTasksHaveValidEventListLinks(delayed, ready, overflowDelayed) &&
+    DelayedTasksHaveValidEventListLinks(overflowDelayed, ready, delayed);
+
+  predicate SchedulerListContextIgnoringReadyItemDeadline{L}(
+                                    List_t *ready,
+                                    List_t *delayed,
+                                    List_t *overflowDelayed,
+                                    ListItem_t *ignored) =
+    ready != delayed &&
+    ready != overflowDelayed &&
+    delayed != overflowDelayed &&
+    ReadyListIgnoringItemDeadline(ready, ignored) &&
     DelayedList(delayed) &&
     DelayedList(overflowDelayed) &&
     Disjoint(ready, delayed) &&
@@ -268,6 +295,10 @@ void vSchedulerListItemSetValue_abs(ListItem_t * const pxListItem,
     ListValueLowerBound{Pre}(pxList, bound) &&
     bound <= \at(pxNewListItem->xItemValue, Pre) ==>
       ListValueLowerBound(pxList, bound);
+  ensures \forall List_t *other, TickType_t bound;
+    other != pxList &&
+    ListValueLowerBound{Pre}(other, bound) ==>
+      ListValueLowerBound(other, bound);
   ensures \forall List_t *other, ListItem_t *item;
     ListInv{Pre}(other) && other != pxList && \valid{Pre}(item) ==>
       (In(item, other) <==> In{Pre}(item, other));
@@ -280,6 +311,8 @@ void vSchedulerListItemSetValue_abs(ListItem_t * const pxListItem,
     other != pxList && ReadyList{Pre}(other) ==> ReadyList(other);
   ensures \forall List_t *other;
     other != pxList && DelayedList{Pre}(other) ==> DelayedList(other);
+  ensures \forall List_t *other;
+    other != pxList && SuspendedList{Pre}(other) ==> SuspendedList(other);
 
   ensures \forall List_t *other;
     other != pxList && Disjoint{Pre}(pxList, other) ==> Disjoint(pxList, other);
@@ -364,6 +397,10 @@ void vSchedulerListInsert_abs(List_t * const pxList,
       \valid(item) &&
       In(item, pxList) &&
       item->xItemValue == \at(item->xItemValue, Pre);
+  ensures \forall List_t *other, TickType_t bound;
+    other != pxList &&
+    ListValueLowerBound{Pre}(other, bound) ==>
+      ListValueLowerBound(other, bound);
   ensures \forall List_t *other, ListItem_t *item;
     ListInv{Pre}(other) && other != pxList && \valid{Pre}(item) ==>
       (In(item, other) <==> In{Pre}(item, other));
@@ -436,6 +473,9 @@ void vSchedulerListInsertEnd_abs(List_t * const pxList,
     other != \at(pxItemToRemove->pxContainer, Pre) &&
     \valid{Pre}(item) ==>
       (In(item, other) <==> In{Pre}(item, other));
+  ensures \forall List_t *list, TickType_t bound;
+    ListValueLowerBound{Pre}(list, bound) ==>
+      ListValueLowerBound(list, bound);
 
   // Item-removal is monotone: the modified list only shrinks and the
   // removed item becomes Detached, so every list-level predicate that
@@ -443,6 +483,15 @@ void vSchedulerListInsertEnd_abs(List_t * const pxList,
   // arbitrary lists in ListPredicatesPreserved are stating uniform
   // preservation, not a modified-list obligation in disguise.
   ensures ListPredicatesPreserved{Pre,Here};
+  ensures \forall List_t *delayed, *overflowDelayed;
+    SchedulerListContextIgnoringReadyItemDeadline{Pre}(
+      \at(pxItemToRemove->pxContainer, Pre),
+      delayed,
+      overflowDelayed,
+      pxItemToRemove) ==>
+        SchedulerListContext(\at(pxItemToRemove->pxContainer, Pre),
+                             delayed,
+                             overflowDelayed);
 
   ensures \forall List_t *list;
     ReadyList{Pre}(list) &&

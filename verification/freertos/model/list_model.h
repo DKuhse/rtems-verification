@@ -21,8 +21,17 @@
     predicate ListRep{L}(List_t *list)
       reads list->uxNumberOfItems;
 
-    predicate In{L}(ListItem_t *item, List_t *list)
-      reads item->pxContainer, list->uxNumberOfItems;
+    predicate InTraversal{L}(ListItem_t *item, List_t *list) =
+      in_list(item, list);
+
+    predicate In{L}(ListItem_t *item, List_t *list) =
+      \valid{L}(item) && item->pxContainer == list;
+
+    predicate ListMembershipConsistent{L}(List_t *list) =
+      \valid(list) &&
+      \forall ListItem_t *item;
+        \valid(item) ==>
+          (In(item, list) <==> InTraversal(item, list));
 
     // Head is abstract.  Mutators that can change the head assign
     // uxNumberOfItems, which is enough to make Head(list) non-stable across
@@ -88,6 +97,7 @@
       \valid(list) &&
       ListRep(list) &&
       ContainerMembershipConsistent(list) &&
+      ListMembershipConsistent(list) &&
       ListStorageSeparated(list) &&
       ListMembershipCountPositive(list);
 

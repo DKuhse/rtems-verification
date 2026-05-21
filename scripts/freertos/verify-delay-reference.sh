@@ -6,6 +6,7 @@
 # Usage:
 #   verify-delay-reference.sh                       # default flags
 #   verify-delay-reference.sh -wp-timeout 60        # 60s prover timeout
+#   RUN_SOUNDNESS_PROBE=0 verify-delay-reference.sh # skip negative probe
 #
 set -e
 eval $(opam env)
@@ -28,10 +29,98 @@ CPP_CMD="gcc -C -E \
     -isystem /usr/include/x86_64-linux-gnu \
     -isystem /usr/lib/gcc/x86_64-linux-gnu/11/include"
 
+DELAY_SOURCE="${OVERLAY}/reference/delay.c"
+
+run_soundness_probe() {
+    local probe_source
+    local report
+    local output
+    local probe_lines
+
+    probe_source=$(mktemp --suffix=.c)
+    report=$(mktemp --suffix=.json)
+
+    awk '
+        {
+            print
+            if ($0 ~ /traceENTER_xTaskDelayUntil\(pxPreviousWakeTime, xTimeIncrement\);/) {
+                print "    //@ assert \\false;"
+                inserted = 1
+            }
+        }
+        END {
+            if (!inserted) {
+                exit 2
+            }
+        }
+    ' "${DELAY_SOURCE}" > "${probe_source}" || {
+        rm -f "${probe_source}" "${report}"
+        echo "ERROR: could not inject xTaskDelayUntil soundness probe"
+        exit 1
+    }
+
+    output=$(frama-c \
+        -cpp-command "${CPP_CMD}" \
+        -machdep "${MACHDEP}" -cpp-frama-c-compliant -std c11 \
+        -wp -wp-fct xTaskDelayUntil -wp-model "Typed+Cast" \
+        -wp-report-json "${report}" \
+        -wp-timeout 10 \
+        "$@" \
+        "${probe_source}" 2>&1) || true
+
+    probe_lines=$(awk '
+        /"goal":/ {
+            goal = $0
+            is_probe = ($0 ~ /xTaskDelayUntil_assert/)
+        }
+        is_probe && /"verdict":/ {
+            verdict = $0
+            sub(/^.*"goal": "/, "", goal)
+            sub(/".*$/, "", goal)
+            sub(/^.*"verdict": "/, "", verdict)
+            sub(/".*$/, "", verdict)
+            found = 1
+            print goal " : " verdict
+        }
+        END {
+            if (!found) exit 1
+        }
+    ' "${report}" 2>/dev/null || true)
+
+    rm -f "${probe_source}" "${report}"
+
+    if [ -z "${probe_lines}" ]; then
+        echo "ERROR: xTaskDelayUntil soundness probe goal was not found"
+        echo "${output}" | tail -20
+        exit 1
+    fi
+
+    echo "--- xTaskDelayUntil soundness probe ---"
+    echo "${probe_lines}" | sed 's/^/  /'
+
+    if echo "${probe_lines}" | grep -vqE ' : (valid|timeout|unknown|failed)$'; then
+        echo "ERROR: unexpected xTaskDelayUntil probe verdict"
+        exit 1
+    fi
+
+    if ! echo "${probe_lines}" | grep -qE ' : (timeout|unknown|failed)$'; then
+        echo "FAIL: all xTaskDelayUntil probe goals proved \\false; its hypotheses are contradictory"
+        exit 1
+    fi
+
+    echo "PASS: at least one xTaskDelayUntil probe goal did not prove \\false"
+    echo ""
+}
+
 echo "========================================"
 echo " WP Verification (FreeRTOS reference)"
 echo "========================================"
 echo ""
+
+if [ "${RUN_SOUNDNESS_PROBE:-1}" != "0" ]; then
+    run_soundness_probe "$@"
+fi
+
 echo "--- vTaskDelay / xTaskDelayUntil (reference) ---"
 
 frama-c \
@@ -40,4 +129,4 @@ frama-c \
     -wp -wp-fct vTaskDelay,xTaskDelayUntil,prvAddCurrentTaskToDelayedList,xTaskResumeAll,vPortYield -wp-model "Typed+Cast" \
     -wp-timeout 10 \
     "$@" \
-    "${OVERLAY}/reference/delay.c"
+    "${DELAY_SOURCE}"

@@ -407,6 +407,8 @@ void vTaskSuspend(TaskHandle_t xTaskToSuspend) {
             }
         } else {
             mtCOVERAGE_TEST_MARKER();
+            //@ assert In(&pxCurrentTCB->xStateListItem, &xReadyTasksList);
+            //@ assert ListValueLowerBound(&xReadyTasksList, pxCurrentTCB->xDeadline);
         }
     }
 #endif /* #if ( configNUMBER_OF_CORES == 1 ) */

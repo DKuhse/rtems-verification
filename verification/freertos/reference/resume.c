@@ -299,6 +299,11 @@ static BaseType_t prvTaskIsTaskSuspended(const TaskHandle_t xTask) {
                       &uxSchedulerSuspended,
                       &xYieldPendings[0],
                       &xReadyTasksList.uxNumberOfItems,
+                      &xSuspendedTaskList.uxNumberOfItems);
+  requires \separated(&pxCurrentTCB,
+                      &uxSchedulerSuspended,
+                      &xYieldPendings[0],
+                      &xReadyTasksList.uxNumberOfItems,
                       &xSuspendedTaskList.uxNumberOfItems,
                       &xTaskToResume->xStateListItem.xItemValue,
                       &xTaskToResume->xStateListItem.pxContainer);

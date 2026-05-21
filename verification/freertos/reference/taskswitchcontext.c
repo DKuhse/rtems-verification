@@ -109,7 +109,7 @@ void vTaskSwitchContext(void) {
         /* Sanity probe — must NOT prove. Checks that the hypothesis
          * set at the point where EDFProperty must hold is not
          * vacuous. Enabled only by sanity-check.sh. */
-        //@ assert \false;
+        //@ assert sanity_task_switch_probe: \false;
 #endif
         traceTASK_SWITCHED_IN();
 

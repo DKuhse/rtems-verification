@@ -41,6 +41,19 @@ CPP_CMD="gcc -C -E \
     -isystem /usr/include/x86_64-linux-gnu \
     -isystem /usr/lib/gcc/x86_64-linux-gnu/11/include"
 
+CPP_CMD_NORMAL="gcc -C -E \
+    -D__LARGE_DATA_MODEL__ \
+    -D__FRAMAC__ \
+    -DEDF_SCHEDULER=1 \
+    -I${OVERLAY}/model \
+    -I${OVERLAY}/overlay/include \
+    -I${OVERLAY}/stubs \
+    -I${FREERTOS_SRC}/include \
+    -nostdinc \
+    -isystem /usr/include \
+    -isystem /usr/include/x86_64-linux-gnu \
+    -isystem /usr/lib/gcc/x86_64-linux-gnu/11/include"
+
 COMMON="-machdep ${MACHDEP} -cpp-frama-c-compliant -std c11"
 
 # Short default timeout: a contradictory hypothesis set lets Qed
@@ -89,7 +102,7 @@ check_probe() {
     probe_lines=$(awk -v fct="${fct}" '
         /"goal":/ {
             goal = $0
-            is_probe = ($0 ~ fct "_assert")
+            is_probe = ($0 ~ /(sanity_|vacuity_)/)
         }
         is_probe && /"verdict":/ {
             verdict = $0
@@ -143,6 +156,115 @@ check_probe() {
     fi
 }
 
+# Same check, but injects a temporary named `assert \false` probe at a
+# specific source marker. This lets us cover functions that do not have a
+# permanent SANITY_PROBE block without changing the verification source.
+# Args: label, source path, function name, marker text, before|after
+check_injected_probe() {
+    local label="$1"
+    local source_path="$2"
+    local fct="$3"
+    local marker="$4"
+    local where="${5:-before}"
+    local probe_source
+    local report
+
+    [ -f "${source_path}" ] || {
+        echo "  ERROR: missing source ${source_path}"
+        FAIL=$((FAIL + 1))
+        return
+    }
+
+    echo "--- ${label} ---"
+
+    probe_source=$(mktemp --suffix=.c)
+    awk -v marker="${marker}" -v where="${where}" '
+        {
+            if (!inserted && index($0, marker) > 0 && where == "before") {
+                print "    //@ assert vacuity_probe: \\false;"
+                inserted = 1
+            }
+            print
+            if (!inserted && index($0, marker) > 0 && where != "before") {
+                print "    //@ assert vacuity_probe: \\false;"
+                inserted = 1
+            }
+        }
+        END {
+            if (!inserted) exit 2
+        }
+    ' "${source_path}" > "${probe_source}" || {
+        rm -f "${probe_source}"
+        echo "  ERROR: could not inject probe at marker: ${marker}"
+        FAIL=$((FAIL + 1))
+        return
+    }
+
+    report=$(mktemp --suffix=.json)
+    output=$(frama-c \
+        -cpp-command "${CPP_CMD_NORMAL}" \
+        ${COMMON} \
+        -wp -wp-fct "${fct}" -wp-model "Typed+Cast" \
+        -wp-report-json "${report}" \
+        ${EXTRA_ARGS} \
+        "${probe_source}" 2>&1) || true
+
+    probe_lines=$(awk '
+        /"goal":/ {
+            goal = $0
+            is_probe = ($0 ~ /vacuity_probe/)
+        }
+        is_probe && /"verdict":/ {
+            verdict = $0
+            sub(/^.*"goal": "/, "", goal)
+            sub(/".*$/, "", goal)
+            sub(/^.*"verdict": "/, "", verdict)
+            sub(/".*$/, "", verdict)
+            found = 1
+            print goal " : " verdict
+        }
+        END {
+            if (!found) exit 1
+        }
+    ' "${report}" 2>/dev/null || true)
+    rm -f "${probe_source}" "${report}"
+
+    if [ -z "${probe_lines}" ]; then
+        echo "  ERROR: injected probe goal for ${fct} not found in WP output"
+        echo "         marker: ${marker}"
+        echo "${output}" | tail -20
+        FAIL=$((FAIL + 1))
+        return
+    fi
+
+    local function_failed=0
+    local function_passed=0
+    while IFS= read -r probe_line; do
+        [ -n "${probe_line}" ] || continue
+        echo "  ${probe_line}"
+
+        if echo "${probe_line}" | grep -qE ' : valid$'; then
+            echo "  FAIL: probe proved \\false — hypothesis set is contradictory"
+            function_failed=1
+        elif echo "${probe_line}" | grep -qE ' : (timeout|unknown|failed)$'; then
+            function_passed=1
+        else
+            echo "  ERROR: unexpected probe status — please inspect manually"
+            function_failed=1
+        fi
+    done <<< "${probe_lines}"
+
+    if [ "${function_failed}" -ne 0 ]; then
+        FAIL=$((FAIL + 1))
+    elif [ "${function_passed}" -ne 0 ]; then
+        echo "  PASS: probe did not prove (model consistent at checked probe point)"
+        PASS=$((PASS + 1))
+    else
+        echo "  ERROR: no usable probe verdicts found"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
 echo "========================================"
 echo " Sanity Check (FreeRTOS WP probes)"
 echo "========================================"
@@ -162,6 +284,90 @@ check_probe "vTaskSwitchContext (reference/taskswitchcontext.c)" \
 check_probe "xTaskIncrementTick (reference/incrementtick.c)" \
     "${OVERLAY}/reference/incrementtick.c" \
     "xTaskIncrementTick"
+
+check_injected_probe "vTaskResume end (reference/resume.c)" \
+    "${OVERLAY}/reference/resume.c" \
+    "vTaskResume" \
+    "traceRETURN_vTaskResume();" \
+    "before"
+
+check_injected_probe "vTaskResume entry (reference/resume.c)" \
+    "${OVERLAY}/reference/resume.c" \
+    "vTaskResume" \
+    "traceENTER_vTaskResume(xTaskToResume);" \
+    "after"
+
+check_injected_probe "vTaskResume after suspended-list remove (reference/resume.c)" \
+    "${OVERLAY}/reference/resume.c" \
+    "vTaskResume" \
+    "(void)uxListRemove(&(pxTCB->xStateListItem));" \
+    "after"
+
+check_injected_probe "vTaskResume after ready-list insert (reference/resume.c)" \
+    "${OVERLAY}/reference/resume.c" \
+    "vTaskResume" \
+    "prvAddTaskToReadyList(pxTCB);" \
+    "after"
+
+check_injected_probe "vTaskResume after preemption check (reference/resume.c)" \
+    "${OVERLAY}/reference/resume.c" \
+    "vTaskResume" \
+    "taskYIELD_ANY_CORE_IF_USING_PREEMPTION(pxTCB);" \
+    "after"
+
+check_injected_probe "prvTaskIsTaskSuspended end (reference/resume.c)" \
+    "${OVERLAY}/reference/resume.c" \
+    "prvTaskIsTaskSuspended" \
+    "return xReturn;" \
+    "before"
+
+check_injected_probe "vPortYield end (reference/resume.c)" \
+    "${OVERLAY}/reference/resume.c" \
+    "vPortYield" \
+    "portRESTORE_CONTEXT();" \
+    "after"
+
+check_injected_probe "vTaskSuspend end (reference/suspend.c)" \
+    "${OVERLAY}/reference/suspend.c" \
+    "vTaskSuspend" \
+    "traceRETURN_vTaskSuspend();" \
+    "before"
+
+check_injected_probe "vPortYield end (reference/suspend.c)" \
+    "${OVERLAY}/reference/suspend.c" \
+    "vPortYield" \
+    "portRESTORE_CONTEXT();" \
+    "after"
+
+check_injected_probe "xTaskDelayUntil end (reference/delay.c)" \
+    "${OVERLAY}/reference/delay.c" \
+    "xTaskDelayUntil" \
+    "traceRETURN_xTaskDelayUntil(xShouldDelay);" \
+    "before"
+
+check_injected_probe "vTaskDelay end (reference/delay.c)" \
+    "${OVERLAY}/reference/delay.c" \
+    "vTaskDelay" \
+    "traceRETURN_vTaskDelay();" \
+    "before"
+
+check_injected_probe "prvAddCurrentTaskToDelayedList end (reference/delay.c)" \
+    "${OVERLAY}/reference/delay.c" \
+    "prvAddCurrentTaskToDelayedList" \
+    "(void)xCanBlockIndefinitely;" \
+    "before"
+
+check_injected_probe "xTaskResumeAll end (reference/delay.c)" \
+    "${OVERLAY}/reference/delay.c" \
+    "xTaskResumeAll" \
+    "traceRETURN_xTaskResumeAll(xAlreadyYielded);" \
+    "before"
+
+check_injected_probe "vPortYield end (reference/delay.c)" \
+    "${OVERLAY}/reference/delay.c" \
+    "vPortYield" \
+    "portRESTORE_CONTEXT();" \
+    "after"
 
 echo ""
 echo "========================================"

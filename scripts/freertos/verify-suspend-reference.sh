@@ -4,7 +4,7 @@
 # vTaskSuspend (verification/freertos/reference/suspend.c).
 #
 # Usage:
-#   verify-suspend-reference.sh                       # default flags
+#   verify-suspend-reference.sh                       # default 30s prover timeout
 #   verify-suspend-reference.sh -wp-timeout 60        # 60s prover timeout
 #
 set -e
@@ -34,9 +34,24 @@ echo "========================================"
 echo ""
 echo "--- vTaskSuspend (reference) ---"
 
+DEFAULT_TIMEOUT=30
+for arg in "$@"; do
+    case "${arg}" in
+        -wp-timeout|-wp-timeout=*)
+            DEFAULT_TIMEOUT=""
+            break
+            ;;
+    esac
+done
+
+DEFAULT_ARGS=()
+if [ -n "${DEFAULT_TIMEOUT}" ]; then
+    DEFAULT_ARGS=(-wp-timeout "${DEFAULT_TIMEOUT}")
+fi
+
 frama-c \
     -cpp-command "${CPP_CMD}" \
     -machdep "${MACHDEP}" -cpp-frama-c-compliant -std c11 \
     -wp -wp-fct vTaskSuspend,vPortYield -wp-model "Typed+Cast" \
-    "$@" \
+    "${DEFAULT_ARGS[@]}" "$@" \
     "${OVERLAY}/reference/suspend.c"
