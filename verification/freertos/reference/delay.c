@@ -5,9 +5,8 @@
  * kept as small contracts.  xTaskResumeAll deliberately does not model the
  * pended-tick drain; that path is owned by the xTaskIncrementTick effort.
  *
- * This first slice proves the finite-delay move and yield behavior.  Full
- * SchedulerListContext preservation needs task-aware list preservation lemmas
- * and is intentionally not claimed here.
+ * This slice proves the finite-delay move, yield behavior, and scheduler-list
+ * context preservation.
  */
 
 #define MPU_WRAPPERS_INCLUDED_FROM_API_FILE
@@ -26,8 +25,8 @@ typedef struct tskTaskControlBlock TCB_t;
 #define FREERTOS_USE_ABSTRACT_LIST_MODEL
 #include "scheduler_model.h"
 
-/* Route the helper's direct uxListRemove call through the abstract list model. */
-#define uxListRemove(pxItemToRemove) vListRemove_abs((pxItemToRemove))
+/* Route the helper's direct uxListRemove call through the scheduler model. */
+#define uxListRemove(pxItemToRemove) vSchedulerListRemove_abs((pxItemToRemove))
 
 /* EDF builds do not maintain priority ready bitmaps. */
 #define portRESET_READY_PRIORITY(uxPriority, uxTopReadyPriority)
@@ -153,14 +152,9 @@ static void vTaskDelayYieldWithinAPI(void) {
           pxCurrentTCB->xStateListItem.pxContainer,
           xNextTaskUnblockTime;
 
-  ensures &xReadyTasksList != pxDelayedTaskList;
-  ensures &xReadyTasksList != pxOverflowDelayedTaskList;
-  ensures pxDelayedTaskList != pxOverflowDelayedTaskList;
-  ensures DelayedList(pxDelayedTaskList);
-  ensures DelayedList(pxOverflowDelayedTaskList);
-  ensures Disjoint(&xReadyTasksList, pxDelayedTaskList);
-  ensures Disjoint(&xReadyTasksList, pxOverflowDelayedTaskList);
-  ensures Disjoint(pxDelayedTaskList, pxOverflowDelayedTaskList);
+  ensures SchedulerListContext(&xReadyTasksList,
+                               pxDelayedTaskList,
+                               pxOverflowDelayedTaskList);
   ensures !In(&pxCurrentTCB->xStateListItem, &xReadyTasksList);
   ensures pxCurrentTCB->xStateListItem.xItemValue ==
             (TickType_t)(\old(xTickCount) + xTicksToWait);
@@ -265,14 +259,9 @@ static void prvAddCurrentTaskToDelayedList(TickType_t xTicksToWait,
           xNextTaskUnblockTime;
 
   ensures uxSchedulerSuspended == (UBaseType_t)0U;
-  ensures &xReadyTasksList != pxDelayedTaskList;
-  ensures &xReadyTasksList != pxOverflowDelayedTaskList;
-  ensures pxDelayedTaskList != pxOverflowDelayedTaskList;
-  ensures DelayedList(pxDelayedTaskList);
-  ensures DelayedList(pxOverflowDelayedTaskList);
-  ensures Disjoint(&xReadyTasksList, pxDelayedTaskList);
-  ensures Disjoint(&xReadyTasksList, pxOverflowDelayedTaskList);
-  ensures Disjoint(pxDelayedTaskList, pxOverflowDelayedTaskList);
+  ensures SchedulerListContext(&xReadyTasksList,
+                               pxDelayedTaskList,
+                               pxOverflowDelayedTaskList);
 
   behavior zero_delay:
     assumes xTicksToDelay == (TickType_t)0U;
@@ -284,11 +273,23 @@ static void prvAddCurrentTaskToDelayedList(TickType_t xTicksToWait,
     assumes xTicksToDelay > (TickType_t)0U;
     assumes xTaskResumeAllReturn == pdTRUE;
     ensures !In(&pxCurrentTCB->xStateListItem, &xReadyTasksList);
+    ensures ((TickType_t)(\old(xTickCount) + xTicksToDelay) <
+             \old(xTickCount)) ==>
+              In(&pxCurrentTCB->xStateListItem, pxOverflowDelayedTaskList);
+    ensures ((TickType_t)(\old(xTickCount) + xTicksToDelay) >=
+             \old(xTickCount)) ==>
+              In(&pxCurrentTCB->xStateListItem, pxDelayedTaskList);
 
   behavior finite_delay_needs_yield:
     assumes xTicksToDelay > (TickType_t)0U;
     assumes xTaskResumeAllReturn == pdFALSE;
     ensures !In(&pxCurrentTCB->xStateListItem, &xReadyTasksList);
+    ensures ((TickType_t)(\old(xTickCount) + xTicksToDelay) <
+             \old(xTickCount)) ==>
+              In(&pxCurrentTCB->xStateListItem, pxOverflowDelayedTaskList);
+    ensures ((TickType_t)(\old(xTickCount) + xTicksToDelay) >=
+             \old(xTickCount)) ==>
+              In(&pxCurrentTCB->xStateListItem, pxDelayedTaskList);
     ensures xYieldWithinAPICalled == pdTRUE;
 
   complete behaviors;
