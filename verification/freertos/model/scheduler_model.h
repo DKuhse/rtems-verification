@@ -28,6 +28,11 @@
     \forall ListItem_t *item;
       \valid(item) && In(item, list) ==> TaskItem(item);
 
+  predicate UnorderedTaskList{L}(List_t *list) =
+    ListInv(list) &&
+    \forall ListItem_t *item;
+      \valid(item) && In(item, list) ==> TaskItem(item);
+
   predicate ReadyItemDeadlineMatches{L}(ListItem_t *item) =
     TaskItem(item) &&
     item->xItemValue ==
@@ -44,6 +49,9 @@
 
   predicate DelayedList{L}(List_t *delayed) =
     TaskList(delayed);
+
+  predicate SuspendedList{L}(List_t *suspended) =
+    UnorderedTaskList(suspended);
 
   predicate TaskEventListLinkValid{L}(struct tskTaskControlBlock *task,
                                       List_t *readyList,
@@ -85,8 +93,26 @@
     DelayedTasksHaveValidEventListLinks(delayed, ready, overflowDelayed) &&
     DelayedTasksHaveValidEventListLinks(overflowDelayed, ready, delayed);
 
+  predicate SchedulerSuspendedListContext{L}(List_t *ready,
+                                             List_t *delayed,
+                                             List_t *overflowDelayed,
+                                             List_t *suspended) =
+    SchedulerListContext(ready, delayed, overflowDelayed) &&
+    suspended != ready &&
+    suspended != delayed &&
+    suspended != overflowDelayed &&
+    SuspendedList(suspended) &&
+    Disjoint(suspended, ready) &&
+    Disjoint(suspended, delayed) &&
+    Disjoint(suspended, overflowDelayed);
+
   predicate TaskListInsertPre{L}(List_t *list, ListItem_t *item) =
     TaskList(list) &&
+    Detached(item) &&
+    TaskItem(item);
+
+  predicate UnorderedTaskListInsertPre{L}(List_t *list, ListItem_t *item) =
+    UnorderedTaskList(list) &&
     Detached(item) &&
     TaskItem(item);
 
@@ -141,6 +167,8 @@
       ReadyList{Before}(list) ==> ReadyList{After}(list)) &&
     (\forall List_t *list;
       DelayedList{Before}(list) ==> DelayedList{After}(list)) &&
+    (\forall List_t *list;
+      SuspendedList{Before}(list) ==> SuspendedList{After}(list)) &&
     (\forall List_t *l, *r;
       Disjoint{Before}(l, r) ==> Disjoint{After}(l, r)) &&
     (\forall List_t *delayed, *ready, *overflowDelayed;
@@ -308,6 +336,75 @@ void vSchedulerListInsert_abs(List_t * const pxList,
                               ListItem_t * const pxNewListItem);
 
 /*@
+  requires UnorderedTaskListInsertPre(pxList, pxNewListItem);
+
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+
+  assigns pxList->uxNumberOfItems,
+          pxNewListItem->pxContainer;
+
+  ensures UnorderedTaskList(pxList);
+  ensures SuspendedList{Pre}(pxList) ==> SuspendedList(pxList);
+  ensures In(pxNewListItem, pxList);
+  ensures pxNewListItem->pxContainer == pxList;
+  ensures pxList->uxNumberOfItems ==
+    (UBaseType_t)(\old(pxList->uxNumberOfItems) + 1U);
+  ensures pxNewListItem->xItemValue == \old(pxNewListItem->xItemValue);
+  ensures pxNewListItem->pvOwner == \old(pxNewListItem->pvOwner);
+
+  ensures \forall ListItem_t *item;
+    \valid{Pre}(item) && item != pxNewListItem ==>
+      (In(item, pxList) <==> In{Pre}(item, pxList));
+  ensures \forall ListItem_t *item;
+    \valid{Pre}(item) &&
+    In{Pre}(item, pxList) ==>
+      \valid(item) &&
+      In(item, pxList) &&
+      item->xItemValue == \at(item->xItemValue, Pre);
+  ensures \forall List_t *other, ListItem_t *item;
+    ListInv{Pre}(other) && other != pxList && \valid{Pre}(item) ==>
+      (In(item, other) <==> In{Pre}(item, other));
+
+  ensures \forall List_t *other;
+    other != pxList && ListInv{Pre}(other) ==> ListInv(other);
+  ensures \forall List_t *other;
+    other != pxList && HeadIsMinimum{Pre}(other) ==> HeadIsMinimum(other);
+  ensures \forall List_t *other;
+    other != pxList && ReadyList{Pre}(other) ==> ReadyList(other);
+  ensures \forall List_t *other;
+    other != pxList && DelayedList{Pre}(other) ==> DelayedList(other);
+  ensures \forall List_t *other;
+    other != pxList && SuspendedList{Pre}(other) ==> SuspendedList(other);
+
+  ensures \forall List_t *other;
+    other != pxList && Disjoint{Pre}(pxList, other) ==> Disjoint(pxList, other);
+  ensures \forall List_t *other;
+    other != pxList && Disjoint{Pre}(other, pxList) ==> Disjoint(other, pxList);
+  ensures \forall List_t *o1, *o2;
+    o1 != pxList && o2 != pxList && Disjoint{Pre}(o1, o2) ==> Disjoint(o1, o2);
+
+  ensures \forall List_t *delayed, *ready, *overflowDelayed;
+    delayed != pxList && ready != pxList && overflowDelayed != pxList &&
+    DelayedTasksHaveValidEventListLinks{Pre}(delayed,
+                                             ready,
+                                             overflowDelayed) ==>
+      DelayedTasksHaveValidEventListLinks(delayed,
+                                          ready,
+                                          overflowDelayed);
+
+  ensures ListInsertValueFrame{Pre,Here}(pxList, pxNewListItem);
+  ensures \forall struct tskTaskControlBlock *task;
+    \valid{Pre}(task) ==>
+      \valid(task) &&
+      task->xDeadline == \at(task->xDeadline, Pre);
+*/
+void vSchedulerListInsertEnd_abs(List_t * const pxList,
+                                 ListItem_t * const pxNewListItem);
+
+/*@
   requires \valid(pxItemToRemove);
   requires pxItemToRemove->pxContainer != \null;
   requires ListInv(pxItemToRemove->pxContainer);
@@ -390,6 +487,10 @@ struct tskTaskControlBlock *vTaskListHeadOwner_abs(List_t * const pxList);
     #undef vListInsert
     #define vListInsert(pxList, pxNewListItem) \
         vSchedulerListInsert_abs((pxList), (pxNewListItem))
+
+    #undef vListInsertEnd
+    #define vListInsertEnd(pxList, pxNewListItem) \
+        vSchedulerListInsertEnd_abs((pxList), (pxNewListItem))
 
     /*
      * Temporary proof-performance wrapper.  The typed owner fact is derivable
