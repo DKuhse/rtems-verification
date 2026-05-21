@@ -52,6 +52,72 @@ typedef struct tskTaskControlBlock TCB_t;
     List_t * volatile pxOverflowDelayedTaskList;
 #endif
 
+/*@
+  predicate ReadiedItemBetween{Before,After}(ListItem_t *item,
+                                             List_t *ready) =
+    \valid{Before}(item) &&
+    \valid{After}(item) &&
+    \valid{Before}(ready) &&
+    \valid{After}(ready) &&
+    \at(item->pxContainer, Before) != ready &&
+    \at(item->pxContainer, After) == ready;
+
+  predicate RemovedItemBetween{Before,After}(ListItem_t *item,
+                                             List_t *list) =
+    \valid{Before}(item) &&
+    \valid{After}(item) &&
+    \valid{Before}(list) &&
+    \valid{After}(list) &&
+    \at(item->pxContainer, Before) == list &&
+    \at(item->pxContainer, After) != list;
+
+  predicate ReadiedItemsHaveValidDeadlines{Before,After}(List_t *ready) =
+    \forall ListItem_t *item;
+      ReadiedItemBetween{Before,After}(item, ready) ==>
+        ReadyItemDeadlineMatches{After}(item);
+
+  predicate ReadiedItemsCameFromDelayedLists{Before,After}(
+      List_t *ready,
+      List_t *delayed,
+      List_t *overflowDelayed) =
+    \forall ListItem_t *item;
+      ReadiedItemBetween{Before,After}(item, ready) ==>
+        (In{Before}(item, delayed) ||
+         In{Before}(item, overflowDelayed));
+
+  predicate DelayedRemovalsWereReadied{Before,After}(List_t *delayed,
+                                                     List_t *ready) =
+    \forall ListItem_t *item;
+      RemovedItemBetween{Before,After}(item, delayed) ==>
+        ReadiedItemBetween{Before,After}(item, ready);
+
+  predicate TickDelayedRemovalsWereReadied{Before,After}(
+      TickType_t previousTick,
+      List_t *delayed,
+      List_t *overflowDelayed,
+      List_t *ready) =
+    (((TickType_t)(previousTick + (TickType_t)1U) == (TickType_t)0U) ==>
+      DelayedRemovalsWereReadied{Before,After}(overflowDelayed, ready)) &&
+    (((TickType_t)(previousTick + (TickType_t)1U) != (TickType_t)0U) ==>
+      DelayedRemovalsWereReadied{Before,After}(delayed, ready));
+
+  predicate PriorReadiedItemsStayReadied{Start,Middle,End}(
+      ListItem_t *current,
+      List_t *ready) =
+    \forall ListItem_t *item;
+      item != current &&
+      ReadiedItemBetween{Start,Middle}(item, ready) ==>
+        ReadiedItemBetween{Start,End}(item, ready);
+
+  predicate PriorDelayedRemovalsAreUnchanged{Start,Middle,End}(
+      ListItem_t *current,
+      List_t *delayed) =
+    \forall ListItem_t *item;
+      item != current &&
+      RemovedItemBetween{Start,End}(item, delayed) ==>
+        RemovedItemBetween{Start,Middle}(item, delayed);
+*/
+
 /* prvResetNextTaskUnblockTime is a static helper in tasks.c that scans the
  * delayed list and updates xNextTaskUnblockTime. */
 /*@
@@ -114,6 +180,16 @@ static void prvResetNextTaskUnblockTime(void);
     ensures \result == pdTRUE || \result == pdFALSE;
     ensures \result == pdTRUE ||
       EDFProperty(&xReadyTasksList, pxCurrentTCB);
+    ensures ReadiedItemsHaveValidDeadlines{Pre,Here}(&xReadyTasksList);
+    ensures ReadiedItemsCameFromDelayedLists{Pre,Here}(
+      &xReadyTasksList,
+      \at(pxDelayedTaskList, Pre),
+      \at(pxOverflowDelayedTaskList, Pre));
+    ensures TickDelayedRemovalsWereReadied{Pre,Here}(
+      \old(xTickCount),
+      \at(pxDelayedTaskList, Pre),
+      \at(pxOverflowDelayedTaskList, Pre),
+      &xReadyTasksList);
 
   complete behaviors suspended, running;
   disjoint behaviors suspended, running;
@@ -150,16 +226,46 @@ BaseType_t xTaskIncrementTick(void) {
 
         /* See if this tick has made a timeout expire. */
         if (xConstTickCount >= xNextTaskUnblockTime) {
+TickDrainStart:
             /*@
               loop invariant xTickCount == (TickType_t)(\at(xTickCount, Pre) + 1U);
               loop invariant pxCurrentTCB == \at(pxCurrentTCB, Pre);
               loop invariant \valid(pxCurrentTCB);
+              loop invariant pxDelayedTaskList == \at(pxDelayedTaskList, TickDrainStart);
+              loop invariant pxDelayedTaskList == \at(pxDelayedTaskList, Pre) ||
+                pxDelayedTaskList == \at(pxOverflowDelayedTaskList, Pre);
+              loop invariant ((TickType_t)(\at(xTickCount, Pre) + (TickType_t)1U) ==
+                                (TickType_t)0U) ==>
+                pxDelayedTaskList == \at(pxOverflowDelayedTaskList, Pre);
+              loop invariant ((TickType_t)(\at(xTickCount, Pre) + (TickType_t)1U) !=
+                                (TickType_t)0U) ==>
+                pxDelayedTaskList == \at(pxDelayedTaskList, Pre);
+              loop invariant Disjoint{TickDrainStart}(&xReadyTasksList,
+                                                      pxDelayedTaskList);
+              loop invariant \forall ListItem_t *item;
+                \valid(item) && In(item, pxDelayedTaskList) ==>
+                  \valid{TickDrainStart}(item) &&
+                  In{TickDrainStart}(item, pxDelayedTaskList);
+              loop invariant \forall ListItem_t *item;
+                \valid{TickDrainStart}(item) &&
+                In{TickDrainStart}(item, pxDelayedTaskList) ==>
+                  (In{Pre}(item, \at(pxDelayedTaskList, Pre)) ||
+                   In{Pre}(item, \at(pxOverflowDelayedTaskList, Pre)));
               loop invariant SchedulerListContext(&xReadyTasksList,
                                                   pxDelayedTaskList,
                                                   pxOverflowDelayedTaskList);
               loop invariant xSwitchRequired == pdTRUE || xSwitchRequired == pdFALSE;
               loop invariant xSwitchRequired == pdTRUE ||
                 EDFProperty(&xReadyTasksList, pxCurrentTCB);
+              loop invariant ReadiedItemsHaveValidDeadlines{Pre,Here}(
+                &xReadyTasksList);
+              loop invariant ReadiedItemsCameFromDelayedLists{Pre,Here}(
+                &xReadyTasksList,
+                \at(pxDelayedTaskList, Pre),
+                \at(pxOverflowDelayedTaskList, Pre));
+              loop invariant DelayedRemovalsWereReadied{Pre,Here}(
+                \at(pxDelayedTaskList, TickDrainStart),
+                &xReadyTasksList);
 
               loop assigns pxTCB,
                            xItemValue,
@@ -199,14 +305,22 @@ BaseType_t xTaskIncrementTick(void) {
                     }
 
                     /* It is time to remove the item from the Blocked state. */
+TickReadySetBeforeUnblock:
+                    //@ assert In(&pxTCB->xStateListItem, pxDelayedTaskList);
+                    //@ assert \valid{TickDrainStart}(&pxTCB->xStateListItem);
+                    //@ assert In{TickDrainStart}(&pxTCB->xStateListItem, pxDelayedTaskList);
+                    /*@ assert In{Pre}(&pxTCB->xStateListItem,
+                                        \at(pxDelayedTaskList, Pre)) ||
+                               In{Pre}(&pxTCB->xStateListItem,
+                                        \at(pxOverflowDelayedTaskList, Pre)); */
+                    //@ assert !In{Pre}(&pxTCB->xStateListItem, &xReadyTasksList);
+                    //@ assert !In{TickDrainStart}(&pxTCB->xStateListItem, &xReadyTasksList);
                     listREMOVE_ITEM(&(pxTCB->xStateListItem));
 
                     /* Is the task waiting on an event also?  If so remove it from
                      * the event list. */
                     if (listLIST_ITEM_CONTAINER(&(pxTCB->xEventListItem)) != NULL) {
-#ifndef SANITY_PROBE
                         //@ assert pxTCB->xEventListItem.pxContainer != &xReadyTasksList;
-#endif
                         listREMOVE_ITEM(&(pxTCB->xEventListItem));
                     } else {
                         mtCOVERAGE_TEST_MARKER();
@@ -218,12 +332,38 @@ BaseType_t xTaskIncrementTick(void) {
                      * contradictory assumptions specifically on the unblock path. */
                     //@ assert \false;
 #endif
-#ifndef SANITY_PROBE
                     //@ assert xSwitchRequired == pdTRUE || EDFProperty(&xReadyTasksList, pxCurrentTCB);
-#endif
                     prvAddTaskToReadyList(pxTCB);
+                    /* Carry the delayed-removal/readied relation across this
+                     * unblock: previous removals stay accounted for, and the
+                     * current state item moved from the drain list to ready. */
+                    //@ assert In(&pxTCB->xStateListItem, &xReadyTasksList);
+                    //@ assert ReadyItemDeadlineMatches(&pxTCB->xStateListItem);
+                    //@ assert ReadyList(&xReadyTasksList);
+                    /*@ assert SchedulerListContext(&xReadyTasksList,
+                                                     pxDelayedTaskList,
+                                                     pxOverflowDelayedTaskList); */
+                    /*@ assert ReadiedItemBetween{Pre,Here}
+                          (&pxTCB->xStateListItem, &xReadyTasksList); */
+                    /*@ assert RemovedItemBetween{Pre,Here}
+                          (&pxTCB->xStateListItem,
+                           \at(pxDelayedTaskList, TickDrainStart)); */
+                    /*@ assert DelayedRemovalsWereReadied
+                          {Pre,TickReadySetBeforeUnblock}
+                          (\at(pxDelayedTaskList, TickDrainStart),
+                           &xReadyTasksList); */
+                    /*@ assert PriorReadiedItemsStayReadied
+                          {Pre,TickReadySetBeforeUnblock,Here}
+                          (&pxTCB->xStateListItem, &xReadyTasksList); */
+                    /*@ assert PriorDelayedRemovalsAreUnchanged
+                          {Pre,TickReadySetBeforeUnblock,Here}
+                          (&pxTCB->xStateListItem,
+                           \at(pxDelayedTaskList, TickDrainStart)); */
+                    /*@ assert DelayedRemovalsWereReadied{Pre,Here}
+                          (\at(pxDelayedTaskList, TickDrainStart),
+                           &xReadyTasksList); */
 
-/* A task being unblocked cannot cause an immediate context switch if
+                           /* A task being unblocked cannot cause an immediate context switch if
  * preemption is turned off. */
 #if (configUSE_PREEMPTION == 1)
                     {
