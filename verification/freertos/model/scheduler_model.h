@@ -54,6 +54,7 @@
     (task->xEventListItem.pxContainer == \null ||
       (ListInv(task->xEventListItem.pxContainer) &&
        In(&task->xEventListItem, task->xEventListItem.pxContainer) &&
+       task->xEventListItem.pxContainer->uxNumberOfItems > (UBaseType_t)0 &&
        task->xEventListItem.pxContainer != readyList &&
        task->xEventListItem.pxContainer != delayedList &&
        task->xEventListItem.pxContainer != overflowDelayedList));

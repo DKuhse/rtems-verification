@@ -36,8 +36,53 @@
         \valid(item) ==>
           (In(item, list) <==> item->pxContainer == list);
 
+    predicate ListItemFieldsSeparated{L}(ListItem_t *item) =
+      \valid(item) &&
+      \separated(&item->xItemValue,
+                 &item->pvOwner,
+                 &item->pxContainer);
+
+    predicate ListItemStorageSeparatedFromList{L}(List_t *list,
+                                                  ListItem_t *item) =
+      \valid(list) &&
+      ListItemFieldsSeparated(item) &&
+      \separated(&list->uxNumberOfItems,
+                 &item->xItemValue,
+                 &item->pvOwner,
+                 &item->pxContainer);
+
+    predicate ListItemFieldsSeparatedFromValueWrite{L}(
+        ListItem_t *writtenItem,
+        ListItem_t *item) =
+      \valid(writtenItem) &&
+      ListItemFieldsSeparated(item) &&
+      \separated(&writtenItem->xItemValue,
+                 &item->xItemValue,
+                 &item->pvOwner);
+
+    predicate ListItemFieldsSeparatedFromListMutation{L}(
+        List_t *list,
+        ListItem_t *changedItem,
+        ListItem_t *item) =
+      \valid(list) &&
+      \valid(changedItem) &&
+      ListItemFieldsSeparated(item) &&
+      \separated(&list->uxNumberOfItems,
+                 &changedItem->pxContainer,
+                 &item->xItemValue,
+                 &item->pvOwner);
+
+    predicate ListStorageSeparated{L}(List_t *list) =
+      \valid(list) &&
+      \forall ListItem_t *item;
+        \valid(item) && In(item, list) ==>
+          ListItemStorageSeparatedFromList(list, item);
+
     predicate ListInv{L}(List_t *list) =
-      \valid(list) && ListRep(list) && ContainerMembershipConsistent(list);
+      \valid(list) &&
+      ListRep(list) &&
+      ContainerMembershipConsistent(list) &&
+      ListStorageSeparated(list);
 
     predicate Detached{L}(ListItem_t *item) =
       \valid(item) && item->pxContainer == \null;
@@ -75,19 +120,20 @@
   ensures Detached(pxListItem);
   ensures pxListItem->pvOwner == \old(pxListItem->pvOwner);
   ensures \forall ListItem_t *item;
-    \valid{Pre}(item) && item != pxListItem ==>
+    ListItemFieldsSeparatedFromValueWrite{Pre}(pxListItem, item) ==>
       item->xItemValue == \old(item->xItemValue);
   ensures \forall ListItem_t *item;
-    \valid{Pre}(item) ==> item->pvOwner == \old(item->pvOwner);
+    ListItemFieldsSeparatedFromValueWrite{Pre}(pxListItem, item) ==>
+      item->pvOwner == \old(item->pvOwner);
 
   ensures \forall List_t *list;
-    \valid{Pre}(list) && ListInv{Pre}(list) ==> ListInv(list);
+    ListInv{Pre}(list) ==> ListInv(list);
   ensures \forall List_t *list;
-    \valid{Pre}(list) && HeadIsMinimum{Pre}(list) ==> HeadIsMinimum(list);
+    HeadIsMinimum{Pre}(list) ==> HeadIsMinimum(list);
   ensures \forall List_t *list;
-    \valid{Pre}(list) ==> Head{Pre}(list) == Head(list);
+    ListInv{Pre}(list) ==> Head{Pre}(list) == Head(list);
   ensures \forall List_t *list, ListItem_t *item;
-    \valid{Pre}(list) && \valid{Pre}(item) ==>
+    ListInv{Pre}(list) && \valid{Pre}(item) ==>
       (In{Pre}(item, list) <==> In(item, list));
 */
 void vListItemSetValue_abs(ListItem_t * const pxListItem,
@@ -116,25 +162,31 @@ void vListItemSetValue_abs(ListItem_t * const pxListItem,
   ensures pxNewListItem->xItemValue == \old(pxNewListItem->xItemValue);
   ensures pxNewListItem->pvOwner == \old(pxNewListItem->pvOwner);
   ensures \forall ListItem_t *item;
-    \valid{Pre}(item) ==> item->xItemValue == \old(item->xItemValue);
+    ListItemFieldsSeparatedFromListMutation{Pre}(pxList,
+                                                 pxNewListItem,
+                                                 item) ==>
+      item->xItemValue == \old(item->xItemValue);
   ensures \forall ListItem_t *item;
-    \valid{Pre}(item) ==> item->pvOwner == \old(item->pvOwner);
+    ListItemFieldsSeparatedFromListMutation{Pre}(pxList,
+                                                 pxNewListItem,
+                                                 item) ==>
+      item->pvOwner == \old(item->pvOwner);
 
   ensures \forall ListItem_t *item;
     \valid{Pre}(item) && item != pxNewListItem ==>
       (In(item, pxList) <==> In{Pre}(item, pxList));
 
   ensures \forall List_t *other;
-    \valid{Pre}(other) && other != pxList && ListInv{Pre}(other) ==>
+    other != pxList && ListInv{Pre}(other) ==>
       ListInv(other);
   ensures \forall List_t *other;
-    \valid{Pre}(other) && other != pxList && HeadIsMinimum{Pre}(other) ==>
+    other != pxList && HeadIsMinimum{Pre}(other) ==>
       HeadIsMinimum(other);
   ensures \forall List_t *other;
-    \valid{Pre}(other) && other != pxList ==>
+    other != pxList && ListInv{Pre}(other) ==>
       Head(other) == Head{Pre}(other);
   ensures \forall List_t *other, ListItem_t *item;
-    \valid{Pre}(other) && \valid{Pre}(item) && other != pxList ==>
+    ListInv{Pre}(other) && \valid{Pre}(item) && other != pxList ==>
       (In(item, other) <==> In{Pre}(item, other));
 */
 void vListInsertSorted_abs(List_t * const pxList,
@@ -159,9 +211,17 @@ void vListInsertSorted_abs(List_t * const pxList,
   ensures pxItemToRemove->xItemValue == \old(pxItemToRemove->xItemValue);
   ensures pxItemToRemove->pvOwner == \old(pxItemToRemove->pvOwner);
   ensures \forall ListItem_t *item;
-    \valid{Pre}(item) ==> item->xItemValue == \old(item->xItemValue);
+    ListItemFieldsSeparatedFromListMutation{Pre}(
+      \at(pxItemToRemove->pxContainer, Pre),
+      pxItemToRemove,
+      item) ==>
+        item->xItemValue == \old(item->xItemValue);
   ensures \forall ListItem_t *item;
-    \valid{Pre}(item) ==> item->pvOwner == \old(item->pvOwner);
+    ListItemFieldsSeparatedFromListMutation{Pre}(
+      \at(pxItemToRemove->pxContainer, Pre),
+      pxItemToRemove,
+      item) ==>
+        item->pvOwner == \old(item->pvOwner);
   // The count transition keeps Head unconstrained by its pre-state on the
   // changed list; HeadIsMinimum plus !In below rule out a stale removed head.
   ensures \at(pxItemToRemove->pxContainer, Pre)->uxNumberOfItems ==
@@ -178,21 +238,19 @@ void vListInsertSorted_abs(List_t * const pxList,
        In{Pre}(item, \at(pxItemToRemove->pxContainer, Pre)));
 
   ensures \forall List_t *other;
-    \valid{Pre}(other) &&
     other != \at(pxItemToRemove->pxContainer, Pre) &&
     ListInv{Pre}(other) ==>
       ListInv(other);
   ensures \forall List_t *other;
-    \valid{Pre}(other) &&
     other != \at(pxItemToRemove->pxContainer, Pre) &&
     HeadIsMinimum{Pre}(other) ==>
       HeadIsMinimum(other);
   ensures \forall List_t *other;
-    \valid{Pre}(other) &&
-    other != \at(pxItemToRemove->pxContainer, Pre) ==>
+    other != \at(pxItemToRemove->pxContainer, Pre) &&
+    ListInv{Pre}(other) ==>
       Head(other) == Head{Pre}(other);
   ensures \forall List_t *other, ListItem_t *item;
-    \valid{Pre}(other) &&
+    ListInv{Pre}(other) &&
     \valid{Pre}(item) &&
     other != \at(pxItemToRemove->pxContainer, Pre) ==>
       (In(item, other) <==> In{Pre}(item, other));
