@@ -106,11 +106,14 @@ static void prvResetNextTaskUnblockTime(void);
   behavior running:
     assumes uxSchedulerSuspended == (UBaseType_t)0U;
     requires \valid(pxCurrentTCB);
+    requires EDFProperty(&xReadyTasksList, pxCurrentTCB);
 
     exits \false;
 
     ensures xTickCount == (TickType_t)(\old(xTickCount) + 1U);
     ensures \result == pdTRUE || \result == pdFALSE;
+    ensures \result == pdTRUE ||
+      EDFProperty(&xReadyTasksList, pxCurrentTCB);
 
   complete behaviors suspended, running;
   disjoint behaviors suspended, running;
@@ -155,6 +158,8 @@ BaseType_t xTaskIncrementTick(void) {
                                                   pxDelayedTaskList,
                                                   pxOverflowDelayedTaskList);
               loop invariant xSwitchRequired == pdTRUE || xSwitchRequired == pdFALSE;
+              loop invariant xSwitchRequired == pdTRUE ||
+                EDFProperty(&xReadyTasksList, pxCurrentTCB);
 
               loop assigns pxTCB,
                            xItemValue,
@@ -199,6 +204,9 @@ BaseType_t xTaskIncrementTick(void) {
                     /* Is the task waiting on an event also?  If so remove it from
                      * the event list. */
                     if (listLIST_ITEM_CONTAINER(&(pxTCB->xEventListItem)) != NULL) {
+#ifndef SANITY_PROBE
+                        //@ assert pxTCB->xEventListItem.pxContainer != &xReadyTasksList;
+#endif
                         listREMOVE_ITEM(&(pxTCB->xEventListItem));
                     } else {
                         mtCOVERAGE_TEST_MARKER();
@@ -209,6 +217,9 @@ BaseType_t xTaskIncrementTick(void) {
                     /* Branch-local sanity probe - must NOT prove.  This catches
                      * contradictory assumptions specifically on the unblock path. */
                     //@ assert \false;
+#endif
+#ifndef SANITY_PROBE
+                    //@ assert xSwitchRequired == pdTRUE || EDFProperty(&xReadyTasksList, pxCurrentTCB);
 #endif
                     prvAddTaskToReadyList(pxTCB);
 

@@ -90,14 +90,43 @@
     Detached(item) &&
     ReadyItemDeadlineMatches(item);
 
+  // EDFProperty is intentionally stated over ready-list item values.
+  // ReadyListDeadlineMatches is the separate invariant that ties those
+  // values back to each task owner's xDeadline.
   predicate EDFProperty{L}(List_t *ready,
                            struct tskTaskControlBlock *running) =
     \valid(running) &&
     In(&running->xStateListItem, ready) &&
     \forall ListItem_t *item;
       \valid(item) && In(item, ready) ==>
-        running->xDeadline <=
-          ((struct tskTaskControlBlock *)item->pvOwner)->xDeadline;
+        running->xDeadline <= item->xItemValue;
+
+  predicate ListValueFrame{Before,After}(List_t *list) =
+    (\forall ListItem_t *item;
+      \valid{After}(item) ==> \valid{Before}(item)) &&
+    (\forall ListItem_t *item;
+      \valid{After}(item) ==>
+        (In{After}(item, list) <==> In{Before}(item, list))) &&
+    (\forall ListItem_t *item;
+      \valid{After}(item) && In{After}(item, list) ==>
+        \at(item->xItemValue, After) ==
+          \at(item->xItemValue, Before));
+
+  predicate ListInsertValueFrame{Before,After}(List_t *list,
+                                               ListItem_t *inserted) =
+    \valid{Before}(inserted) &&
+    \valid{After}(inserted) &&
+    In{After}(inserted, list) &&
+    \at(inserted->xItemValue, After) ==
+      \at(inserted->xItemValue, Before) &&
+    \at(inserted->pvOwner, After) == \at(inserted->pvOwner, Before) &&
+    (\forall ListItem_t *item;
+      \valid{After}(item) && item != inserted && In{After}(item, list) ==>
+        \valid{Before}(item) &&
+        In{Before}(item, list) &&
+        \at(item->xItemValue, After) ==
+          \at(item->xItemValue, Before));
+
 */
 
 /*@
@@ -137,12 +166,21 @@
       DelayedTasksHaveValidEventListLinks(delayed,
                                           ready,
                                           overflowDelayed);
+  ensures \forall List_t *list;
+    ReadyList{Pre}(list) &&
+    ReadyList(list) ==>
+      ListValueFrame{Pre,Here}(list);
+  ensures \forall struct tskTaskControlBlock *task;
+    \valid{Pre}(task) ==>
+      \valid(task) &&
+      task->xDeadline == \at(task->xDeadline, Pre);
 */
 void vSchedulerListItemSetValue_abs(ListItem_t * const pxListItem,
                                     TickType_t xValue);
 
 /*@
   requires ReadyList(pxList);
+  requires TaskList(pxList);
   requires \valid(pxNewListItem);
   requires Detached(pxNewListItem);
   requires ReadyItemDeadlineMatches(pxNewListItem);
@@ -187,6 +225,11 @@ void vSchedulerListItemSetValue_abs(ListItem_t * const pxListItem,
       DelayedTasksHaveValidEventListLinks(delayed,
                                           ready,
                                           overflowDelayed);
+  ensures ListInsertValueFrame{Pre,Here}(pxList, pxNewListItem);
+  ensures \forall struct tskTaskControlBlock *task;
+    \valid{Pre}(task) ==>
+      \valid(task) &&
+      task->xDeadline == \at(task->xDeadline, Pre);
 */
 void vSchedulerReadyListInsert_abs(List_t * const pxList,
                                    ListItem_t * const pxNewListItem);
@@ -240,6 +283,15 @@ void vSchedulerReadyListInsert_abs(List_t * const pxList,
       DelayedTasksHaveValidEventListLinks(delayed,
                                           ready,
                                           overflowDelayed);
+  ensures \forall List_t *list;
+    ReadyList{Pre}(list) &&
+    ReadyList(list) &&
+    list != \at(pxItemToRemove->pxContainer, Pre) ==>
+      ListValueFrame{Pre,Here}(list);
+  ensures \forall struct tskTaskControlBlock *task;
+    \valid{Pre}(task) ==>
+      \valid(task) &&
+      task->xDeadline == \at(task->xDeadline, Pre);
 */
 UBaseType_t vSchedulerListRemove_abs(ListItem_t * const pxItemToRemove);
 
