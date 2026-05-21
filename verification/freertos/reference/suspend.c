@@ -54,6 +54,7 @@ typedef TCB_t * TaskHandle_t;
     BaseType_t  xSchedulerRunning;
     UBaseType_t uxCurrentNumberOfTasks;
     BaseType_t  xYieldWithinAPICalled;
+    BaseType_t  xYieldPendings[1];
     List_t      xDelayedTaskList1;
     List_t      xDelayedTaskList2;
     List_t *    pxDelayedTaskList;
@@ -67,6 +68,7 @@ typedef TCB_t * TaskHandle_t;
     volatile BaseType_t  xSchedulerRunning;
     volatile UBaseType_t uxCurrentNumberOfTasks;
     volatile BaseType_t  xYieldWithinAPICalled;
+    volatile BaseType_t  xYieldPendings[1];
     List_t               xDelayedTaskList1;
     List_t               xDelayedTaskList2;
     List_t * volatile    pxDelayedTaskList;
@@ -90,36 +92,70 @@ typedef TCB_t * TaskHandle_t;
                                         pxDelayedTaskList,
                                         pxOverflowDelayedTaskList,
                                         &xSuspendedTaskList);
+  ensures EDFProperty{Pre}(&xReadyTasksList, pxCurrentTCB) ==>
+    EDFProperty(&xReadyTasksList, pxCurrentTCB);
 */
 static void prvResetNextTaskUnblockTime(void);
 
 /*@
+  requires xReadyTasksList.uxNumberOfItems > (UBaseType_t)0U;
+  requires ReadyList(&xReadyTasksList);
+
   terminates \true;
   allocates \nothing;
   frees \nothing;
   exits \false;
 
-  assigns xYieldWithinAPICalled;
+  assigns pxCurrentTCB, xYieldPendings[0];
+
+  behavior suspended:
+    assumes uxSchedulerSuspended != (UBaseType_t)0U;
+    ensures xYieldPendings[0] == pdTRUE;
+    ensures pxCurrentTCB == \old(pxCurrentTCB);
+
+  behavior running:
+    assumes uxSchedulerSuspended == (UBaseType_t)0U;
+    ensures xYieldPendings[0] == pdFALSE;
+    ensures pxCurrentTCB == (TCB_t *)Head(&xReadyTasksList)->pvOwner;
+    ensures EDFProperty(&xReadyTasksList, pxCurrentTCB);
+
+  complete behaviors;
+  disjoint behaviors;
+*/
+void vTaskSwitchContext(void);
+
+/*@
+  requires uxSchedulerSuspended == (UBaseType_t)0U;
+  requires xReadyTasksList.uxNumberOfItems > (UBaseType_t)0U;
+  requires ReadyList(&xReadyTasksList);
+  requires SchedulerSuspendedListContext(&xReadyTasksList,
+                                         pxDelayedTaskList,
+                                         pxOverflowDelayedTaskList,
+                                         &xSuspendedTaskList);
+
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+
+  assigns xYieldWithinAPICalled,
+          pxCurrentTCB,
+          xYieldPendings[0];
 
   ensures xYieldWithinAPICalled == pdTRUE;
+  ensures EDFProperty(&xReadyTasksList, pxCurrentTCB);
+  ensures SchedulerSuspendedListContext(&xReadyTasksList,
+                                        pxDelayedTaskList,
+                                        pxOverflowDelayedTaskList,
+                                        &xSuspendedTaskList);
 */
 static void vTaskSuspendYieldWithinAPI(void) {
     xYieldWithinAPICalled = pdTRUE;
+    vTaskSwitchContext();
 }
 
 #undef portYIELD_WITHIN_API
 #define portYIELD_WITHIN_API() vTaskSuspendYieldWithinAPI()
-
-/* Pre-scheduler fallback is unreachable in this reference slice. */
-/*@
-  terminates \true;
-  allocates \nothing;
-  frees \nothing;
-  exits \false;
-
-  assigns pxCurrentTCB \from xReadyTasksList.uxNumberOfItems;
-*/
-void vTaskSwitchContext(void);
 
 /*@
   requires xSchedulerRunning != pdFALSE;
@@ -127,6 +163,9 @@ void vTaskSwitchContext(void);
   requires xYieldWithinAPICalled == pdFALSE ||
            xYieldWithinAPICalled == pdTRUE;
   requires \valid(pxCurrentTCB);
+  requires EDFProperty(&xReadyTasksList, pxCurrentTCB);
+  requires (xTaskToSuspend == \null || xTaskToSuspend == pxCurrentTCB) ==>
+    xReadyTasksList.uxNumberOfItems > (UBaseType_t)1U;
   requires xTaskToSuspend == \null || \valid(xTaskToSuspend);
   requires \valid((xTaskToSuspend == \null) ? pxCurrentTCB : xTaskToSuspend);
   requires TaskItem(&((xTaskToSuspend == \null) ?
@@ -151,6 +190,7 @@ void vTaskSwitchContext(void);
                       &xSchedulerRunning,
                       &xNextTaskUnblockTime,
                       &xYieldWithinAPICalled,
+                      &xYieldPendings[0],
                       &xReadyTasksList.uxNumberOfItems,
                       &pxDelayedTaskList->uxNumberOfItems,
                       &pxOverflowDelayedTaskList->uxNumberOfItems,
@@ -170,14 +210,16 @@ void vTaskSwitchContext(void);
           ((xTaskToSuspend == \null) ?
             pxCurrentTCB : xTaskToSuspend)->xStateListItem.pxContainer,
           xNextTaskUnblockTime,
-          xYieldWithinAPICalled;
+          xYieldWithinAPICalled,
+          pxCurrentTCB,
+          xYieldPendings[0];
 
-  ensures pxCurrentTCB == \old(pxCurrentTCB);
   ensures uxSchedulerSuspended == \old(uxSchedulerSuspended);
   ensures SchedulerSuspendedListContext(&xReadyTasksList,
                                         pxDelayedTaskList,
                                         pxOverflowDelayedTaskList,
                                         &xSuspendedTaskList);
+  ensures EDFProperty(&xReadyTasksList, pxCurrentTCB);
   ensures In(&((xTaskToSuspend == \null) ?
                \old(pxCurrentTCB) : xTaskToSuspend)->xStateListItem,
              &xSuspendedTaskList);
@@ -197,6 +239,7 @@ void vTaskSwitchContext(void);
 
   behavior suspend_other:
     assumes xTaskToSuspend != \null && xTaskToSuspend != pxCurrentTCB;
+    ensures pxCurrentTCB == \old(pxCurrentTCB);
     ensures xYieldWithinAPICalled == \old(xYieldWithinAPICalled);
 
   complete behaviors;

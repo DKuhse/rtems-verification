@@ -61,6 +61,33 @@ typedef struct tskTaskControlBlock TCB_t;
 #endif
 
 /*@
+  requires xReadyTasksList.uxNumberOfItems > (UBaseType_t)0U;
+  requires ReadyList(&xReadyTasksList);
+
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+
+  assigns pxCurrentTCB, xYieldPendings[0];
+
+  behavior suspended:
+    assumes uxSchedulerSuspended != (UBaseType_t)0U;
+    ensures xYieldPendings[0] == pdTRUE;
+    ensures pxCurrentTCB == \old(pxCurrentTCB);
+
+  behavior running:
+    assumes uxSchedulerSuspended == (UBaseType_t)0U;
+    ensures xYieldPendings[0] == pdFALSE;
+    ensures pxCurrentTCB == (TCB_t *)Head(&xReadyTasksList)->pvOwner;
+    ensures EDFProperty(&xReadyTasksList, pxCurrentTCB);
+
+  complete behaviors;
+  disjoint behaviors;
+*/
+void vTaskSwitchContext(void);
+
+/*@
   requires uxSchedulerSuspended == (UBaseType_t)0U;
 
   terminates \true;
@@ -82,40 +109,88 @@ void vTaskSuspendAll(void) {
   requires uxSchedulerSuspended == (UBaseType_t)1U;
   requires xTaskResumeAllReturn == pdTRUE ||
            xTaskResumeAllReturn == pdFALSE;
+  requires SchedulerListContext(&xReadyTasksList,
+                                pxDelayedTaskList,
+                                pxOverflowDelayedTaskList);
+  requires xTaskResumeAllReturn == pdFALSE ||
+           xReadyTasksList.uxNumberOfItems > (UBaseType_t)0U;
+  requires xTaskResumeAllReturn == pdFALSE ||
+           ReadyList(&xReadyTasksList);
+  requires \separated(&pxCurrentTCB,
+                      &uxSchedulerSuspended,
+                      &xTaskResumeAllReturn,
+                      &xYieldPendings[0]);
 
   terminates \true;
   allocates \nothing;
   frees \nothing;
   exits \false;
 
-  assigns uxSchedulerSuspended;
+  assigns uxSchedulerSuspended,
+          pxCurrentTCB,
+          xYieldPendings[0];
 
   ensures uxSchedulerSuspended == (UBaseType_t)0U;
   ensures \result == xTaskResumeAllReturn;
   ensures \result == pdTRUE || \result == pdFALSE;
+  ensures SchedulerListContext(&xReadyTasksList,
+                               pxDelayedTaskList,
+                               pxOverflowDelayedTaskList);
+
+  behavior yield_performed:
+    assumes xTaskResumeAllReturn == pdTRUE;
+    ensures EDFProperty(&xReadyTasksList, pxCurrentTCB);
+
+  behavior no_yield:
+    assumes xTaskResumeAllReturn == pdFALSE;
+    ensures pxCurrentTCB == \old(pxCurrentTCB);
+
+  complete behaviors;
+  disjoint behaviors;
 */
 BaseType_t xTaskResumeAll(void) {
     BaseType_t xAlreadyYielded = xTaskResumeAllReturn;
 
     traceENTER_xTaskResumeAll();
     uxSchedulerSuspended = (UBaseType_t)(uxSchedulerSuspended - 1U);
+
+    if (xAlreadyYielded != pdFALSE) {
+        vTaskSwitchContext();
+    } else {
+        mtCOVERAGE_TEST_MARKER();
+    }
+
     traceRETURN_xTaskResumeAll(xAlreadyYielded);
 
     return xAlreadyYielded;
 }
 
 /*@
+  requires uxSchedulerSuspended == (UBaseType_t)0U;
+  requires xReadyTasksList.uxNumberOfItems > (UBaseType_t)0U;
+  requires ReadyList(&xReadyTasksList);
+  requires SchedulerListContext(&xReadyTasksList,
+                                pxDelayedTaskList,
+                                pxOverflowDelayedTaskList);
+
   terminates \true;
   allocates \nothing;
   frees \nothing;
   exits \false;
 
-  assigns xYieldWithinAPICalled;
+  assigns xYieldWithinAPICalled,
+          pxCurrentTCB,
+          xYieldPendings[0];
 
   ensures xYieldWithinAPICalled == pdTRUE;
+  ensures EDFProperty(&xReadyTasksList, pxCurrentTCB);
+  ensures SchedulerListContext(&xReadyTasksList,
+                               pxDelayedTaskList,
+                               pxOverflowDelayedTaskList);
 */
 static void vTaskDelayYieldWithinAPI(void) {
     xYieldWithinAPICalled = pdTRUE;
+    vTaskSwitchContext();
 }
 
 #define taskYIELD_WITHIN_API() vTaskDelayYieldWithinAPI()
@@ -127,6 +202,7 @@ static void vTaskDelayYieldWithinAPI(void) {
                                 pxDelayedTaskList,
                                 pxOverflowDelayedTaskList);
   requires \valid(pxCurrentTCB);
+  requires xReadyTasksList.uxNumberOfItems > (UBaseType_t)0U;
   requires In(&pxCurrentTCB->xStateListItem, &xReadyTasksList);
   requires pxCurrentTCB->xEventListItem.pxContainer == \null;
   requires \separated(&pxCurrentTCB,
@@ -156,6 +232,8 @@ static void vTaskDelayYieldWithinAPI(void) {
                                pxDelayedTaskList,
                                pxOverflowDelayedTaskList);
   ensures !In(&pxCurrentTCB->xStateListItem, &xReadyTasksList);
+  ensures xReadyTasksList.uxNumberOfItems ==
+    (UBaseType_t)(\old(xReadyTasksList.uxNumberOfItems) - 1U);
   ensures pxCurrentTCB->xStateListItem.xItemValue ==
             (TickType_t)(\old(xTickCount) + xTicksToWait);
 
@@ -228,6 +306,9 @@ static void prvAddCurrentTaskToDelayedList(TickType_t xTicksToWait,
                                 pxDelayedTaskList,
                                 pxOverflowDelayedTaskList);
   requires \valid(pxCurrentTCB);
+  requires xReadyTasksList.uxNumberOfItems > (UBaseType_t)0U;
+  requires xTicksToDelay == (TickType_t)0U ||
+           xReadyTasksList.uxNumberOfItems > (UBaseType_t)1U;
   requires In(&pxCurrentTCB->xStateListItem, &xReadyTasksList);
   requires pxCurrentTCB->xEventListItem.pxContainer == \null;
   requires \separated(&pxCurrentTCB,
@@ -238,6 +319,7 @@ static void prvAddCurrentTaskToDelayedList(TickType_t xTicksToWait,
                       &pxOverflowDelayedTaskList,
                       &xTaskResumeAllReturn,
                       &xYieldWithinAPICalled,
+                      &xYieldPendings[0],
                       &xReadyTasksList.uxNumberOfItems,
                       &pxDelayedTaskList->uxNumberOfItems,
                       &pxOverflowDelayedTaskList->uxNumberOfItems,
@@ -251,6 +333,8 @@ static void prvAddCurrentTaskToDelayedList(TickType_t xTicksToWait,
 
   assigns uxSchedulerSuspended,
           xYieldWithinAPICalled,
+          pxCurrentTCB,
+          xYieldPendings[0],
           xReadyTasksList.uxNumberOfItems,
           pxDelayedTaskList->uxNumberOfItems,
           pxOverflowDelayedTaskList->uxNumberOfItems,
@@ -262,6 +346,7 @@ static void prvAddCurrentTaskToDelayedList(TickType_t xTicksToWait,
   ensures SchedulerListContext(&xReadyTasksList,
                                pxDelayedTaskList,
                                pxOverflowDelayedTaskList);
+  ensures EDFProperty(&xReadyTasksList, pxCurrentTCB);
 
   behavior zero_delay:
     assumes xTicksToDelay == (TickType_t)0U;
@@ -272,24 +357,24 @@ static void prvAddCurrentTaskToDelayedList(TickType_t xTicksToWait,
   behavior finite_delay_resume_yielded:
     assumes xTicksToDelay > (TickType_t)0U;
     assumes xTaskResumeAllReturn == pdTRUE;
-    ensures !In(&pxCurrentTCB->xStateListItem, &xReadyTasksList);
+    ensures !In(&\old(pxCurrentTCB)->xStateListItem, &xReadyTasksList);
     ensures ((TickType_t)(\old(xTickCount) + xTicksToDelay) <
              \old(xTickCount)) ==>
-              In(&pxCurrentTCB->xStateListItem, pxOverflowDelayedTaskList);
+              In(&\old(pxCurrentTCB)->xStateListItem, pxOverflowDelayedTaskList);
     ensures ((TickType_t)(\old(xTickCount) + xTicksToDelay) >=
              \old(xTickCount)) ==>
-              In(&pxCurrentTCB->xStateListItem, pxDelayedTaskList);
+              In(&\old(pxCurrentTCB)->xStateListItem, pxDelayedTaskList);
 
   behavior finite_delay_needs_yield:
     assumes xTicksToDelay > (TickType_t)0U;
     assumes xTaskResumeAllReturn == pdFALSE;
-    ensures !In(&pxCurrentTCB->xStateListItem, &xReadyTasksList);
+    ensures !In(&\old(pxCurrentTCB)->xStateListItem, &xReadyTasksList);
     ensures ((TickType_t)(\old(xTickCount) + xTicksToDelay) <
              \old(xTickCount)) ==>
-              In(&pxCurrentTCB->xStateListItem, pxOverflowDelayedTaskList);
+              In(&\old(pxCurrentTCB)->xStateListItem, pxOverflowDelayedTaskList);
     ensures ((TickType_t)(\old(xTickCount) + xTicksToDelay) >=
              \old(xTickCount)) ==>
-              In(&pxCurrentTCB->xStateListItem, pxDelayedTaskList);
+              In(&\old(pxCurrentTCB)->xStateListItem, pxDelayedTaskList);
     ensures xYieldWithinAPICalled == pdTRUE;
 
   complete behaviors;
