@@ -37,6 +37,6 @@ echo "--- vTaskSuspend (reference) ---"
 frama-c \
     -cpp-command "${CPP_CMD}" \
     -machdep "${MACHDEP}" -cpp-frama-c-compliant -std c11 \
-    -wp -wp-fct vTaskSuspend -wp-model "Typed+Cast" \
+    -wp -wp-fct vTaskSuspend,vPortYield -wp-model "Typed+Cast" \
     "$@" \
     "${OVERLAY}/reference/suspend.c"

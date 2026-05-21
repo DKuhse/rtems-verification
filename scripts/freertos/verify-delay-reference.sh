@@ -37,6 +37,6 @@ echo "--- vTaskDelay (reference) ---"
 frama-c \
     -cpp-command "${CPP_CMD}" \
     -machdep "${MACHDEP}" -cpp-frama-c-compliant -std c11 \
-    -wp -wp-fct vTaskDelay,prvAddCurrentTaskToDelayedList -wp-model "Typed+Cast" \
+    -wp -wp-fct vTaskDelay,prvAddCurrentTaskToDelayedList,xTaskResumeAll,vPortYield -wp-model "Typed+Cast" \
     "$@" \
     "${OVERLAY}/reference/delay.c"

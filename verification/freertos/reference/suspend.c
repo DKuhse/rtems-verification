@@ -53,7 +53,6 @@ typedef TCB_t * TaskHandle_t;
     TickType_t  xNextTaskUnblockTime;
     BaseType_t  xSchedulerRunning;
     UBaseType_t uxCurrentNumberOfTasks;
-    BaseType_t  xYieldWithinAPICalled;
     BaseType_t  xYieldPendings[1];
     List_t      xDelayedTaskList1;
     List_t      xDelayedTaskList2;
@@ -67,7 +66,6 @@ typedef TCB_t * TaskHandle_t;
     volatile TickType_t  xNextTaskUnblockTime;
     volatile BaseType_t  xSchedulerRunning;
     volatile UBaseType_t uxCurrentNumberOfTasks;
-    volatile BaseType_t  xYieldWithinAPICalled;
     volatile BaseType_t  xYieldPendings[1];
     List_t               xDelayedTaskList1;
     List_t               xDelayedTaskList2;
@@ -124,6 +122,56 @@ static void prvResetNextTaskUnblockTime(void);
 */
 void vTaskSwitchContext(void);
 
+/* The MSP430 port's yield wrapper is assembly/context-save code around
+ * vTaskSwitchContext.  Keep the call sequence visible and stub the port
+ * operations at their contracts.
+ */
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns \nothing;
+*/
+void vPortYieldPushStatusRegister(void);
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns \nothing;
+*/
+void vPortYieldDisableInterrupts(void);
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns \nothing;
+*/
+void vPortYieldSaveContext(void);
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns \nothing;
+*/
+void vPortYieldRestoreContext(void);
+
+#undef portDISABLE_INTERRUPTS
+#define portDISABLE_INTERRUPTS() vPortYieldDisableInterrupts()
+
+#undef portSAVE_CONTEXT
+#define portSAVE_CONTEXT() vPortYieldSaveContext()
+
+#undef portRESTORE_CONTEXT
+#define portRESTORE_CONTEXT() vPortYieldRestoreContext()
+
 /*@
   requires uxSchedulerSuspended == (UBaseType_t)0U;
   requires xReadyTasksList.uxNumberOfItems > (UBaseType_t)0U;
@@ -138,30 +186,39 @@ void vTaskSwitchContext(void);
   frees \nothing;
   exits \false;
 
-  assigns xYieldWithinAPICalled,
-          pxCurrentTCB,
+  assigns pxCurrentTCB,
           xYieldPendings[0];
 
-  ensures xYieldWithinAPICalled == pdTRUE;
   ensures EDFProperty(&xReadyTasksList, pxCurrentTCB);
   ensures SchedulerSuspendedListContext(&xReadyTasksList,
                                         pxDelayedTaskList,
                                         pxOverflowDelayedTaskList,
                                         &xSuspendedTaskList);
 */
-static void vTaskSuspendYieldWithinAPI(void) {
-    xYieldWithinAPICalled = pdTRUE;
+void vPortYield(void) {
+#ifdef __FRAMAC__
+    vPortYieldPushStatusRegister();
+#else
+    asm volatile("push.w  sr");
+#endif
+
+    portDISABLE_INTERRUPTS();
+    portSAVE_CONTEXT();
+
     vTaskSwitchContext();
+
+    portRESTORE_CONTEXT();
 }
 
+#undef portYIELD
+#define portYIELD() vPortYield()
+
 #undef portYIELD_WITHIN_API
-#define portYIELD_WITHIN_API() vTaskSuspendYieldWithinAPI()
+#define portYIELD_WITHIN_API() portYIELD()
 
 /*@
   requires xSchedulerRunning != pdFALSE;
   requires uxSchedulerSuspended == (UBaseType_t)0U;
-  requires xYieldWithinAPICalled == pdFALSE ||
-           xYieldWithinAPICalled == pdTRUE;
   requires \valid(pxCurrentTCB);
   requires EDFProperty(&xReadyTasksList, pxCurrentTCB);
   requires (xTaskToSuspend == \null || xTaskToSuspend == pxCurrentTCB) ==>
@@ -189,7 +246,6 @@ static void vTaskSuspendYieldWithinAPI(void) {
                       &uxSchedulerSuspended,
                       &xSchedulerRunning,
                       &xNextTaskUnblockTime,
-                      &xYieldWithinAPICalled,
                       &xYieldPendings[0],
                       &xReadyTasksList.uxNumberOfItems,
                       &pxDelayedTaskList->uxNumberOfItems,
@@ -210,7 +266,6 @@ static void vTaskSuspendYieldWithinAPI(void) {
           ((xTaskToSuspend == \null) ?
             pxCurrentTCB : xTaskToSuspend)->xStateListItem.pxContainer,
           xNextTaskUnblockTime,
-          xYieldWithinAPICalled,
           pxCurrentTCB,
           xYieldPendings[0];
 
@@ -235,12 +290,10 @@ static void vTaskSuspendYieldWithinAPI(void) {
 
   behavior suspend_current:
     assumes xTaskToSuspend == \null || xTaskToSuspend == pxCurrentTCB;
-    ensures xYieldWithinAPICalled == pdTRUE;
 
   behavior suspend_other:
     assumes xTaskToSuspend != \null && xTaskToSuspend != pxCurrentTCB;
     ensures pxCurrentTCB == \old(pxCurrentTCB);
-    ensures xYieldWithinAPICalled == \old(xYieldWithinAPICalled);
 
   complete behaviors;
   disjoint behaviors;
