@@ -2,9 +2,9 @@
  * Scheduler-facing list model.
  *
  * Scheduler proofs use ListInv/In/HeadIsMinimum and the *_abs wrappers below.
- * The model keeps membership container-based, matching the FreeRTOS list item
- * owner field used by the scheduler-facing code, and exposes the source-level
- * head entry through xListEnd.pxNext.
+ * The model keeps scheduler membership tied to the FreeRTOS list item owner
+ * field while also exposing a source-shaped traversal predicate over pxNext.
+ * Head is the source-level list head entry through xListEnd.pxNext.
  */
 
 #ifndef VERIFICATION_FREERTOS_MODEL_LIST_MODEL_H
@@ -19,8 +19,30 @@
 
 /*@
   axiomatic Scheduler_List_Model {
+    inductive TraversesFrom{L}(ListItem_t *item,
+                               ListItem_t *cursor,
+                               List_t *list) {
+      case TraversesHere{L}: \forall ListItem_t *item,
+                                      ListItem_t *cursor,
+                                      List_t *list;
+        \valid(list) &&
+        \valid(item) &&
+        cursor == item ==>
+          TraversesFrom(item, cursor, list);
+
+      case TraversesNext{L}: \forall ListItem_t *item,
+                                      ListItem_t *cursor,
+                                      List_t *list;
+        \valid(list) &&
+        \valid(cursor) &&
+        TraversesFrom(item, cursor->pxNext, list) ==>
+          TraversesFrom(item, cursor, list);
+    }
+
     predicate InTraversal{L}(ListItem_t *item, List_t *list) =
-      \valid{L}(item) && item->pxContainer == list;
+      \valid(list) &&
+      list->uxNumberOfItems > (UBaseType_t)0 &&
+      TraversesFrom(item, list->xListEnd.pxNext, list);
 
     predicate In{L}(ListItem_t *item, List_t *list) =
       \valid{L}(item) && item->pxContainer == list;
