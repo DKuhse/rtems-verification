@@ -50,23 +50,25 @@ typedef struct tskTaskControlBlock TCB_t;
         vListInsert(&(xReadyTasksList), &((pxTCB)->xStateListItem));        \
     } while (0)
 
-/* Hack: Frama-C can't handle volatile. */
+/* Frama-C's Volatile plugin instruments the source-shaped volatile globals
+ * through the ghost mirrors below.
+ */
 #ifdef __FRAMAC__
-    TCB_t *     pxCurrentTCB;
+    TCB_t * volatile pxCurrentTCB;
     List_t      xReadyTasksList;
     List_t      xPendingReadyList;
-    UBaseType_t uxSchedulerSuspended;
-    UBaseType_t uxCurrentNumberOfTasks;
-    TickType_t  xTickCount;
-    TickType_t  xPendedTicks;
-    TickType_t  xNextTaskUnblockTime;
-    BaseType_t  xYieldPendings[1];
+    volatile UBaseType_t uxSchedulerSuspended;
+    volatile UBaseType_t uxCurrentNumberOfTasks;
+    volatile TickType_t  xTickCount;
+    volatile TickType_t  xPendedTicks;
+    volatile TickType_t  xNextTaskUnblockTime;
+    volatile BaseType_t  xYieldPendings[1];
     List_t      xDelayedTaskList1;
     List_t      xDelayedTaskList2;
-    List_t *    pxDelayedTaskList;
-    List_t *    pxOverflowDelayedTaskList;
+    List_t * volatile pxDelayedTaskList;
+    List_t * volatile pxOverflowDelayedTaskList;
 #else
-    volatile TCB_t *     pxCurrentTCB;
+    TCB_t * volatile     pxCurrentTCB;
     List_t               xReadyTasksList;
     List_t               xPendingReadyList;
     volatile UBaseType_t uxSchedulerSuspended;
@@ -81,6 +83,259 @@ typedef struct tskTaskControlBlock TCB_t;
     List_t * volatile    pxOverflowDelayedTaskList;
 #endif
 
+/*@ ghost TCB_t *pxCurrentTCB_ghost; */
+/*@ ghost UBaseType_t uxSchedulerSuspended_ghost; */
+/*@ ghost UBaseType_t uxCurrentNumberOfTasks_ghost; */
+/*@ ghost TickType_t xTickCount_ghost; */
+/*@ ghost TickType_t xPendedTicks_ghost; */
+/*@ ghost TickType_t xNextTaskUnblockTime_ghost; */
+/*@ ghost BaseType_t xYieldPendings0_ghost; */
+/*@ ghost List_t *pxDelayedTaskList_ghost; */
+/*@ ghost List_t *pxOverflowDelayedTaskList_ghost; */
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns \result \from pxCurrentTCB_ghost;
+  ensures \result == pxCurrentTCB_ghost;
+*/
+TCB_t *pxCurrentTCB_read(TCB_t * volatile *current);
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns *current, pxCurrentTCB_ghost, \result \from value;
+  ensures \result == value;
+  ensures pxCurrentTCB_ghost == value;
+*/
+TCB_t *pxCurrentTCB_write(TCB_t * volatile *current,
+                          TCB_t *value);
+
+/*@ volatile pxCurrentTCB
+      reads pxCurrentTCB_read
+      writes pxCurrentTCB_write;
+*/
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns \result \from uxSchedulerSuspended_ghost;
+  ensures \result == uxSchedulerSuspended_ghost;
+*/
+UBaseType_t uxSchedulerSuspended_read(volatile UBaseType_t *suspended);
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns *suspended, uxSchedulerSuspended_ghost, \result \from value;
+  ensures \result == value;
+  ensures uxSchedulerSuspended_ghost == value;
+*/
+UBaseType_t uxSchedulerSuspended_write(volatile UBaseType_t *suspended,
+                                       UBaseType_t value);
+
+/*@ volatile uxSchedulerSuspended
+      reads uxSchedulerSuspended_read
+      writes uxSchedulerSuspended_write;
+*/
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns \result \from uxCurrentNumberOfTasks_ghost;
+  ensures \result == uxCurrentNumberOfTasks_ghost;
+*/
+UBaseType_t uxCurrentNumberOfTasks_read(volatile UBaseType_t *numberOfTasks);
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns *numberOfTasks, uxCurrentNumberOfTasks_ghost, \result \from value;
+  ensures \result == value;
+  ensures uxCurrentNumberOfTasks_ghost == value;
+*/
+UBaseType_t uxCurrentNumberOfTasks_write(volatile UBaseType_t *numberOfTasks,
+                                         UBaseType_t value);
+
+/*@ volatile uxCurrentNumberOfTasks
+      reads uxCurrentNumberOfTasks_read
+      writes uxCurrentNumberOfTasks_write;
+*/
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns \result \from xTickCount_ghost;
+  ensures \result == xTickCount_ghost;
+*/
+TickType_t xTickCount_read(volatile TickType_t *tick);
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns *tick, xTickCount_ghost, \result \from value;
+  ensures \result == value;
+  ensures xTickCount_ghost == value;
+*/
+TickType_t xTickCount_write(volatile TickType_t *tick,
+                            TickType_t value);
+
+/*@ volatile xTickCount
+      reads xTickCount_read
+      writes xTickCount_write;
+*/
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns \result \from xPendedTicks_ghost;
+  ensures \result == xPendedTicks_ghost;
+*/
+TickType_t xPendedTicks_read(volatile TickType_t *pendedTicks);
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns *pendedTicks, xPendedTicks_ghost, \result \from value;
+  ensures \result == value;
+  ensures xPendedTicks_ghost == value;
+*/
+TickType_t xPendedTicks_write(volatile TickType_t *pendedTicks,
+                              TickType_t value);
+
+/*@ volatile xPendedTicks
+      reads xPendedTicks_read
+      writes xPendedTicks_write;
+*/
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns \result \from xNextTaskUnblockTime_ghost;
+  ensures \result == xNextTaskUnblockTime_ghost;
+*/
+TickType_t xNextTaskUnblockTime_read(volatile TickType_t *unblockTime);
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns *unblockTime, xNextTaskUnblockTime_ghost, \result \from value;
+  ensures \result == value;
+  ensures xNextTaskUnblockTime_ghost == value;
+*/
+TickType_t xNextTaskUnblockTime_write(volatile TickType_t *unblockTime,
+                                      TickType_t value);
+
+/*@ volatile xNextTaskUnblockTime
+      reads xNextTaskUnblockTime_read
+      writes xNextTaskUnblockTime_write;
+*/
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns \result \from xYieldPendings0_ghost;
+  ensures \result == xYieldPendings0_ghost;
+*/
+BaseType_t xYieldPendings0_read(volatile BaseType_t *yieldPending);
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns *yieldPending, xYieldPendings0_ghost, \result \from value;
+  ensures \result == value;
+  ensures xYieldPendings0_ghost == value;
+*/
+BaseType_t xYieldPendings0_write(volatile BaseType_t *yieldPending,
+                                 BaseType_t value);
+
+/*@ volatile xYieldPendings[0]
+      reads xYieldPendings0_read
+      writes xYieldPendings0_write;
+*/
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns \result \from pxDelayedTaskList_ghost;
+  ensures \result == pxDelayedTaskList_ghost;
+*/
+List_t *pxDelayedTaskList_read(List_t * volatile *list);
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns *list, pxDelayedTaskList_ghost, \result \from value;
+  ensures \result == value;
+  ensures pxDelayedTaskList_ghost == value;
+*/
+List_t *pxDelayedTaskList_write(List_t * volatile *list,
+                                List_t *value);
+
+/*@ volatile pxDelayedTaskList
+      reads pxDelayedTaskList_read
+      writes pxDelayedTaskList_write;
+*/
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns \result \from pxOverflowDelayedTaskList_ghost;
+  ensures \result == pxOverflowDelayedTaskList_ghost;
+*/
+List_t *pxOverflowDelayedTaskList_read(List_t * volatile *list);
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns *list, pxOverflowDelayedTaskList_ghost, \result \from value;
+  ensures \result == value;
+  ensures pxOverflowDelayedTaskList_ghost == value;
+*/
+List_t *pxOverflowDelayedTaskList_write(List_t * volatile *list,
+                                        List_t *value);
+
+/*@ volatile pxOverflowDelayedTaskList
+      reads pxOverflowDelayedTaskList_read
+      writes pxOverflowDelayedTaskList_write;
+*/
+
 /*@
   requires xReadyTasksList.uxNumberOfItems > (UBaseType_t)0U;
   requires ReadyList(&xReadyTasksList);
@@ -90,18 +345,21 @@ typedef struct tskTaskControlBlock TCB_t;
   frees \nothing;
   exits \false;
 
-  assigns pxCurrentTCB, xYieldPendings[0];
+  assigns pxCurrentTCB,
+          pxCurrentTCB_ghost,
+          xYieldPendings[0],
+          xYieldPendings0_ghost;
 
   behavior suspended:
-    assumes uxSchedulerSuspended != (UBaseType_t)0U;
-    ensures xYieldPendings[0] == pdTRUE;
-    ensures pxCurrentTCB == \old(pxCurrentTCB);
+    assumes uxSchedulerSuspended_ghost != (UBaseType_t)0U;
+    ensures xYieldPendings0_ghost == pdTRUE;
+    ensures pxCurrentTCB_ghost == \old(pxCurrentTCB_ghost);
 
   behavior running:
-    assumes uxSchedulerSuspended == (UBaseType_t)0U;
-    ensures xYieldPendings[0] == pdFALSE;
-    ensures pxCurrentTCB == (TCB_t *)Head(&xReadyTasksList)->pvOwner;
-    ensures EDFProperty(&xReadyTasksList, pxCurrentTCB);
+    assumes uxSchedulerSuspended_ghost == (UBaseType_t)0U;
+    ensures xYieldPendings0_ghost == pdFALSE;
+    ensures pxCurrentTCB_ghost == (TCB_t *)Head(&xReadyTasksList)->pvOwner;
+    ensures EDFProperty(&xReadyTasksList, pxCurrentTCB_ghost);
 
   complete behaviors;
   disjoint behaviors;
@@ -109,16 +367,17 @@ typedef struct tskTaskControlBlock TCB_t;
 void vTaskSwitchContext(void);
 
 /*@
-  requires uxSchedulerSuspended == (UBaseType_t)0U;
+  requires uxSchedulerSuspended_ghost == (UBaseType_t)0U;
 
   terminates \true;
   allocates \nothing;
   frees \nothing;
   exits \false;
 
-  assigns uxSchedulerSuspended;
+  assigns uxSchedulerSuspended,
+          uxSchedulerSuspended_ghost;
 
-  ensures uxSchedulerSuspended == (UBaseType_t)1U;
+  ensures uxSchedulerSuspended_ghost == (UBaseType_t)1U;
 */
 void vTaskSuspendAll(void) {
     traceENTER_vTaskSuspendAll();
@@ -177,12 +436,12 @@ void vPortYieldRestoreContext(void);
 #define portRESTORE_CONTEXT() vPortYieldRestoreContext()
 
 /*@
-  requires uxSchedulerSuspended == (UBaseType_t)0U;
+  requires uxSchedulerSuspended_ghost == (UBaseType_t)0U;
   requires xReadyTasksList.uxNumberOfItems > (UBaseType_t)0U;
   requires ReadyList(&xReadyTasksList);
   requires SchedulerListContext(&xReadyTasksList,
-                                pxDelayedTaskList,
-                                pxOverflowDelayedTaskList);
+                                pxDelayedTaskList_ghost,
+                                pxOverflowDelayedTaskList_ghost);
 
   terminates \true;
   allocates \nothing;
@@ -190,12 +449,14 @@ void vPortYieldRestoreContext(void);
   exits \false;
 
   assigns pxCurrentTCB,
-          xYieldPendings[0];
+          pxCurrentTCB_ghost,
+          xYieldPendings[0],
+          xYieldPendings0_ghost;
 
-  ensures EDFProperty(&xReadyTasksList, pxCurrentTCB);
+  ensures EDFProperty(&xReadyTasksList, pxCurrentTCB_ghost);
   ensures SchedulerListContext(&xReadyTasksList,
-                               pxDelayedTaskList,
-                               pxOverflowDelayedTaskList);
+                               pxDelayedTaskList_ghost,
+                               pxOverflowDelayedTaskList_ghost);
 */
 void vPortYield(void) {
 #ifdef __FRAMAC__
@@ -228,19 +489,20 @@ void vPortYield(void) {
 
 /*@
   requires SchedulerListContext(&xReadyTasksList,
-                                pxDelayedTaskList,
-                                pxOverflowDelayedTaskList);
+                                pxDelayedTaskList_ghost,
+                                pxOverflowDelayedTaskList_ghost);
 
   terminates \true;
   allocates \nothing;
   frees \nothing;
   exits \false;
 
-  assigns xNextTaskUnblockTime;
+  assigns xNextTaskUnblockTime,
+          xNextTaskUnblockTime_ghost;
 
   ensures SchedulerListContext(&xReadyTasksList,
-                               pxDelayedTaskList,
-                               pxOverflowDelayedTaskList);
+                               pxDelayedTaskList_ghost,
+                               pxOverflowDelayedTaskList_ghost);
 */
 static void prvResetNextTaskUnblockTime(void);
 
@@ -257,15 +519,15 @@ static void prvResetNextTaskUnblockTime(void);
 BaseType_t xTaskIncrementTick(void);
 
 /*@
-  requires uxSchedulerSuspended == (UBaseType_t)1U;
-  requires uxCurrentNumberOfTasks > (UBaseType_t)0U;
-  requires xYieldPendings[0] == pdTRUE || xYieldPendings[0] == pdFALSE;
-  requires xPendedTicks == (TickType_t)0U;
+  requires uxSchedulerSuspended_ghost == (UBaseType_t)1U;
+  requires uxCurrentNumberOfTasks_ghost > (UBaseType_t)0U;
+  requires xYieldPendings0_ghost == pdTRUE || xYieldPendings0_ghost == pdFALSE;
+  requires xPendedTicks_ghost == (TickType_t)0U;
   requires ListInv(&xPendingReadyList);
   requires xPendingReadyList.uxNumberOfItems == (UBaseType_t)0U;
   requires SchedulerListContext(&xReadyTasksList,
-                                pxDelayedTaskList,
-                                pxOverflowDelayedTaskList);
+                                pxDelayedTaskList_ghost,
+                                pxOverflowDelayedTaskList_ghost);
   requires xReadyTasksList.uxNumberOfItems > (UBaseType_t)0U;
   requires \separated(&pxCurrentTCB,
                       &uxSchedulerSuspended,
@@ -282,24 +544,27 @@ BaseType_t xTaskIncrementTick(void);
   exits \false;
 
   assigns uxSchedulerSuspended,
+          uxSchedulerSuspended_ghost,
           pxCurrentTCB,
-          xYieldPendings[0];
+          pxCurrentTCB_ghost,
+          xYieldPendings[0],
+          xYieldPendings0_ghost;
 
-  ensures uxSchedulerSuspended == (UBaseType_t)0U;
+  ensures uxSchedulerSuspended_ghost == (UBaseType_t)0U;
   ensures \result == pdTRUE || \result == pdFALSE;
   ensures SchedulerListContext(&xReadyTasksList,
-                               pxDelayedTaskList,
-                               pxOverflowDelayedTaskList);
+                               pxDelayedTaskList_ghost,
+                               pxOverflowDelayedTaskList_ghost);
 
   behavior yield_performed:
-    assumes xYieldPendings[0] != pdFALSE;
+    assumes xYieldPendings0_ghost != pdFALSE;
     ensures \result == pdTRUE;
-    ensures EDFProperty(&xReadyTasksList, pxCurrentTCB);
+    ensures EDFProperty(&xReadyTasksList, pxCurrentTCB_ghost);
 
   behavior no_yield:
-    assumes xYieldPendings[0] == pdFALSE;
+    assumes xYieldPendings0_ghost == pdFALSE;
     ensures \result == pdFALSE;
-    ensures pxCurrentTCB == \old(pxCurrentTCB);
+    ensures pxCurrentTCB_ghost == \old(pxCurrentTCB_ghost);
 
   complete behaviors;
   disjoint behaviors;
@@ -375,7 +640,9 @@ BaseType_t xTaskResumeAll(void) {
                     //@ assert xPendedCounts == (TickType_t)0U;
                     if (xPendedCounts > (TickType_t)0U) {
                         /*@
-                          loop assigns xPendedCounts, xYieldPendings[0];
+                          loop assigns xPendedCounts,
+                                       xYieldPendings[0],
+                                       xYieldPendings0_ghost;
                           loop variant xPendedCounts;
                         */
                         do {
@@ -402,12 +669,12 @@ BaseType_t xTaskResumeAll(void) {
 #endif /* #if ( configUSE_PREEMPTION != 0 ) */
 
                     {
-                        //@ assert uxSchedulerSuspended == (UBaseType_t)0U;
+                        //@ assert uxSchedulerSuspended_ghost == (UBaseType_t)0U;
                         //@ assert xReadyTasksList.uxNumberOfItems > (UBaseType_t)0U;
                         //@ assert ReadyList(&xReadyTasksList);
                         /*@ assert SchedulerListContext(&xReadyTasksList,
-                                                         pxDelayedTaskList,
-                                                         pxOverflowDelayedTaskList); */
+                                                         pxDelayedTaskList_ghost,
+                                                         pxOverflowDelayedTaskList_ghost); */
                         taskYIELD_TASK_CORE_IF_USING_PREEMPTION(pxCurrentTCB);
                     }
                 } else {
@@ -430,27 +697,27 @@ BaseType_t xTaskResumeAll(void) {
   requires xCanBlockIndefinitely == pdFALSE;
   requires SchedulerListContextIgnoringReadyItemDeadline(
                                 &xReadyTasksList,
-                                pxDelayedTaskList,
-                                pxOverflowDelayedTaskList,
-                                &pxCurrentTCB->xStateListItem);
+                                pxDelayedTaskList_ghost,
+                                pxOverflowDelayedTaskList_ghost,
+                                &pxCurrentTCB_ghost->xStateListItem);
   requires ListInv(&xPendingReadyList);
   requires xPendingReadyList.uxNumberOfItems == (UBaseType_t)0U;
   requires &xPendingReadyList != &xReadyTasksList;
-  requires &xPendingReadyList != pxDelayedTaskList;
-  requires &xPendingReadyList != pxOverflowDelayedTaskList;
-  requires \valid(pxCurrentTCB);
+  requires &xPendingReadyList != pxDelayedTaskList_ghost;
+  requires &xPendingReadyList != pxOverflowDelayedTaskList_ghost;
+  requires \valid(pxCurrentTCB_ghost);
   requires xReadyTasksList.uxNumberOfItems > (UBaseType_t)0U;
-  requires pxCurrentTCB->xEventListItem.pxContainer == \null;
+  requires pxCurrentTCB_ghost->xEventListItem.pxContainer == \null;
   requires \separated(&pxCurrentTCB,
                       &xTickCount,
                       &xNextTaskUnblockTime,
                       &pxDelayedTaskList,
                       &pxOverflowDelayedTaskList,
                       &xReadyTasksList.uxNumberOfItems,
-                      &pxDelayedTaskList->uxNumberOfItems,
-                      &pxOverflowDelayedTaskList->uxNumberOfItems,
-                      &pxCurrentTCB->xStateListItem.xItemValue,
-                      &pxCurrentTCB->xStateListItem.pxContainer);
+                      &pxDelayedTaskList_ghost->uxNumberOfItems,
+                      &pxOverflowDelayedTaskList_ghost->uxNumberOfItems,
+                      &pxCurrentTCB_ghost->xStateListItem.xItemValue,
+                      &pxCurrentTCB_ghost->xStateListItem.pxContainer);
 
   terminates \true;
   allocates \nothing;
@@ -458,41 +725,42 @@ BaseType_t xTaskResumeAll(void) {
   exits \false;
 
   assigns xReadyTasksList.uxNumberOfItems,
-          pxDelayedTaskList->uxNumberOfItems,
-          pxOverflowDelayedTaskList->uxNumberOfItems,
-          pxCurrentTCB->xStateListItem.xItemValue,
-          pxCurrentTCB->xStateListItem.pxContainer,
-          xNextTaskUnblockTime;
+          pxDelayedTaskList_ghost->uxNumberOfItems,
+          pxOverflowDelayedTaskList_ghost->uxNumberOfItems,
+          pxCurrentTCB_ghost->xStateListItem.xItemValue,
+          pxCurrentTCB_ghost->xStateListItem.pxContainer,
+          xNextTaskUnblockTime,
+          xNextTaskUnblockTime_ghost;
 
   ensures SchedulerListContext(&xReadyTasksList,
-                               pxDelayedTaskList,
-                               pxOverflowDelayedTaskList);
+                               pxDelayedTaskList_ghost,
+                               pxOverflowDelayedTaskList_ghost);
   ensures ListInv(&xPendingReadyList);
   ensures xPendingReadyList.uxNumberOfItems ==
     \old(xPendingReadyList.uxNumberOfItems);
-  ensures !In(&pxCurrentTCB->xStateListItem, &xReadyTasksList);
+  ensures !In(&pxCurrentTCB_ghost->xStateListItem, &xReadyTasksList);
   ensures xReadyTasksList.uxNumberOfItems ==
     (UBaseType_t)(\old(xReadyTasksList.uxNumberOfItems) - 1U);
-  ensures pxCurrentTCB->xStateListItem.xItemValue ==
-            (TickType_t)(\old(xTickCount) + xTicksToWait);
+  ensures pxCurrentTCB_ghost->xStateListItem.xItemValue ==
+            (TickType_t)(\old(xTickCount_ghost) + xTicksToWait);
 
   behavior wake_time_overflows:
-    assumes (TickType_t)(xTickCount + xTicksToWait) < xTickCount;
-    ensures In(&pxCurrentTCB->xStateListItem, pxOverflowDelayedTaskList);
-    ensures !In(&pxCurrentTCB->xStateListItem, pxDelayedTaskList);
-    ensures xNextTaskUnblockTime == \old(xNextTaskUnblockTime);
+    assumes (TickType_t)(xTickCount_ghost + xTicksToWait) < xTickCount_ghost;
+    ensures In(&pxCurrentTCB_ghost->xStateListItem, pxOverflowDelayedTaskList_ghost);
+    ensures !In(&pxCurrentTCB_ghost->xStateListItem, pxDelayedTaskList_ghost);
+    ensures xNextTaskUnblockTime_ghost == \old(xNextTaskUnblockTime_ghost);
 
   behavior wake_time_current_tick_window:
-    assumes (TickType_t)(xTickCount + xTicksToWait) >= xTickCount;
-    ensures In(&pxCurrentTCB->xStateListItem, pxDelayedTaskList);
-    ensures !In(&pxCurrentTCB->xStateListItem, pxOverflowDelayedTaskList);
-    ensures ((TickType_t)(\old(xTickCount) + xTicksToWait) <
-             \old(xNextTaskUnblockTime)) ==>
-              xNextTaskUnblockTime ==
-                (TickType_t)(\old(xTickCount) + xTicksToWait);
-    ensures ((TickType_t)(\old(xTickCount) + xTicksToWait) >=
-             \old(xNextTaskUnblockTime)) ==>
-              xNextTaskUnblockTime == \old(xNextTaskUnblockTime);
+    assumes (TickType_t)(xTickCount_ghost + xTicksToWait) >= xTickCount_ghost;
+    ensures In(&pxCurrentTCB_ghost->xStateListItem, pxDelayedTaskList_ghost);
+    ensures !In(&pxCurrentTCB_ghost->xStateListItem, pxOverflowDelayedTaskList_ghost);
+    ensures ((TickType_t)(\old(xTickCount_ghost) + xTicksToWait) <
+             \old(xNextTaskUnblockTime_ghost)) ==>
+              xNextTaskUnblockTime_ghost ==
+                (TickType_t)(\old(xTickCount_ghost) + xTicksToWait);
+    ensures ((TickType_t)(\old(xTickCount_ghost) + xTicksToWait) >=
+             \old(xNextTaskUnblockTime_ghost)) ==>
+              xNextTaskUnblockTime_ghost == \old(xNextTaskUnblockTime_ghost);
 
   complete behaviors;
   disjoint behaviors;
@@ -562,37 +830,37 @@ static void prvAddCurrentTaskToDelayedList(TickType_t xTicksToWait,
 */
 
 /*@
-  requires uxSchedulerSuspended == (UBaseType_t)0U;
+  requires uxSchedulerSuspended_ghost == (UBaseType_t)0U;
   requires SchedulerListContext(&xReadyTasksList,
-                                pxDelayedTaskList,
-                                pxOverflowDelayedTaskList);
-  requires \valid(pxCurrentTCB);
+                                pxDelayedTaskList_ghost,
+                                pxOverflowDelayedTaskList_ghost);
+  requires \valid(pxCurrentTCB_ghost);
   requires \valid(pxPreviousWakeTime);
   requires xTimeIncrement > (TickType_t)0U;
   requires DelayUntilShouldDelay(*pxPreviousWakeTime,
                                  xTimeIncrement,
-                                 xTickCount);
-  requires uxCurrentNumberOfTasks > (UBaseType_t)0U;
-  requires xYieldPendings[0] == pdTRUE || xYieldPendings[0] == pdFALSE;
-  requires xPendedTicks == (TickType_t)0U;
+                                 xTickCount_ghost);
+  requires uxCurrentNumberOfTasks_ghost > (UBaseType_t)0U;
+  requires xYieldPendings0_ghost == pdTRUE || xYieldPendings0_ghost == pdFALSE;
+  requires xPendedTicks_ghost == (TickType_t)0U;
   requires ListInv(&xPendingReadyList);
   requires xPendingReadyList.uxNumberOfItems == (UBaseType_t)0U;
   requires &xPendingReadyList != &xReadyTasksList;
-  requires &xPendingReadyList != pxDelayedTaskList;
-  requires &xPendingReadyList != pxOverflowDelayedTaskList;
+  requires &xPendingReadyList != pxDelayedTaskList_ghost;
+  requires &xPendingReadyList != pxOverflowDelayedTaskList_ghost;
   requires xReadyTasksList.uxNumberOfItems > (UBaseType_t)1U;
-  requires In(&pxCurrentTCB->xStateListItem, &xReadyTasksList);
-  requires pxCurrentTCB->xEventListItem.pxContainer == \null;
+  requires In(&pxCurrentTCB_ghost->xStateListItem, &xReadyTasksList);
+  requires pxCurrentTCB_ghost->xEventListItem.pxContainer == \null;
   requires \forall ListItem_t *item;
     \valid(item) &&
     In(item, &xReadyTasksList) &&
-    item != &pxCurrentTCB->xStateListItem ==>
-      \separated(&pxCurrentTCB->xDeadline,
+    item != &pxCurrentTCB_ghost->xStateListItem ==>
+      \separated(&pxCurrentTCB_ghost->xDeadline,
                  &((TCB_t *)item->pvOwner)->xDeadline);
   requires \forall ListItem_t *item;
     \valid(item) &&
     In(item, &xReadyTasksList) &&
-    item != &pxCurrentTCB->xStateListItem ==>
+    item != &pxCurrentTCB_ghost->xStateListItem ==>
       \separated(pxPreviousWakeTime,
                  &((TCB_t *)item->pvOwner)->xDeadline);
   requires \forall ListItem_t *item;
@@ -600,22 +868,22 @@ static void prvAddCurrentTaskToDelayedList(TickType_t xTicksToWait,
       TickSeparatedFromListItem(pxPreviousWakeTime, item);
   requires \forall ListItem_t *item;
     \valid(item) ==>
-      TickSeparatedFromListItem(&pxCurrentTCB->xDeadline, item);
+      TickSeparatedFromListItem(&pxCurrentTCB_ghost->xDeadline, item);
   requires \forall ListItem_t *item;
     \valid(item) &&
     In(item, &xReadyTasksList) &&
-    item != &pxCurrentTCB->xStateListItem ==>
-      TickSeparatedFromTask(&pxCurrentTCB->xDeadline,
+    item != &pxCurrentTCB_ghost->xStateListItem ==>
+      TickSeparatedFromTask(&pxCurrentTCB_ghost->xDeadline,
                             (TCB_t *)item->pvOwner);
   requires \forall ListItem_t *item;
     \valid(item) &&
-    In(item, pxDelayedTaskList) ==>
-      TickSeparatedFromTask(&pxCurrentTCB->xDeadline,
+    In(item, pxDelayedTaskList_ghost) ==>
+      TickSeparatedFromTask(&pxCurrentTCB_ghost->xDeadline,
                             (TCB_t *)item->pvOwner);
   requires \forall ListItem_t *item;
     \valid(item) &&
-    In(item, pxOverflowDelayedTaskList) ==>
-      TickSeparatedFromTask(&pxCurrentTCB->xDeadline,
+    In(item, pxOverflowDelayedTaskList_ghost) ==>
+      TickSeparatedFromTask(&pxCurrentTCB_ghost->xDeadline,
                             (TCB_t *)item->pvOwner);
   requires \forall ListItem_t *item;
     \valid(item) &&
@@ -624,18 +892,18 @@ static void prvAddCurrentTaskToDelayedList(TickType_t xTicksToWait,
                             (TCB_t *)item->pvOwner);
   requires \forall ListItem_t *item;
     \valid(item) &&
-    In(item, pxDelayedTaskList) ==>
+    In(item, pxDelayedTaskList_ghost) ==>
       TickSeparatedFromTask(pxPreviousWakeTime,
                             (TCB_t *)item->pvOwner);
   requires \forall ListItem_t *item;
     \valid(item) &&
-    In(item, pxOverflowDelayedTaskList) ==>
+    In(item, pxOverflowDelayedTaskList_ghost) ==>
       TickSeparatedFromTask(pxPreviousWakeTime,
                             (TCB_t *)item->pvOwner);
-  requires \separated(&pxCurrentTCB->xDeadline, &xPendingReadyList);
-  requires \separated(&pxCurrentTCB->xDeadline, &xReadyTasksList);
-  requires \separated(&pxCurrentTCB->xDeadline, pxDelayedTaskList);
-  requires \separated(&pxCurrentTCB->xDeadline, pxOverflowDelayedTaskList);
+  requires \separated(&pxCurrentTCB_ghost->xDeadline, &xPendingReadyList);
+  requires \separated(&pxCurrentTCB_ghost->xDeadline, &xReadyTasksList);
+  requires \separated(&pxCurrentTCB_ghost->xDeadline, pxDelayedTaskList_ghost);
+  requires \separated(&pxCurrentTCB_ghost->xDeadline, pxOverflowDelayedTaskList_ghost);
   requires \separated(&pxCurrentTCB,
                       &uxSchedulerSuspended,
                       &uxCurrentNumberOfTasks,
@@ -647,17 +915,17 @@ static void prvAddCurrentTaskToDelayedList(TickType_t xTicksToWait,
                       &xYieldPendings[0],
                       &xPendingReadyList.uxNumberOfItems,
                       &xReadyTasksList.uxNumberOfItems,
-                      &pxDelayedTaskList->uxNumberOfItems,
-                      &pxOverflowDelayedTaskList->uxNumberOfItems,
-                      &pxCurrentTCB->xDeadline,
-                      &pxCurrentTCB->xStateListItem.xItemValue,
-                      &pxCurrentTCB->xStateListItem.pxContainer);
+                      &pxDelayedTaskList_ghost->uxNumberOfItems,
+                      &pxOverflowDelayedTaskList_ghost->uxNumberOfItems,
+                      &pxCurrentTCB_ghost->xDeadline,
+                      &pxCurrentTCB_ghost->xStateListItem.xItemValue,
+                      &pxCurrentTCB_ghost->xStateListItem.pxContainer);
   requires \separated(pxPreviousWakeTime, &xPendingReadyList);
   requires \separated(pxPreviousWakeTime, &xReadyTasksList);
-  requires \separated(pxPreviousWakeTime, pxDelayedTaskList);
-  requires \separated(pxPreviousWakeTime, pxOverflowDelayedTaskList);
-  requires \separated(pxPreviousWakeTime, &pxCurrentTCB->xEventListItem);
-  requires \separated(pxPreviousWakeTime, &pxCurrentTCB->xStateListItem);
+  requires \separated(pxPreviousWakeTime, pxDelayedTaskList_ghost);
+  requires \separated(pxPreviousWakeTime, pxOverflowDelayedTaskList_ghost);
+  requires \separated(pxPreviousWakeTime, &pxCurrentTCB_ghost->xEventListItem);
+  requires \separated(pxPreviousWakeTime, &pxCurrentTCB_ghost->xStateListItem);
   requires \separated(pxPreviousWakeTime,
                       &pxCurrentTCB,
                       &uxSchedulerSuspended,
@@ -670,11 +938,11 @@ static void prvAddCurrentTaskToDelayedList(TickType_t xTicksToWait,
                       &xYieldPendings[0],
                       &xPendingReadyList.uxNumberOfItems,
                       &xReadyTasksList.uxNumberOfItems,
-                      &pxDelayedTaskList->uxNumberOfItems,
-                      &pxOverflowDelayedTaskList->uxNumberOfItems,
-                      &pxCurrentTCB->xDeadline,
-                      &pxCurrentTCB->xStateListItem.xItemValue,
-                      &pxCurrentTCB->xStateListItem.pxContainer);
+                      &pxDelayedTaskList_ghost->uxNumberOfItems,
+                      &pxOverflowDelayedTaskList_ghost->uxNumberOfItems,
+                      &pxCurrentTCB_ghost->xDeadline,
+                      &pxCurrentTCB_ghost->xStateListItem.xItemValue,
+                      &pxCurrentTCB_ghost->xStateListItem.pxContainer);
 
   terminates \true;
   allocates \nothing;
@@ -682,56 +950,60 @@ static void prvAddCurrentTaskToDelayedList(TickType_t xTicksToWait,
   exits \false;
 
   assigns uxSchedulerSuspended,
+          uxSchedulerSuspended_ghost,
           pxCurrentTCB,
+          pxCurrentTCB_ghost,
           xYieldPendings[0],
+          xYieldPendings0_ghost,
           *pxPreviousWakeTime,
-          \old(pxCurrentTCB)->xDeadline,
+          \old(pxCurrentTCB_ghost)->xDeadline,
           xReadyTasksList.uxNumberOfItems,
-          pxDelayedTaskList->uxNumberOfItems,
-          pxOverflowDelayedTaskList->uxNumberOfItems,
-          \old(pxCurrentTCB)->xStateListItem.xItemValue,
-          \old(pxCurrentTCB)->xStateListItem.pxContainer,
-          xNextTaskUnblockTime;
+          pxDelayedTaskList_ghost->uxNumberOfItems,
+          pxOverflowDelayedTaskList_ghost->uxNumberOfItems,
+          \old(pxCurrentTCB_ghost)->xStateListItem.xItemValue,
+          \old(pxCurrentTCB_ghost)->xStateListItem.pxContainer,
+          xNextTaskUnblockTime,
+          xNextTaskUnblockTime_ghost;
 
-  ensures uxSchedulerSuspended == (UBaseType_t)0U;
+  ensures uxSchedulerSuspended_ghost == (UBaseType_t)0U;
   ensures \result == pdTRUE;
   ensures *pxPreviousWakeTime ==
             (TickType_t)(\old(*pxPreviousWakeTime) + xTimeIncrement);
-  ensures \old(pxCurrentTCB)->xDeadline ==
+  ensures \old(pxCurrentTCB_ghost)->xDeadline ==
             (TickType_t)(\old(*pxPreviousWakeTime) +
                          xTimeIncrement +
                          xTimeIncrement);
   ensures SchedulerListContext(&xReadyTasksList,
-                               pxDelayedTaskList,
-                               pxOverflowDelayedTaskList);
-  ensures EDFProperty(&xReadyTasksList, pxCurrentTCB);
-  ensures !In(&\old(pxCurrentTCB)->xStateListItem, &xReadyTasksList);
+                               pxDelayedTaskList_ghost,
+                               pxOverflowDelayedTaskList_ghost);
+  ensures EDFProperty(&xReadyTasksList, pxCurrentTCB_ghost);
+  ensures !In(&\old(pxCurrentTCB_ghost)->xStateListItem, &xReadyTasksList);
 
   behavior tick_count_overflowed_and_wake_is_future:
-    assumes xTickCount < *pxPreviousWakeTime;
+    assumes xTickCount_ghost < *pxPreviousWakeTime;
     assumes (TickType_t)(*pxPreviousWakeTime + xTimeIncrement) <
               *pxPreviousWakeTime;
     assumes (TickType_t)(*pxPreviousWakeTime + xTimeIncrement) >
-              xTickCount;
-    ensures In(&\old(pxCurrentTCB)->xStateListItem, pxDelayedTaskList);
-    ensures !In(&\old(pxCurrentTCB)->xStateListItem,
-                pxOverflowDelayedTaskList);
+              xTickCount_ghost;
+    ensures In(&\old(pxCurrentTCB_ghost)->xStateListItem, pxDelayedTaskList_ghost);
+    ensures !In(&\old(pxCurrentTCB_ghost)->xStateListItem,
+                pxOverflowDelayedTaskList_ghost);
 
   behavior wake_time_overflows:
-    assumes xTickCount >= *pxPreviousWakeTime;
+    assumes xTickCount_ghost >= *pxPreviousWakeTime;
     assumes (TickType_t)(*pxPreviousWakeTime + xTimeIncrement) <
               *pxPreviousWakeTime;
-    ensures In(&\old(pxCurrentTCB)->xStateListItem,
-               pxOverflowDelayedTaskList);
-    ensures !In(&\old(pxCurrentTCB)->xStateListItem, pxDelayedTaskList);
+    ensures In(&\old(pxCurrentTCB_ghost)->xStateListItem,
+               pxOverflowDelayedTaskList_ghost);
+    ensures !In(&\old(pxCurrentTCB_ghost)->xStateListItem, pxDelayedTaskList_ghost);
 
   behavior wake_time_is_future:
-    assumes xTickCount >= *pxPreviousWakeTime;
+    assumes xTickCount_ghost >= *pxPreviousWakeTime;
     assumes (TickType_t)(*pxPreviousWakeTime + xTimeIncrement) >
-              xTickCount;
-    ensures In(&\old(pxCurrentTCB)->xStateListItem, pxDelayedTaskList);
-    ensures !In(&\old(pxCurrentTCB)->xStateListItem,
-                pxOverflowDelayedTaskList);
+              xTickCount_ghost;
+    ensures In(&\old(pxCurrentTCB_ghost)->xStateListItem, pxDelayedTaskList_ghost);
+    ensures !In(&\old(pxCurrentTCB_ghost)->xStateListItem,
+                pxOverflowDelayedTaskList_ghost);
 
   complete behaviors;
   disjoint behaviors;
@@ -753,6 +1025,7 @@ BaseType_t xTaskDelayUntil(TickType_t* const pxPreviousWakeTime,
         const TickType_t xConstTickCount = xTickCount;
 
         configASSERT(uxSchedulerSuspended == 1U);
+        //@ assert uxSchedulerSuspended_ghost == (UBaseType_t)1U;
 
 #if (EDF_SCHEDULER == 1)
         // new deadline = last wake time + period + rel. deadline (we only support implicit deadline, hence rel. deadline = period => xTimeIncrement*2)
@@ -806,34 +1079,34 @@ BaseType_t xTaskDelayUntil(TickType_t* const pxPreviousWakeTime,
 }
 
 /*@
-  requires uxSchedulerSuspended == (UBaseType_t)0U;
+  requires uxSchedulerSuspended_ghost == (UBaseType_t)0U;
   requires SchedulerListContext(&xReadyTasksList,
-                                pxDelayedTaskList,
-                                pxOverflowDelayedTaskList);
-  requires \valid(pxCurrentTCB);
+                                pxDelayedTaskList_ghost,
+                                pxOverflowDelayedTaskList_ghost);
+  requires \valid(pxCurrentTCB_ghost);
   requires \valid(pxPreviousWakeTime);
   requires xTimeIncrement > (TickType_t)0U;
-  requires uxCurrentNumberOfTasks > (UBaseType_t)0U;
-  requires xYieldPendings[0] == pdTRUE || xYieldPendings[0] == pdFALSE;
-  requires xPendedTicks == (TickType_t)0U;
+  requires uxCurrentNumberOfTasks_ghost > (UBaseType_t)0U;
+  requires xYieldPendings0_ghost == pdTRUE || xYieldPendings0_ghost == pdFALSE;
+  requires xPendedTicks_ghost == (TickType_t)0U;
   requires ListInv(&xPendingReadyList);
   requires xPendingReadyList.uxNumberOfItems == (UBaseType_t)0U;
   requires &xPendingReadyList != &xReadyTasksList;
-  requires &xPendingReadyList != pxDelayedTaskList;
-  requires &xPendingReadyList != pxOverflowDelayedTaskList;
+  requires &xPendingReadyList != pxDelayedTaskList_ghost;
+  requires &xPendingReadyList != pxOverflowDelayedTaskList_ghost;
   requires xReadyTasksList.uxNumberOfItems > (UBaseType_t)1U;
-  requires In(&pxCurrentTCB->xStateListItem, &xReadyTasksList);
-  requires pxCurrentTCB->xEventListItem.pxContainer == \null;
+  requires In(&pxCurrentTCB_ghost->xStateListItem, &xReadyTasksList);
+  requires pxCurrentTCB_ghost->xEventListItem.pxContainer == \null;
   requires \forall ListItem_t *item;
     \valid(item) &&
     In(item, &xReadyTasksList) &&
-    item != &pxCurrentTCB->xStateListItem ==>
-      \separated(&pxCurrentTCB->xDeadline,
+    item != &pxCurrentTCB_ghost->xStateListItem ==>
+      \separated(&pxCurrentTCB_ghost->xDeadline,
                  &((TCB_t *)item->pvOwner)->xDeadline);
   requires \forall ListItem_t *item;
     \valid(item) &&
     In(item, &xReadyTasksList) &&
-    item != &pxCurrentTCB->xStateListItem ==>
+    item != &pxCurrentTCB_ghost->xStateListItem ==>
       \separated(pxPreviousWakeTime,
                  &((TCB_t *)item->pvOwner)->xDeadline);
   requires \forall ListItem_t *item;
@@ -841,22 +1114,22 @@ BaseType_t xTaskDelayUntil(TickType_t* const pxPreviousWakeTime,
       TickSeparatedFromListItem(pxPreviousWakeTime, item);
   requires \forall ListItem_t *item;
     \valid(item) ==>
-      TickSeparatedFromListItem(&pxCurrentTCB->xDeadline, item);
+      TickSeparatedFromListItem(&pxCurrentTCB_ghost->xDeadline, item);
   requires \forall ListItem_t *item;
     \valid(item) &&
     In(item, &xReadyTasksList) &&
-    item != &pxCurrentTCB->xStateListItem ==>
-      TickSeparatedFromTask(&pxCurrentTCB->xDeadline,
+    item != &pxCurrentTCB_ghost->xStateListItem ==>
+      TickSeparatedFromTask(&pxCurrentTCB_ghost->xDeadline,
                             (TCB_t *)item->pvOwner);
   requires \forall ListItem_t *item;
     \valid(item) &&
-    In(item, pxDelayedTaskList) ==>
-      TickSeparatedFromTask(&pxCurrentTCB->xDeadline,
+    In(item, pxDelayedTaskList_ghost) ==>
+      TickSeparatedFromTask(&pxCurrentTCB_ghost->xDeadline,
                             (TCB_t *)item->pvOwner);
   requires \forall ListItem_t *item;
     \valid(item) &&
-    In(item, pxOverflowDelayedTaskList) ==>
-      TickSeparatedFromTask(&pxCurrentTCB->xDeadline,
+    In(item, pxOverflowDelayedTaskList_ghost) ==>
+      TickSeparatedFromTask(&pxCurrentTCB_ghost->xDeadline,
                             (TCB_t *)item->pvOwner);
   requires \forall ListItem_t *item;
     \valid(item) &&
@@ -865,18 +1138,18 @@ BaseType_t xTaskDelayUntil(TickType_t* const pxPreviousWakeTime,
                             (TCB_t *)item->pvOwner);
   requires \forall ListItem_t *item;
     \valid(item) &&
-    In(item, pxDelayedTaskList) ==>
+    In(item, pxDelayedTaskList_ghost) ==>
       TickSeparatedFromTask(pxPreviousWakeTime,
                             (TCB_t *)item->pvOwner);
   requires \forall ListItem_t *item;
     \valid(item) &&
-    In(item, pxOverflowDelayedTaskList) ==>
+    In(item, pxOverflowDelayedTaskList_ghost) ==>
       TickSeparatedFromTask(pxPreviousWakeTime,
                             (TCB_t *)item->pvOwner);
-  requires \separated(&pxCurrentTCB->xDeadline, &xPendingReadyList);
-  requires \separated(&pxCurrentTCB->xDeadline, &xReadyTasksList);
-  requires \separated(&pxCurrentTCB->xDeadline, pxDelayedTaskList);
-  requires \separated(&pxCurrentTCB->xDeadline, pxOverflowDelayedTaskList);
+  requires \separated(&pxCurrentTCB_ghost->xDeadline, &xPendingReadyList);
+  requires \separated(&pxCurrentTCB_ghost->xDeadline, &xReadyTasksList);
+  requires \separated(&pxCurrentTCB_ghost->xDeadline, pxDelayedTaskList_ghost);
+  requires \separated(&pxCurrentTCB_ghost->xDeadline, pxOverflowDelayedTaskList_ghost);
   requires \separated(&pxCurrentTCB,
                       &uxSchedulerSuspended,
                       &uxCurrentNumberOfTasks,
@@ -888,17 +1161,17 @@ BaseType_t xTaskDelayUntil(TickType_t* const pxPreviousWakeTime,
                       &xYieldPendings[0],
                       &xPendingReadyList.uxNumberOfItems,
                       &xReadyTasksList.uxNumberOfItems,
-                      &pxDelayedTaskList->uxNumberOfItems,
-                      &pxOverflowDelayedTaskList->uxNumberOfItems,
-                      &pxCurrentTCB->xDeadline,
-                      &pxCurrentTCB->xStateListItem.xItemValue,
-                      &pxCurrentTCB->xStateListItem.pxContainer);
+                      &pxDelayedTaskList_ghost->uxNumberOfItems,
+                      &pxOverflowDelayedTaskList_ghost->uxNumberOfItems,
+                      &pxCurrentTCB_ghost->xDeadline,
+                      &pxCurrentTCB_ghost->xStateListItem.xItemValue,
+                      &pxCurrentTCB_ghost->xStateListItem.pxContainer);
   requires \separated(pxPreviousWakeTime, &xPendingReadyList);
   requires \separated(pxPreviousWakeTime, &xReadyTasksList);
-  requires \separated(pxPreviousWakeTime, pxDelayedTaskList);
-  requires \separated(pxPreviousWakeTime, pxOverflowDelayedTaskList);
-  requires \separated(pxPreviousWakeTime, &pxCurrentTCB->xEventListItem);
-  requires \separated(pxPreviousWakeTime, &pxCurrentTCB->xStateListItem);
+  requires \separated(pxPreviousWakeTime, pxDelayedTaskList_ghost);
+  requires \separated(pxPreviousWakeTime, pxOverflowDelayedTaskList_ghost);
+  requires \separated(pxPreviousWakeTime, &pxCurrentTCB_ghost->xEventListItem);
+  requires \separated(pxPreviousWakeTime, &pxCurrentTCB_ghost->xStateListItem);
   requires \separated(pxPreviousWakeTime,
                       &pxCurrentTCB,
                       &uxSchedulerSuspended,
@@ -911,11 +1184,11 @@ BaseType_t xTaskDelayUntil(TickType_t* const pxPreviousWakeTime,
                       &xYieldPendings[0],
                       &xPendingReadyList.uxNumberOfItems,
                       &xReadyTasksList.uxNumberOfItems,
-                      &pxDelayedTaskList->uxNumberOfItems,
-                      &pxOverflowDelayedTaskList->uxNumberOfItems,
-                      &pxCurrentTCB->xDeadline,
-                      &pxCurrentTCB->xStateListItem.xItemValue,
-                      &pxCurrentTCB->xStateListItem.pxContainer);
+                      &pxDelayedTaskList_ghost->uxNumberOfItems,
+                      &pxOverflowDelayedTaskList_ghost->uxNumberOfItems,
+                      &pxCurrentTCB_ghost->xDeadline,
+                      &pxCurrentTCB_ghost->xStateListItem.xItemValue,
+                      &pxCurrentTCB_ghost->xStateListItem.pxContainer);
 
   terminates \true;
   allocates \nothing;
@@ -923,75 +1196,79 @@ BaseType_t xTaskDelayUntil(TickType_t* const pxPreviousWakeTime,
   exits \false;
 
   assigns uxSchedulerSuspended,
+          uxSchedulerSuspended_ghost,
           pxCurrentTCB,
+          pxCurrentTCB_ghost,
           xYieldPendings[0],
+          xYieldPendings0_ghost,
           *pxPreviousWakeTime,
-          \old(pxCurrentTCB)->xDeadline,
+          \old(pxCurrentTCB_ghost)->xDeadline,
           xReadyTasksList.uxNumberOfItems,
-          pxDelayedTaskList->uxNumberOfItems,
-          pxOverflowDelayedTaskList->uxNumberOfItems,
-          \old(pxCurrentTCB)->xStateListItem.xItemValue,
-          \old(pxCurrentTCB)->xStateListItem.pxContainer,
-          xNextTaskUnblockTime;
+          pxDelayedTaskList_ghost->uxNumberOfItems,
+          pxOverflowDelayedTaskList_ghost->uxNumberOfItems,
+          \old(pxCurrentTCB_ghost)->xStateListItem.xItemValue,
+          \old(pxCurrentTCB_ghost)->xStateListItem.pxContainer,
+          xNextTaskUnblockTime,
+          xNextTaskUnblockTime_ghost;
 
-  ensures uxSchedulerSuspended == (UBaseType_t)0U;
+  ensures uxSchedulerSuspended_ghost == (UBaseType_t)0U;
   ensures \result == pdTRUE || \result == pdFALSE;
   ensures *pxPreviousWakeTime ==
             (TickType_t)(\old(*pxPreviousWakeTime) + xTimeIncrement);
-  ensures \old(pxCurrentTCB)->xDeadline ==
+  ensures \old(pxCurrentTCB_ghost)->xDeadline ==
             (TickType_t)(\old(*pxPreviousWakeTime) +
                          xTimeIncrement +
                          xTimeIncrement);
   ensures SchedulerListContext(&xReadyTasksList,
-                               pxDelayedTaskList,
-                               pxOverflowDelayedTaskList);
-  ensures EDFProperty(&xReadyTasksList, pxCurrentTCB);
+                               pxDelayedTaskList_ghost,
+                               pxOverflowDelayedTaskList_ghost);
+  ensures EDFProperty(&xReadyTasksList, pxCurrentTCB_ghost);
 
   behavior tick_count_overflowed_and_wake_is_future:
-    assumes xTickCount < *pxPreviousWakeTime;
+    assumes xTickCount_ghost < *pxPreviousWakeTime;
     assumes (TickType_t)(*pxPreviousWakeTime + xTimeIncrement) <
               *pxPreviousWakeTime;
     assumes (TickType_t)(*pxPreviousWakeTime + xTimeIncrement) >
-              xTickCount;
+              xTickCount_ghost;
     ensures \result == pdTRUE;
-    ensures !In(&\old(pxCurrentTCB)->xStateListItem, &xReadyTasksList);
-    ensures In(&\old(pxCurrentTCB)->xStateListItem, pxDelayedTaskList);
-    ensures !In(&\old(pxCurrentTCB)->xStateListItem,
-                pxOverflowDelayedTaskList);
+    ensures !In(&\old(pxCurrentTCB_ghost)->xStateListItem, &xReadyTasksList);
+    ensures In(&\old(pxCurrentTCB_ghost)->xStateListItem, pxDelayedTaskList_ghost);
+    ensures !In(&\old(pxCurrentTCB_ghost)->xStateListItem,
+                pxOverflowDelayedTaskList_ghost);
 
   behavior wake_time_overflows:
-    assumes xTickCount >= *pxPreviousWakeTime;
+    assumes xTickCount_ghost >= *pxPreviousWakeTime;
     assumes (TickType_t)(*pxPreviousWakeTime + xTimeIncrement) <
               *pxPreviousWakeTime;
     ensures \result == pdTRUE;
-    ensures !In(&\old(pxCurrentTCB)->xStateListItem, &xReadyTasksList);
-    ensures In(&\old(pxCurrentTCB)->xStateListItem,
-               pxOverflowDelayedTaskList);
-    ensures !In(&\old(pxCurrentTCB)->xStateListItem, pxDelayedTaskList);
+    ensures !In(&\old(pxCurrentTCB_ghost)->xStateListItem, &xReadyTasksList);
+    ensures In(&\old(pxCurrentTCB_ghost)->xStateListItem,
+               pxOverflowDelayedTaskList_ghost);
+    ensures !In(&\old(pxCurrentTCB_ghost)->xStateListItem, pxDelayedTaskList_ghost);
 
   behavior wake_time_is_future:
-    assumes xTickCount >= *pxPreviousWakeTime;
+    assumes xTickCount_ghost >= *pxPreviousWakeTime;
     assumes (TickType_t)(*pxPreviousWakeTime + xTimeIncrement) >
-              xTickCount;
+              xTickCount_ghost;
     ensures \result == pdTRUE;
-    ensures !In(&\old(pxCurrentTCB)->xStateListItem, &xReadyTasksList);
-    ensures In(&\old(pxCurrentTCB)->xStateListItem, pxDelayedTaskList);
-    ensures !In(&\old(pxCurrentTCB)->xStateListItem,
-                pxOverflowDelayedTaskList);
+    ensures !In(&\old(pxCurrentTCB_ghost)->xStateListItem, &xReadyTasksList);
+    ensures In(&\old(pxCurrentTCB_ghost)->xStateListItem, pxDelayedTaskList_ghost);
+    ensures !In(&\old(pxCurrentTCB_ghost)->xStateListItem,
+                pxOverflowDelayedTaskList_ghost);
 
   behavior no_delay:
     assumes !DelayUntilShouldDelay(*pxPreviousWakeTime,
                                    xTimeIncrement,
-                                   xTickCount);
+                                   xTickCount_ghost);
     ensures \result == pdFALSE;
-    ensures In(&\old(pxCurrentTCB)->xStateListItem, &xReadyTasksList);
-    ensures !In(&\old(pxCurrentTCB)->xStateListItem, pxDelayedTaskList);
-    ensures !In(&\old(pxCurrentTCB)->xStateListItem,
-                pxOverflowDelayedTaskList);
+    ensures In(&\old(pxCurrentTCB_ghost)->xStateListItem, &xReadyTasksList);
+    ensures !In(&\old(pxCurrentTCB_ghost)->xStateListItem, pxDelayedTaskList_ghost);
+    ensures !In(&\old(pxCurrentTCB_ghost)->xStateListItem,
+                pxOverflowDelayedTaskList_ghost);
     ensures xReadyTasksList.uxNumberOfItems ==
               \old(xReadyTasksList.uxNumberOfItems);
-    ensures \old(pxCurrentTCB)->xStateListItem.xItemValue ==
-              \old(pxCurrentTCB)->xDeadline;
+    ensures \old(pxCurrentTCB_ghost)->xStateListItem.xItemValue ==
+              \old(pxCurrentTCB_ghost)->xDeadline;
 
   complete behaviors;
   disjoint behaviors;
@@ -1013,6 +1290,7 @@ BaseType_t xTaskDelayUntilReadyRefresh(TickType_t* const pxPreviousWakeTime,
         const TickType_t xConstTickCount = xTickCount;
 
         configASSERT(uxSchedulerSuspended == 1U);
+        //@ assert uxSchedulerSuspended_ghost == (UBaseType_t)1U;
 
 #if (EDF_SCHEDULER == 1)
         // new deadline = last wake time + period + rel. deadline (we only support implicit deadline, hence rel. deadline = period => xTimeIncrement*2)
@@ -1051,9 +1329,9 @@ BaseType_t xTaskDelayUntilReadyRefresh(TickType_t* const pxPreviousWakeTime,
 #if (EDF_SCHEDULER == 1)
             /*@ assert SchedulerListContextIgnoringReadyItemDeadline(
                            &xReadyTasksList,
-                           pxDelayedTaskList,
-                           pxOverflowDelayedTaskList,
-                           &pxCurrentTCB->xStateListItem); */
+                           pxDelayedTaskList_ghost,
+                           pxOverflowDelayedTaskList_ghost,
+                           &pxCurrentTCB_ghost->xStateListItem); */
             uxListRemove(&(pxCurrentTCB->xStateListItem));
             prvAddTaskToReadyList(pxCurrentTCB);
 #endif
@@ -1075,24 +1353,24 @@ BaseType_t xTaskDelayUntilReadyRefresh(TickType_t* const pxPreviousWakeTime,
 }
 
 /*@
-  requires uxSchedulerSuspended == (UBaseType_t)0U;
+  requires uxSchedulerSuspended_ghost == (UBaseType_t)0U;
   requires SchedulerListContext(&xReadyTasksList,
-                                pxDelayedTaskList,
-                                pxOverflowDelayedTaskList);
-  requires \valid(pxCurrentTCB);
-  requires uxCurrentNumberOfTasks > (UBaseType_t)0U;
-  requires xYieldPendings[0] == pdTRUE || xYieldPendings[0] == pdFALSE;
-  requires xPendedTicks == (TickType_t)0U;
+                                pxDelayedTaskList_ghost,
+                                pxOverflowDelayedTaskList_ghost);
+  requires \valid(pxCurrentTCB_ghost);
+  requires uxCurrentNumberOfTasks_ghost > (UBaseType_t)0U;
+  requires xYieldPendings0_ghost == pdTRUE || xYieldPendings0_ghost == pdFALSE;
+  requires xPendedTicks_ghost == (TickType_t)0U;
   requires ListInv(&xPendingReadyList);
   requires xPendingReadyList.uxNumberOfItems == (UBaseType_t)0U;
   requires &xPendingReadyList != &xReadyTasksList;
-  requires &xPendingReadyList != pxDelayedTaskList;
-  requires &xPendingReadyList != pxOverflowDelayedTaskList;
+  requires &xPendingReadyList != pxDelayedTaskList_ghost;
+  requires &xPendingReadyList != pxOverflowDelayedTaskList_ghost;
   requires xReadyTasksList.uxNumberOfItems > (UBaseType_t)0U;
   requires xTicksToDelay == (TickType_t)0U ||
            xReadyTasksList.uxNumberOfItems > (UBaseType_t)1U;
-  requires In(&pxCurrentTCB->xStateListItem, &xReadyTasksList);
-  requires pxCurrentTCB->xEventListItem.pxContainer == \null;
+  requires In(&pxCurrentTCB_ghost->xStateListItem, &xReadyTasksList);
+  requires pxCurrentTCB_ghost->xEventListItem.pxContainer == \null;
   requires \separated(&pxCurrentTCB,
                       &uxSchedulerSuspended,
                       &uxCurrentNumberOfTasks,
@@ -1104,10 +1382,10 @@ BaseType_t xTaskDelayUntilReadyRefresh(TickType_t* const pxPreviousWakeTime,
                       &xYieldPendings[0],
                       &xPendingReadyList.uxNumberOfItems,
                       &xReadyTasksList.uxNumberOfItems,
-                      &pxDelayedTaskList->uxNumberOfItems,
-                      &pxOverflowDelayedTaskList->uxNumberOfItems,
-                      &pxCurrentTCB->xStateListItem.xItemValue,
-                      &pxCurrentTCB->xStateListItem.pxContainer);
+                      &pxDelayedTaskList_ghost->uxNumberOfItems,
+                      &pxOverflowDelayedTaskList_ghost->uxNumberOfItems,
+                      &pxCurrentTCB_ghost->xStateListItem.xItemValue,
+                      &pxCurrentTCB_ghost->xStateListItem.pxContainer);
 
   terminates \true;
   allocates \nothing;
@@ -1115,47 +1393,51 @@ BaseType_t xTaskDelayUntilReadyRefresh(TickType_t* const pxPreviousWakeTime,
   exits \false;
 
   assigns uxSchedulerSuspended,
+          uxSchedulerSuspended_ghost,
           pxCurrentTCB,
+          pxCurrentTCB_ghost,
           xYieldPendings[0],
+          xYieldPendings0_ghost,
           xReadyTasksList.uxNumberOfItems,
-          pxDelayedTaskList->uxNumberOfItems,
-          pxOverflowDelayedTaskList->uxNumberOfItems,
-          pxCurrentTCB->xStateListItem.xItemValue,
-          pxCurrentTCB->xStateListItem.pxContainer,
-          xNextTaskUnblockTime;
+          pxDelayedTaskList_ghost->uxNumberOfItems,
+          pxOverflowDelayedTaskList_ghost->uxNumberOfItems,
+          pxCurrentTCB_ghost->xStateListItem.xItemValue,
+          pxCurrentTCB_ghost->xStateListItem.pxContainer,
+          xNextTaskUnblockTime,
+          xNextTaskUnblockTime_ghost;
 
-  ensures uxSchedulerSuspended == (UBaseType_t)0U;
+  ensures uxSchedulerSuspended_ghost == (UBaseType_t)0U;
   ensures SchedulerListContext(&xReadyTasksList,
-                               pxDelayedTaskList,
-                               pxOverflowDelayedTaskList);
-  ensures EDFProperty(&xReadyTasksList, pxCurrentTCB);
+                               pxDelayedTaskList_ghost,
+                               pxOverflowDelayedTaskList_ghost);
+  ensures EDFProperty(&xReadyTasksList, pxCurrentTCB_ghost);
 
   behavior zero_delay:
     assumes xTicksToDelay == (TickType_t)0U;
-    ensures In(&pxCurrentTCB->xStateListItem, &xReadyTasksList);
-    ensures xNextTaskUnblockTime == \old(xNextTaskUnblockTime);
+    ensures In(&pxCurrentTCB_ghost->xStateListItem, &xReadyTasksList);
+    ensures xNextTaskUnblockTime_ghost == \old(xNextTaskUnblockTime_ghost);
 
   behavior finite_delay_resume_yielded:
     assumes xTicksToDelay > (TickType_t)0U;
-    assumes xYieldPendings[0] != pdFALSE;
-    ensures !In(&\old(pxCurrentTCB)->xStateListItem, &xReadyTasksList);
-    ensures ((TickType_t)(\old(xTickCount) + xTicksToDelay) <
-             \old(xTickCount)) ==>
-              In(&\old(pxCurrentTCB)->xStateListItem, pxOverflowDelayedTaskList);
-    ensures ((TickType_t)(\old(xTickCount) + xTicksToDelay) >=
-             \old(xTickCount)) ==>
-              In(&\old(pxCurrentTCB)->xStateListItem, pxDelayedTaskList);
+    assumes xYieldPendings0_ghost != pdFALSE;
+    ensures !In(&\old(pxCurrentTCB_ghost)->xStateListItem, &xReadyTasksList);
+    ensures ((TickType_t)(\old(xTickCount_ghost) + xTicksToDelay) <
+             \old(xTickCount_ghost)) ==>
+              In(&\old(pxCurrentTCB_ghost)->xStateListItem, pxOverflowDelayedTaskList_ghost);
+    ensures ((TickType_t)(\old(xTickCount_ghost) + xTicksToDelay) >=
+             \old(xTickCount_ghost)) ==>
+              In(&\old(pxCurrentTCB_ghost)->xStateListItem, pxDelayedTaskList_ghost);
 
   behavior finite_delay_needs_yield:
     assumes xTicksToDelay > (TickType_t)0U;
-    assumes xYieldPendings[0] == pdFALSE;
-    ensures !In(&\old(pxCurrentTCB)->xStateListItem, &xReadyTasksList);
-    ensures ((TickType_t)(\old(xTickCount) + xTicksToDelay) <
-             \old(xTickCount)) ==>
-              In(&\old(pxCurrentTCB)->xStateListItem, pxOverflowDelayedTaskList);
-    ensures ((TickType_t)(\old(xTickCount) + xTicksToDelay) >=
-             \old(xTickCount)) ==>
-              In(&\old(pxCurrentTCB)->xStateListItem, pxDelayedTaskList);
+    assumes xYieldPendings0_ghost == pdFALSE;
+    ensures !In(&\old(pxCurrentTCB_ghost)->xStateListItem, &xReadyTasksList);
+    ensures ((TickType_t)(\old(xTickCount_ghost) + xTicksToDelay) <
+             \old(xTickCount_ghost)) ==>
+              In(&\old(pxCurrentTCB_ghost)->xStateListItem, pxOverflowDelayedTaskList_ghost);
+    ensures ((TickType_t)(\old(xTickCount_ghost) + xTicksToDelay) >=
+             \old(xTickCount_ghost)) ==>
+              In(&\old(pxCurrentTCB_ghost)->xStateListItem, pxDelayedTaskList_ghost);
 
   complete behaviors;
   disjoint behaviors;
@@ -1169,7 +1451,7 @@ void vTaskDelay(const TickType_t xTicksToDelay) {
     if (xTicksToDelay > (TickType_t)0U) {
         vTaskSuspendAll();
         {
-            //@ assert uxSchedulerSuspended == (UBaseType_t)1U;
+            //@ assert uxSchedulerSuspended_ghost == (UBaseType_t)1U;
 
             traceTASK_DELAY();
 

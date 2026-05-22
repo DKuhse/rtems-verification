@@ -74,6 +74,7 @@ check_probe() {
     local label="$1"
     local source_path="$2"
     local fct="$3"
+    local mode="${4:-}"
     local report
 
     [ -f "${source_path}" ] || {
@@ -88,13 +89,25 @@ check_probe() {
     # NOT add -wp-prop=@assert here — restricting goals would hide
     # real failures elsewhere; we want to see them too.
     report=$(mktemp --suffix=.json)
-    output=$(frama-c \
-        -cpp-command "${CPP_CMD}" \
-        ${COMMON} \
-        -wp -wp-fct "${fct}" -wp-model "Typed+Cast" \
-        -wp-report-json "${report}" \
-        ${EXTRA_ARGS} \
-        "${source_path}" 2>&1) || true
+    if [ "${mode}" = "volatile" ]; then
+        output=$(frama-c \
+            -cpp-command "${CPP_CMD}" \
+            ${COMMON} \
+            "${source_path}" \
+            -volatile \
+            -then-on Volatile \
+            -wp -wp-fct "${fct}" -wp-model "Typed+Cast" \
+            -wp-report-json "${report}" \
+            ${EXTRA_ARGS} 2>&1) || true
+    else
+        output=$(frama-c \
+            -cpp-command "${CPP_CMD}" \
+            ${COMMON} \
+            -wp -wp-fct "${fct}" -wp-model "Typed+Cast" \
+            -wp-report-json "${report}" \
+            ${EXTRA_ARGS} \
+            "${source_path}" 2>&1) || true
+    fi
 
     # Read the machine-readable WP report. Frama-C 32 only prints failed
     # goals in the normal text output, so a proved probe may have no
@@ -159,13 +172,14 @@ check_probe() {
 # Same check, but injects a temporary named `assert \false` probe at a
 # specific source marker. This lets us cover functions that do not have a
 # permanent SANITY_PROBE block without changing the verification source.
-# Args: label, source path, function name, marker text, before|after
+# Args: label, source path, function name, marker text, before|after, [volatile]
 check_injected_probe() {
     local label="$1"
     local source_path="$2"
     local fct="$3"
     local marker="$4"
     local where="${5:-before}"
+    local mode="${6:-}"
     local probe_source
     local report
 
@@ -201,13 +215,25 @@ check_injected_probe() {
     }
 
     report=$(mktemp --suffix=.json)
-    output=$(frama-c \
-        -cpp-command "${CPP_CMD_NORMAL}" \
-        ${COMMON} \
-        -wp -wp-fct "${fct}" -wp-model "Typed+Cast" \
-        -wp-report-json "${report}" \
-        ${EXTRA_ARGS} \
-        "${probe_source}" 2>&1) || true
+    if [ "${mode}" = "volatile" ]; then
+        output=$(frama-c \
+            -cpp-command "${CPP_CMD_NORMAL}" \
+            ${COMMON} \
+            "${probe_source}" \
+            -volatile \
+            -then-on Volatile \
+            -wp -wp-fct "${fct}" -wp-model "Typed+Cast" \
+            -wp-report-json "${report}" \
+            ${EXTRA_ARGS} 2>&1) || true
+    else
+        output=$(frama-c \
+            -cpp-command "${CPP_CMD_NORMAL}" \
+            ${COMMON} \
+            -wp -wp-fct "${fct}" -wp-model "Typed+Cast" \
+            -wp-report-json "${report}" \
+            ${EXTRA_ARGS} \
+            "${probe_source}" 2>&1) || true
+    fi
 
     probe_lines=$(awk '
         /"goal":/ {
@@ -279,95 +305,111 @@ check_probe "vTaskSwitchContext (overlay/tasks.c)" \
 
 check_probe "vTaskSwitchContext (reference/taskswitchcontext.c)" \
     "${OVERLAY}/reference/taskswitchcontext.c" \
-    "vTaskSwitchContext"
+    "vTaskSwitchContext" \
+    "volatile"
 
 check_probe "xTaskIncrementTick (reference/incrementtick.c)" \
     "${OVERLAY}/reference/incrementtick.c" \
-    "xTaskIncrementTick"
+    "xTaskIncrementTick" \
+    "volatile"
 
 check_injected_probe "vTaskResume end (reference/resume.c)" \
     "${OVERLAY}/reference/resume.c" \
     "vTaskResume" \
     "traceRETURN_vTaskResume();" \
-    "before"
+    "before" \
+    "volatile"
 
 check_injected_probe "vTaskResume entry (reference/resume.c)" \
     "${OVERLAY}/reference/resume.c" \
     "vTaskResume" \
     "traceENTER_vTaskResume(xTaskToResume);" \
-    "after"
+    "after" \
+    "volatile"
 
 check_injected_probe "vTaskResume after suspended-list remove (reference/resume.c)" \
     "${OVERLAY}/reference/resume.c" \
     "vTaskResume" \
     "(void)uxListRemove(&(pxTCB->xStateListItem));" \
-    "after"
+    "after" \
+    "volatile"
 
 check_injected_probe "vTaskResume after ready-list insert (reference/resume.c)" \
     "${OVERLAY}/reference/resume.c" \
     "vTaskResume" \
     "prvAddTaskToReadyList(pxTCB);" \
-    "after"
+    "after" \
+    "volatile"
 
 check_injected_probe "vTaskResume after preemption check (reference/resume.c)" \
     "${OVERLAY}/reference/resume.c" \
     "vTaskResume" \
     "taskYIELD_ANY_CORE_IF_USING_PREEMPTION(pxTCB);" \
-    "after"
+    "after" \
+    "volatile"
 
 check_injected_probe "prvTaskIsTaskSuspended end (reference/resume.c)" \
     "${OVERLAY}/reference/resume.c" \
     "prvTaskIsTaskSuspended" \
     "return xReturn;" \
-    "before"
+    "before" \
+    "volatile"
 
 check_injected_probe "vPortYield end (reference/resume.c)" \
     "${OVERLAY}/reference/resume.c" \
     "vPortYield" \
     "portRESTORE_CONTEXT();" \
-    "after"
+    "after" \
+    "volatile"
 
 check_injected_probe "vTaskSuspend end (reference/suspend.c)" \
     "${OVERLAY}/reference/suspend.c" \
     "vTaskSuspend" \
     "traceRETURN_vTaskSuspend();" \
-    "before"
+    "before" \
+    "volatile"
 
 check_injected_probe "vPortYield end (reference/suspend.c)" \
     "${OVERLAY}/reference/suspend.c" \
     "vPortYield" \
     "portRESTORE_CONTEXT();" \
-    "after"
+    "after" \
+    "volatile"
 
 check_injected_probe "xTaskDelayUntil end (reference/delay.c)" \
     "${OVERLAY}/reference/delay.c" \
     "xTaskDelayUntil" \
     "traceRETURN_xTaskDelayUntil(xShouldDelay);" \
-    "before"
+    "before" \
+    "volatile"
 
 check_injected_probe "vTaskDelay end (reference/delay.c)" \
     "${OVERLAY}/reference/delay.c" \
     "vTaskDelay" \
     "traceRETURN_vTaskDelay();" \
-    "before"
+    "before" \
+    "volatile"
 
 check_injected_probe "prvAddCurrentTaskToDelayedList end (reference/delay.c)" \
     "${OVERLAY}/reference/delay.c" \
     "prvAddCurrentTaskToDelayedList" \
     "(void)xCanBlockIndefinitely;" \
-    "before"
+    "before" \
+    "volatile"
 
 check_injected_probe "xTaskResumeAll end (reference/delay.c)" \
     "${OVERLAY}/reference/delay.c" \
     "xTaskResumeAll" \
     "traceRETURN_xTaskResumeAll(xAlreadyYielded);" \
-    "before"
+    "before" \
+    "volatile"
 
 check_injected_probe "vPortYield end (reference/delay.c)" \
     "${OVERLAY}/reference/delay.c" \
     "vPortYield" \
     "portRESTORE_CONTEXT();" \
-    "after"
+    "after" \
+    "volatile"
 
 echo ""
 echo "========================================"

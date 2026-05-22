@@ -52,6 +52,8 @@ fi
 frama-c \
     -cpp-command "${CPP_CMD}" \
     -machdep "${MACHDEP}" -cpp-frama-c-compliant -std c11 \
+    "${OVERLAY}/reference/suspend.c" \
+    -volatile \
+    -then-on Volatile \
     -wp -wp-fct vTaskSuspend,vPortYield -wp-model "Typed+Cast" \
-    "${DEFAULT_ARGS[@]}" "$@" \
-    "${OVERLAY}/reference/suspend.c"
+    "${DEFAULT_ARGS[@]}" "$@"

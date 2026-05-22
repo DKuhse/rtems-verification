@@ -13,18 +13,105 @@ typedef struct tskTaskControlBlock TCB_t;
 #define FREERTOS_USE_ABSTRACT_LIST_MODEL
 #include "scheduler_model.h"
 
-/* Hack: Frama-C can't handle volatile */
+/* Frama-C's Volatile plugin instruments the source-shaped volatile globals
+ * through the ghost mirrors below.
+ */
 #ifdef __FRAMAC__
-    TCB_t * pxCurrentTCB;
+    TCB_t * volatile pxCurrentTCB;
     List_t xReadyTasksList;
-    UBaseType_t uxSchedulerSuspended;
-    BaseType_t xYieldPendings[1];
+    volatile UBaseType_t uxSchedulerSuspended;
+    volatile BaseType_t xYieldPendings[1];
 #else
-    volatile TCB_t * pxCurrentTCB;
+    TCB_t * volatile pxCurrentTCB;
     List_t xReadyTasksList;
     volatile UBaseType_t uxSchedulerSuspended;
     volatile BaseType_t xYieldPendings[1];
 #endif
+
+/*@ ghost TCB_t *pxCurrentTCB_ghost; */
+/*@ ghost UBaseType_t uxSchedulerSuspended_ghost; */
+/*@ ghost BaseType_t xYieldPendings0_ghost; */
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns \result \from pxCurrentTCB_ghost;
+  ensures \result == pxCurrentTCB_ghost;
+*/
+TCB_t *pxCurrentTCB_read(TCB_t * volatile *current);
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns *current, pxCurrentTCB_ghost, \result \from value;
+  ensures \result == value;
+  ensures pxCurrentTCB_ghost == value;
+*/
+TCB_t *pxCurrentTCB_write(TCB_t * volatile *current,
+                          TCB_t *value);
+
+/*@ volatile pxCurrentTCB
+      reads pxCurrentTCB_read
+      writes pxCurrentTCB_write;
+*/
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns \result \from uxSchedulerSuspended_ghost;
+  ensures \result == uxSchedulerSuspended_ghost;
+*/
+UBaseType_t uxSchedulerSuspended_read(volatile UBaseType_t *suspended);
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns *suspended, uxSchedulerSuspended_ghost, \result \from value;
+  ensures \result == value;
+  ensures uxSchedulerSuspended_ghost == value;
+*/
+UBaseType_t uxSchedulerSuspended_write(volatile UBaseType_t *suspended,
+                                       UBaseType_t value);
+
+/*@ volatile uxSchedulerSuspended
+      reads uxSchedulerSuspended_read
+      writes uxSchedulerSuspended_write;
+*/
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns \result \from xYieldPendings0_ghost;
+  ensures \result == xYieldPendings0_ghost;
+*/
+BaseType_t xYieldPendings0_read(volatile BaseType_t *yieldPending);
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns *yieldPending, xYieldPendings0_ghost, \result \from value;
+  ensures \result == value;
+  ensures xYieldPendings0_ghost == value;
+*/
+BaseType_t xYieldPendings0_write(volatile BaseType_t *yieldPending,
+                                 BaseType_t value);
+
+/*@ volatile xYieldPendings[0]
+      reads xYieldPendings0_read
+      writes xYieldPendings0_write;
+*/
 
 #define taskSELECT_HIGHEST_PRIORITY_TASK() \
     pxCurrentTCB = listGET_OWNER_OF_HEAD_ENTRY( &xReadyTasksList )
@@ -33,21 +120,28 @@ typedef struct tskTaskControlBlock TCB_t;
   requires xReadyTasksList.uxNumberOfItems > 0;
   requires ReadyList( &xReadyTasksList );
 
-  assigns pxCurrentTCB, xYieldPendings[ 0 ];
+  assigns pxCurrentTCB,
+          pxCurrentTCB_ghost,
+          xYieldPendings[ 0 ],
+          xYieldPendings0_ghost;
 
   behavior suspended:
-    assumes uxSchedulerSuspended != (UBaseType_t)0U;
-    assigns xYieldPendings[0];
-    ensures xYieldPendings[0] == pdTRUE;
-    ensures pxCurrentTCB == \old( pxCurrentTCB );
+    assumes uxSchedulerSuspended_ghost != (UBaseType_t)0U;
+    assigns xYieldPendings[0],
+            xYieldPendings0_ghost;
+    ensures xYieldPendings0_ghost == pdTRUE;
+    ensures pxCurrentTCB_ghost == \old( pxCurrentTCB_ghost );
 
   behavior running:
-    assumes uxSchedulerSuspended == (UBaseType_t)0U;
-    assigns pxCurrentTCB, xYieldPendings[ 0 ];
-    ensures xYieldPendings[0] == pdFALSE;
-    ensures pxCurrentTCB ==
+    assumes uxSchedulerSuspended_ghost == (UBaseType_t)0U;
+    assigns pxCurrentTCB,
+            pxCurrentTCB_ghost,
+            xYieldPendings[ 0 ],
+            xYieldPendings0_ghost;
+    ensures xYieldPendings0_ghost == pdFALSE;
+    ensures pxCurrentTCB_ghost ==
               (TCB_t *) Head( &xReadyTasksList )->pvOwner;
-    ensures EDFProperty( &xReadyTasksList, pxCurrentTCB );
+    ensures EDFProperty( &xReadyTasksList, pxCurrentTCB_ghost );
 
   complete behaviors suspended, running;
   disjoint behaviors suspended, running;

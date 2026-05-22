@@ -37,6 +37,8 @@ echo "--- vTaskResume (reference) ---"
 frama-c \
     -cpp-command "${CPP_CMD}" \
     -machdep "${MACHDEP}" -cpp-frama-c-compliant -std c11 \
+    "${OVERLAY}/reference/resume.c" \
+    -volatile \
+    -then-on Volatile \
     -wp -wp-fct vTaskResume,prvTaskIsTaskSuspended,vPortYield -wp-model "Typed+Cast" \
-    "$@" \
-    "${OVERLAY}/reference/resume.c"
+    "$@"

@@ -23,22 +23,24 @@ typedef struct tskTaskControlBlock TCB_t;
 #define FREERTOS_USE_ABSTRACT_LIST_MODEL
 #include "scheduler_model.h"
 
-/* Hack: Frama-C can't handle volatile. */
+/* Frama-C's Volatile plugin instruments the source-shaped volatile globals
+ * through the ghost mirrors below.
+ */
 #ifdef __FRAMAC__
-    TCB_t *           pxCurrentTCB;
+    TCB_t * volatile  pxCurrentTCB;
     List_t            xReadyTasksList;
-    UBaseType_t       uxSchedulerSuspended;
-    TickType_t        xTickCount;
-    TickType_t        xNextTaskUnblockTime;
-    TickType_t        xPendedTicks;
-    BaseType_t        xYieldPendings[1];
-    BaseType_t        xNumOfOverflows;
+    volatile UBaseType_t uxSchedulerSuspended;
+    volatile TickType_t  xTickCount;
+    volatile TickType_t  xNextTaskUnblockTime;
+    volatile TickType_t  xPendedTicks;
+    volatile BaseType_t  xYieldPendings[1];
+    volatile BaseType_t  xNumOfOverflows;
     List_t            xDelayedTaskList1;
     List_t            xDelayedTaskList2;
-    List_t *          pxDelayedTaskList;
-    List_t *          pxOverflowDelayedTaskList;
+    List_t * volatile pxDelayedTaskList;
+    List_t * volatile pxOverflowDelayedTaskList;
 #else
-    volatile TCB_t *  pxCurrentTCB;
+    TCB_t * volatile  pxCurrentTCB;
     List_t            xReadyTasksList;
     volatile UBaseType_t uxSchedulerSuspended;
     volatile TickType_t  xTickCount;
@@ -51,6 +53,295 @@ typedef struct tskTaskControlBlock TCB_t;
     List_t * volatile pxDelayedTaskList;
     List_t * volatile pxOverflowDelayedTaskList;
 #endif
+
+/*@ ghost TCB_t *pxCurrentTCB_ghost; */
+/*@ ghost List_t *pxDelayedTaskList_ghost; */
+/*@ ghost List_t *pxOverflowDelayedTaskList_ghost; */
+/*@ ghost UBaseType_t uxSchedulerSuspended_ghost; */
+/*@ ghost TickType_t xTickCount_ghost; */
+/*@ ghost TickType_t xNextTaskUnblockTime_ghost; */
+/*@ ghost TickType_t xPendedTicks_ghost; */
+/*@ ghost BaseType_t xYieldPendings0_ghost; */
+/*@ ghost BaseType_t xNumOfOverflows_ghost; */
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+
+  assigns \result \from pxCurrentTCB_ghost;
+
+  ensures \result == pxCurrentTCB_ghost;
+*/
+TCB_t *pxCurrentTCB_read(TCB_t * volatile *current);
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+
+  assigns *current, pxCurrentTCB_ghost, \result \from value;
+
+  ensures \result == value;
+  ensures pxCurrentTCB_ghost == value;
+*/
+TCB_t *pxCurrentTCB_write(TCB_t * volatile *current,
+                          TCB_t *value);
+
+/*@ volatile pxCurrentTCB
+      reads pxCurrentTCB_read
+      writes pxCurrentTCB_write;
+*/
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+
+  assigns \result \from pxDelayedTaskList_ghost;
+
+  ensures \result == pxDelayedTaskList_ghost;
+*/
+List_t *pxDelayedTaskList_read(List_t * volatile *list);
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+
+  assigns *list, pxDelayedTaskList_ghost, \result \from value;
+
+  ensures \result == value;
+  ensures pxDelayedTaskList_ghost == value;
+*/
+List_t *pxDelayedTaskList_write(List_t * volatile *list,
+                                List_t *value);
+
+/*@ volatile pxDelayedTaskList
+      reads pxDelayedTaskList_read
+      writes pxDelayedTaskList_write;
+*/
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+
+  assigns \result \from pxOverflowDelayedTaskList_ghost;
+
+  ensures \result == pxOverflowDelayedTaskList_ghost;
+*/
+List_t *pxOverflowDelayedTaskList_read(List_t * volatile *list);
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+
+  assigns *list, pxOverflowDelayedTaskList_ghost, \result \from value;
+
+  ensures \result == value;
+  ensures pxOverflowDelayedTaskList_ghost == value;
+*/
+List_t *pxOverflowDelayedTaskList_write(List_t * volatile *list,
+                                        List_t *value);
+
+/*@ volatile pxOverflowDelayedTaskList
+      reads pxOverflowDelayedTaskList_read
+      writes pxOverflowDelayedTaskList_write;
+*/
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+
+  assigns \result \from uxSchedulerSuspended_ghost;
+
+  ensures \result == uxSchedulerSuspended_ghost;
+*/
+UBaseType_t uxSchedulerSuspended_read(volatile UBaseType_t *suspended);
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+
+  assigns *suspended, uxSchedulerSuspended_ghost, \result \from value;
+
+  ensures \result == value;
+  ensures uxSchedulerSuspended_ghost == value;
+*/
+UBaseType_t uxSchedulerSuspended_write(volatile UBaseType_t *suspended,
+                                       UBaseType_t value);
+
+/*@ volatile uxSchedulerSuspended
+      reads uxSchedulerSuspended_read
+      writes uxSchedulerSuspended_write;
+*/
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+
+  assigns \result \from xTickCount_ghost;
+
+  ensures \result == xTickCount_ghost;
+*/
+TickType_t xTickCount_read(volatile TickType_t *tick);
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+
+  assigns *tick, xTickCount_ghost, \result \from value;
+
+  ensures \result == value;
+  ensures xTickCount_ghost == value;
+*/
+TickType_t xTickCount_write(volatile TickType_t *tick,
+                            TickType_t value);
+
+/*@ volatile xTickCount
+      reads xTickCount_read
+      writes xTickCount_write;
+*/
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+
+  assigns \result \from xNextTaskUnblockTime_ghost;
+
+  ensures \result == xNextTaskUnblockTime_ghost;
+*/
+TickType_t xNextTaskUnblockTime_read(volatile TickType_t *unblockTime);
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+
+  assigns *unblockTime, xNextTaskUnblockTime_ghost, \result \from value;
+
+  ensures \result == value;
+  ensures xNextTaskUnblockTime_ghost == value;
+*/
+TickType_t xNextTaskUnblockTime_write(volatile TickType_t *unblockTime,
+                                      TickType_t value);
+
+/*@ volatile xNextTaskUnblockTime
+      reads xNextTaskUnblockTime_read
+      writes xNextTaskUnblockTime_write;
+*/
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+
+  assigns \result \from xPendedTicks_ghost;
+
+  ensures \result == xPendedTicks_ghost;
+*/
+TickType_t xPendedTicks_read(volatile TickType_t *pendedTicks);
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+
+  assigns *pendedTicks, xPendedTicks_ghost, \result \from value;
+
+  ensures \result == value;
+  ensures xPendedTicks_ghost == value;
+*/
+TickType_t xPendedTicks_write(volatile TickType_t *pendedTicks,
+                              TickType_t value);
+
+/*@ volatile xPendedTicks
+      reads xPendedTicks_read
+      writes xPendedTicks_write;
+*/
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+
+  assigns \result \from xYieldPendings0_ghost;
+
+  ensures \result == xYieldPendings0_ghost;
+*/
+BaseType_t xYieldPendings0_read(volatile BaseType_t *yieldPending);
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+
+  assigns *yieldPending, xYieldPendings0_ghost, \result \from value;
+
+  ensures \result == value;
+  ensures xYieldPendings0_ghost == value;
+*/
+BaseType_t xYieldPendings0_write(volatile BaseType_t *yieldPending,
+                                 BaseType_t value);
+
+/*@ volatile xYieldPendings[0]
+      reads xYieldPendings0_read
+      writes xYieldPendings0_write;
+*/
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+
+  assigns \result \from xNumOfOverflows_ghost;
+
+  ensures \result == xNumOfOverflows_ghost;
+*/
+BaseType_t xNumOfOverflows_read(volatile BaseType_t *numOverflows);
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+
+  assigns *numOverflows, xNumOfOverflows_ghost, \result \from value;
+
+  ensures \result == value;
+  ensures xNumOfOverflows_ghost == value;
+*/
+BaseType_t xNumOfOverflows_write(volatile BaseType_t *numOverflows,
+                                 BaseType_t value);
+
+/*@ volatile xNumOfOverflows
+      reads xNumOfOverflows_read
+      writes xNumOfOverflows_write;
+*/
 
 /*@
   predicate ReadiedItemBetween{Before,After}(ListItem_t *item,
@@ -126,7 +417,8 @@ typedef struct tskTaskControlBlock TCB_t;
   frees \nothing;
   exits \false;
 
-  assigns xNextTaskUnblockTime;
+  assigns xNextTaskUnblockTime,
+          xNextTaskUnblockTime_ghost;
 */
 static void prvResetNextTaskUnblockTime(void);
 
@@ -150,45 +442,48 @@ static void prvResetNextTaskUnblockTime(void);
 
 /*@
   requires SchedulerListContext(&xReadyTasksList,
-                                pxDelayedTaskList,
-                                pxOverflowDelayedTaskList);
+                                pxDelayedTaskList_ghost,
+                                pxOverflowDelayedTaskList_ghost);
 
   // Termination of the delayed-list drain depends on list-count semantics.
   // This reset proves tick arithmetic only; termination is a later ADT proof.
   terminates \false;
 
   ensures SchedulerListContext(&xReadyTasksList,
-                               pxDelayedTaskList,
-                               pxOverflowDelayedTaskList);
+                               pxDelayedTaskList_ghost,
+                               pxOverflowDelayedTaskList_ghost);
 
   behavior suspended:
-    assumes uxSchedulerSuspended != (UBaseType_t)0U;
+    assumes uxSchedulerSuspended_ghost != (UBaseType_t)0U;
     exits \false;
-    assigns xPendedTicks;
-    ensures xPendedTicks == (TickType_t)(\old(xPendedTicks) + 1U);
-    ensures xTickCount == \old(xTickCount);
+    assigns xPendedTicks,
+            xPendedTicks_ghost;
+    ensures xPendedTicks_ghost ==
+      (TickType_t)(\old(xPendedTicks_ghost) + 1U);
+    ensures xTickCount_ghost == \old(xTickCount_ghost);
     ensures \result == pdFALSE;
 
   behavior running:
-    assumes uxSchedulerSuspended == (UBaseType_t)0U;
-    requires \valid(pxCurrentTCB);
-    requires EDFProperty(&xReadyTasksList, pxCurrentTCB);
+    assumes uxSchedulerSuspended_ghost == (UBaseType_t)0U;
+    requires \valid(pxCurrentTCB_ghost);
+    requires EDFProperty(&xReadyTasksList, pxCurrentTCB_ghost);
 
     exits \false;
 
-    ensures xTickCount == (TickType_t)(\old(xTickCount) + 1U);
+    ensures xTickCount_ghost ==
+      (TickType_t)(\old(xTickCount_ghost) + 1U);
     ensures \result == pdTRUE || \result == pdFALSE;
     ensures \result == pdTRUE ||
-      EDFProperty(&xReadyTasksList, pxCurrentTCB);
+      EDFProperty(&xReadyTasksList, pxCurrentTCB_ghost);
     ensures ReadiedItemsHaveValidDeadlines{Pre,Here}(&xReadyTasksList);
     ensures ReadiedItemsCameFromDelayedLists{Pre,Here}(
       &xReadyTasksList,
-      \at(pxDelayedTaskList, Pre),
-      \at(pxOverflowDelayedTaskList, Pre));
+      \at(pxDelayedTaskList_ghost, Pre),
+      \at(pxOverflowDelayedTaskList_ghost, Pre));
     ensures TickDelayedRemovalsWereReadied{Pre,Here}(
-      \old(xTickCount),
-      \at(pxDelayedTaskList, Pre),
-      \at(pxOverflowDelayedTaskList, Pre),
+      \old(xTickCount_ghost),
+      \at(pxDelayedTaskList_ghost, Pre),
+      \at(pxOverflowDelayedTaskList_ghost, Pre),
       &xReadyTasksList);
 
   complete behaviors suspended, running;
@@ -228,49 +523,56 @@ BaseType_t xTaskIncrementTick(void) {
         if (xConstTickCount >= xNextTaskUnblockTime) {
 TickDrainStart:
             /*@
-              loop invariant xTickCount == (TickType_t)(\at(xTickCount, Pre) + 1U);
-              loop invariant pxCurrentTCB == \at(pxCurrentTCB, Pre);
-              loop invariant \valid(pxCurrentTCB);
-              loop invariant pxDelayedTaskList == \at(pxDelayedTaskList, TickDrainStart);
-              loop invariant pxDelayedTaskList == \at(pxDelayedTaskList, Pre) ||
-                pxDelayedTaskList == \at(pxOverflowDelayedTaskList, Pre);
-              loop invariant ((TickType_t)(\at(xTickCount, Pre) + (TickType_t)1U) ==
+              loop invariant xTickCount_ghost ==
+                (TickType_t)(\at(xTickCount_ghost, Pre) + 1U);
+              loop invariant pxCurrentTCB_ghost == \at(pxCurrentTCB_ghost, Pre);
+              loop invariant \valid(pxCurrentTCB_ghost);
+              loop invariant pxDelayedTaskList_ghost ==
+                \at(pxDelayedTaskList_ghost, TickDrainStart);
+              loop invariant pxDelayedTaskList_ghost ==
+                \at(pxDelayedTaskList_ghost, Pre) ||
+                pxDelayedTaskList_ghost ==
+                  \at(pxOverflowDelayedTaskList_ghost, Pre);
+              loop invariant ((TickType_t)(\at(xTickCount_ghost, Pre) + (TickType_t)1U) ==
                                 (TickType_t)0U) ==>
-                pxDelayedTaskList == \at(pxOverflowDelayedTaskList, Pre);
-              loop invariant ((TickType_t)(\at(xTickCount, Pre) + (TickType_t)1U) !=
+                pxDelayedTaskList_ghost ==
+                  \at(pxOverflowDelayedTaskList_ghost, Pre);
+              loop invariant ((TickType_t)(\at(xTickCount_ghost, Pre) + (TickType_t)1U) !=
                                 (TickType_t)0U) ==>
-                pxDelayedTaskList == \at(pxDelayedTaskList, Pre);
+                pxDelayedTaskList_ghost ==
+                  \at(pxDelayedTaskList_ghost, Pre);
               loop invariant Disjoint{TickDrainStart}(&xReadyTasksList,
-                                                      pxDelayedTaskList);
+                                                      pxDelayedTaskList_ghost);
               loop invariant \forall ListItem_t *item;
-                \valid(item) && In(item, pxDelayedTaskList) ==>
+                \valid(item) && In(item, pxDelayedTaskList_ghost) ==>
                   \valid{TickDrainStart}(item) &&
-                  In{TickDrainStart}(item, pxDelayedTaskList);
+                  In{TickDrainStart}(item, pxDelayedTaskList_ghost);
               loop invariant \forall ListItem_t *item;
                 \valid{TickDrainStart}(item) &&
-                In{TickDrainStart}(item, pxDelayedTaskList) ==>
-                  (In{Pre}(item, \at(pxDelayedTaskList, Pre)) ||
-                   In{Pre}(item, \at(pxOverflowDelayedTaskList, Pre)));
+                In{TickDrainStart}(item, pxDelayedTaskList_ghost) ==>
+                  (In{Pre}(item, \at(pxDelayedTaskList_ghost, Pre)) ||
+                   In{Pre}(item, \at(pxOverflowDelayedTaskList_ghost, Pre)));
               loop invariant SchedulerListContext(&xReadyTasksList,
-                                                  pxDelayedTaskList,
-                                                  pxOverflowDelayedTaskList);
+                                                  pxDelayedTaskList_ghost,
+                                                  pxOverflowDelayedTaskList_ghost);
               loop invariant xSwitchRequired == pdTRUE || xSwitchRequired == pdFALSE;
               loop invariant xSwitchRequired == pdTRUE ||
-                EDFProperty(&xReadyTasksList, pxCurrentTCB);
+                EDFProperty(&xReadyTasksList, pxCurrentTCB_ghost);
               loop invariant ReadiedItemsHaveValidDeadlines{Pre,Here}(
                 &xReadyTasksList);
               loop invariant ReadiedItemsCameFromDelayedLists{Pre,Here}(
                 &xReadyTasksList,
-                \at(pxDelayedTaskList, Pre),
-                \at(pxOverflowDelayedTaskList, Pre));
+                \at(pxDelayedTaskList_ghost, Pre),
+                \at(pxOverflowDelayedTaskList_ghost, Pre));
               loop invariant DelayedRemovalsWereReadied{Pre,Here}(
-                \at(pxDelayedTaskList, TickDrainStart),
+                \at(pxDelayedTaskList_ghost, TickDrainStart),
                 &xReadyTasksList);
 
               loop assigns pxTCB,
                            xItemValue,
                            xSwitchRequired,
                            xNextTaskUnblockTime,
+                           xNextTaskUnblockTime_ghost,
                            { list->uxNumberOfItems | List_t *list; \valid(list) },
                            { item->xItemValue | ListItem_t *item; \valid(item) },
                            { item->pxContainer | ListItem_t *item; \valid(item) };
@@ -306,13 +608,13 @@ TickDrainStart:
 
                     /* It is time to remove the item from the Blocked state. */
 TickReadySetBeforeUnblock:
-                    //@ assert In(&pxTCB->xStateListItem, pxDelayedTaskList);
+                    //@ assert In(&pxTCB->xStateListItem, pxDelayedTaskList_ghost);
                     //@ assert \valid{TickDrainStart}(&pxTCB->xStateListItem);
-                    //@ assert In{TickDrainStart}(&pxTCB->xStateListItem, pxDelayedTaskList);
+                    //@ assert In{TickDrainStart}(&pxTCB->xStateListItem, pxDelayedTaskList_ghost);
                     /*@ assert In{Pre}(&pxTCB->xStateListItem,
-                                        \at(pxDelayedTaskList, Pre)) ||
+                                        \at(pxDelayedTaskList_ghost, Pre)) ||
                                In{Pre}(&pxTCB->xStateListItem,
-                                        \at(pxOverflowDelayedTaskList, Pre)); */
+                                        \at(pxOverflowDelayedTaskList_ghost, Pre)); */
                     //@ assert !In{Pre}(&pxTCB->xStateListItem, &xReadyTasksList);
                     //@ assert !In{TickDrainStart}(&pxTCB->xStateListItem, &xReadyTasksList);
                     listREMOVE_ITEM(&(pxTCB->xStateListItem));
@@ -333,11 +635,11 @@ TickReadySetBeforeUnblock:
                     //@ assert sanity_tick_unblock_probe: \false;
 #endif
                     /*@ assert xSwitchRequired == pdTRUE ||
-                               In(&pxCurrentTCB->xStateListItem,
+                               In(&pxCurrentTCB_ghost->xStateListItem,
                                   &xReadyTasksList); */
                     /*@ assert xSwitchRequired == pdTRUE ||
                                ListValueLowerBound(&xReadyTasksList,
-                                                   pxCurrentTCB->xDeadline); */
+                                                   pxCurrentTCB_ghost->xDeadline); */
                     prvAddTaskToReadyList(pxTCB);
                     /* Carry the delayed-removal/readied relation across this
                      * unblock: previous removals stay accounted for, and the
@@ -346,16 +648,16 @@ TickReadySetBeforeUnblock:
                     //@ assert ReadyItemDeadlineMatches(&pxTCB->xStateListItem);
                     //@ assert ReadyList(&xReadyTasksList);
                     /*@ assert SchedulerListContext(&xReadyTasksList,
-                                                     pxDelayedTaskList,
-                                                     pxOverflowDelayedTaskList); */
+                                                     pxDelayedTaskList_ghost,
+                                                     pxOverflowDelayedTaskList_ghost); */
                     /*@ assert ReadiedItemBetween{Pre,Here}
                           (&pxTCB->xStateListItem, &xReadyTasksList); */
                     /*@ assert RemovedItemBetween{Pre,Here}
                           (&pxTCB->xStateListItem,
-                           \at(pxDelayedTaskList, TickDrainStart)); */
+                           \at(pxDelayedTaskList_ghost, TickDrainStart)); */
                     /*@ assert DelayedRemovalsWereReadied
                           {Pre,TickReadySetBeforeUnblock}
-                          (\at(pxDelayedTaskList, TickDrainStart),
+                          (\at(pxDelayedTaskList_ghost, TickDrainStart),
                            &xReadyTasksList); */
                     /*@ assert PriorReadiedItemsStayReadied
                           {Pre,TickReadySetBeforeUnblock,Here}
@@ -363,9 +665,9 @@ TickReadySetBeforeUnblock:
                     /*@ assert PriorDelayedRemovalsAreUnchanged
                           {Pre,TickReadySetBeforeUnblock,Here}
                           (&pxTCB->xStateListItem,
-                           \at(pxDelayedTaskList, TickDrainStart)); */
+                           \at(pxDelayedTaskList_ghost, TickDrainStart)); */
                     /*@ assert DelayedRemovalsWereReadied{Pre,Here}
-                          (\at(pxDelayedTaskList, TickDrainStart),
+                          (\at(pxDelayedTaskList_ghost, TickDrainStart),
                            &xReadyTasksList); */
 
                            /* A task being unblocked cannot cause an immediate context switch if

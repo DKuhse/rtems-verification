@@ -65,11 +65,13 @@ run_soundness_probe() {
     output=$(frama-c \
         -cpp-command "${CPP_CMD}" \
         -machdep "${MACHDEP}" -cpp-frama-c-compliant -std c11 \
+        "${probe_source}" \
+        -volatile \
+        -then-on Volatile \
         -wp -wp-fct "${function_name}" -wp-model "Typed+Cast" \
         -wp-report-json "${report}" \
         -wp-timeout 10 \
-        "$@" \
-        "${probe_source}" 2>&1) || true
+        "$@" 2>&1) || true
 
     probe_lines=$(awk -v function_name="${function_name}" '
         /"goal":/ {
@@ -130,7 +132,9 @@ echo "--- vTaskDelay / xTaskDelayUntil (reference) ---"
 frama-c \
     -cpp-command "${CPP_CMD}" \
     -machdep "${MACHDEP}" -cpp-frama-c-compliant -std c11 \
+    "${DELAY_SOURCE}" \
+    -volatile \
+    -then-on Volatile \
     -wp -wp-fct vTaskDelay,xTaskDelayUntil,xTaskDelayUntilReadyRefresh,prvAddCurrentTaskToDelayedList,xTaskResumeAll,vPortYield -wp-model "Typed+Cast" \
     -wp-timeout 10 \
-    "$@" \
-    "${DELAY_SOURCE}"
+    "$@"

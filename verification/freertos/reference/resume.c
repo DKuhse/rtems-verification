@@ -47,20 +47,22 @@ typedef TCB_t * TaskHandle_t;
         tracePOST_MOVED_TASK_TO_READY_STATE(pxTCB);                         \
     } while (0)
 
-/* Hack: Frama-C can't handle volatile. */
+/* Frama-C's Volatile plugin instruments the source-shaped volatile globals
+ * through the ghost mirrors below.
+ */
 #ifdef __FRAMAC__
-    TCB_t *     pxCurrentTCB;
+    TCB_t * volatile pxCurrentTCB;
     List_t      xReadyTasksList;
     List_t      xSuspendedTaskList;
     List_t      xPendingReadyList;
-    UBaseType_t uxSchedulerSuspended;
-    BaseType_t  xYieldPendings[1];
+    volatile UBaseType_t uxSchedulerSuspended;
+    volatile BaseType_t  xYieldPendings[1];
     List_t      xDelayedTaskList1;
     List_t      xDelayedTaskList2;
-    List_t *    pxDelayedTaskList;
-    List_t *    pxOverflowDelayedTaskList;
+    List_t * volatile pxDelayedTaskList;
+    List_t * volatile pxOverflowDelayedTaskList;
 #else
-    volatile TCB_t *     pxCurrentTCB;
+    TCB_t * volatile     pxCurrentTCB;
     List_t               xReadyTasksList;
     List_t               xSuspendedTaskList;
     List_t               xPendingReadyList;
@@ -72,6 +74,147 @@ typedef TCB_t * TaskHandle_t;
     List_t * volatile    pxOverflowDelayedTaskList;
 #endif
 
+/*@ ghost TCB_t *pxCurrentTCB_ghost; */
+/*@ ghost UBaseType_t uxSchedulerSuspended_ghost; */
+/*@ ghost BaseType_t xYieldPendings0_ghost; */
+/*@ ghost List_t *pxDelayedTaskList_ghost; */
+/*@ ghost List_t *pxOverflowDelayedTaskList_ghost; */
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns \result \from pxCurrentTCB_ghost;
+  ensures \result == pxCurrentTCB_ghost;
+*/
+TCB_t *pxCurrentTCB_read(TCB_t * volatile *current);
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns *current, pxCurrentTCB_ghost, \result \from value;
+  ensures \result == value;
+  ensures pxCurrentTCB_ghost == value;
+*/
+TCB_t *pxCurrentTCB_write(TCB_t * volatile *current,
+                          TCB_t *value);
+
+/*@ volatile pxCurrentTCB
+      reads pxCurrentTCB_read
+      writes pxCurrentTCB_write;
+*/
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns \result \from uxSchedulerSuspended_ghost;
+  ensures \result == uxSchedulerSuspended_ghost;
+*/
+UBaseType_t uxSchedulerSuspended_read(volatile UBaseType_t *suspended);
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns *suspended, uxSchedulerSuspended_ghost, \result \from value;
+  ensures \result == value;
+  ensures uxSchedulerSuspended_ghost == value;
+*/
+UBaseType_t uxSchedulerSuspended_write(volatile UBaseType_t *suspended,
+                                       UBaseType_t value);
+
+/*@ volatile uxSchedulerSuspended
+      reads uxSchedulerSuspended_read
+      writes uxSchedulerSuspended_write;
+*/
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns \result \from xYieldPendings0_ghost;
+  ensures \result == xYieldPendings0_ghost;
+*/
+BaseType_t xYieldPendings0_read(volatile BaseType_t *yieldPending);
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns *yieldPending, xYieldPendings0_ghost, \result \from value;
+  ensures \result == value;
+  ensures xYieldPendings0_ghost == value;
+*/
+BaseType_t xYieldPendings0_write(volatile BaseType_t *yieldPending,
+                                 BaseType_t value);
+
+/*@ volatile xYieldPendings[0]
+      reads xYieldPendings0_read
+      writes xYieldPendings0_write;
+*/
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns \result \from pxDelayedTaskList_ghost;
+  ensures \result == pxDelayedTaskList_ghost;
+*/
+List_t *pxDelayedTaskList_read(List_t * volatile *list);
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns *list, pxDelayedTaskList_ghost, \result \from value;
+  ensures \result == value;
+  ensures pxDelayedTaskList_ghost == value;
+*/
+List_t *pxDelayedTaskList_write(List_t * volatile *list,
+                                List_t *value);
+
+/*@ volatile pxDelayedTaskList
+      reads pxDelayedTaskList_read
+      writes pxDelayedTaskList_write;
+*/
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns \result \from pxOverflowDelayedTaskList_ghost;
+  ensures \result == pxOverflowDelayedTaskList_ghost;
+*/
+List_t *pxOverflowDelayedTaskList_read(List_t * volatile *list);
+
+/*@
+  terminates \true;
+  allocates \nothing;
+  frees \nothing;
+  exits \false;
+  assigns *list, pxOverflowDelayedTaskList_ghost, \result \from value;
+  ensures \result == value;
+  ensures pxOverflowDelayedTaskList_ghost == value;
+*/
+List_t *pxOverflowDelayedTaskList_write(List_t * volatile *list,
+                                        List_t *value);
+
+/*@ volatile pxOverflowDelayedTaskList
+      reads pxOverflowDelayedTaskList_read
+      writes pxOverflowDelayedTaskList_write;
+*/
+
 /*@
   requires xReadyTasksList.uxNumberOfItems > (UBaseType_t)0U;
   requires ReadyList(&xReadyTasksList);
@@ -81,18 +224,21 @@ typedef TCB_t * TaskHandle_t;
   frees \nothing;
   exits \false;
 
-  assigns pxCurrentTCB, xYieldPendings[0];
+  assigns pxCurrentTCB,
+          pxCurrentTCB_ghost,
+          xYieldPendings[0],
+          xYieldPendings0_ghost;
 
   behavior suspended:
-    assumes uxSchedulerSuspended != (UBaseType_t)0U;
-    ensures xYieldPendings[0] == pdTRUE;
-    ensures pxCurrentTCB == \old(pxCurrentTCB);
+    assumes uxSchedulerSuspended_ghost != (UBaseType_t)0U;
+    ensures xYieldPendings0_ghost == pdTRUE;
+    ensures pxCurrentTCB_ghost == \old(pxCurrentTCB_ghost);
 
   behavior running:
-    assumes uxSchedulerSuspended == (UBaseType_t)0U;
-    ensures xYieldPendings[0] == pdFALSE;
-    ensures pxCurrentTCB == (TCB_t *)Head(&xReadyTasksList)->pvOwner;
-    ensures EDFProperty(&xReadyTasksList, pxCurrentTCB);
+    assumes uxSchedulerSuspended_ghost == (UBaseType_t)0U;
+    ensures xYieldPendings0_ghost == pdFALSE;
+    ensures pxCurrentTCB_ghost == (TCB_t *)Head(&xReadyTasksList)->pvOwner;
+    ensures EDFProperty(&xReadyTasksList, pxCurrentTCB_ghost);
 
   complete behaviors;
   disjoint behaviors;
@@ -150,12 +296,12 @@ void vPortYieldRestoreContext(void);
 #define portRESTORE_CONTEXT() vPortYieldRestoreContext()
 
 /*@
-  requires uxSchedulerSuspended == (UBaseType_t)0U;
+  requires uxSchedulerSuspended_ghost == (UBaseType_t)0U;
   requires xReadyTasksList.uxNumberOfItems > (UBaseType_t)0U;
   requires ReadyList(&xReadyTasksList);
   requires SchedulerSuspendedListContext(&xReadyTasksList,
-                                         pxDelayedTaskList,
-                                         pxOverflowDelayedTaskList,
+                                         pxDelayedTaskList_ghost,
+                                         pxOverflowDelayedTaskList_ghost,
                                          &xSuspendedTaskList);
 
   terminates \true;
@@ -164,12 +310,14 @@ void vPortYieldRestoreContext(void);
   exits \false;
 
   assigns pxCurrentTCB,
-          xYieldPendings[0];
+          pxCurrentTCB_ghost,
+          xYieldPendings[0],
+          xYieldPendings0_ghost;
 
-  ensures EDFProperty(&xReadyTasksList, pxCurrentTCB);
+  ensures EDFProperty(&xReadyTasksList, pxCurrentTCB_ghost);
   ensures SchedulerSuspendedListContext(&xReadyTasksList,
-                                        pxDelayedTaskList,
-                                        pxOverflowDelayedTaskList,
+                                        pxDelayedTaskList_ghost,
+                                        pxOverflowDelayedTaskList_ghost,
                                         &xSuspendedTaskList);
 */
 void vPortYield(void) {
@@ -208,8 +356,8 @@ void vPortYield(void) {
   requires In(&xTask->xStateListItem, &xSuspendedTaskList);
   requires xTask->xEventListItem.pxContainer == \null;
   requires SchedulerSuspendedListContext(&xReadyTasksList,
-                                         pxDelayedTaskList,
-                                         pxOverflowDelayedTaskList,
+                                         pxDelayedTaskList_ghost,
+                                         pxOverflowDelayedTaskList_ghost,
                                          &xSuspendedTaskList);
 
   terminates \true;
@@ -221,8 +369,8 @@ void vPortYield(void) {
 
   ensures \result == pdTRUE;
   ensures SchedulerSuspendedListContext(&xReadyTasksList,
-                                        pxDelayedTaskList,
-                                        pxOverflowDelayedTaskList,
+                                        pxDelayedTaskList_ghost,
+                                        pxOverflowDelayedTaskList_ghost,
                                         &xSuspendedTaskList);
 */
 static BaseType_t prvTaskIsTaskSuspended(const TaskHandle_t xTask) {
@@ -279,22 +427,22 @@ static BaseType_t prvTaskIsTaskSuspended(const TaskHandle_t xTask) {
 }
 
 /*@
-  requires uxSchedulerSuspended == (UBaseType_t)0U;
+  requires uxSchedulerSuspended_ghost == (UBaseType_t)0U;
   requires xTaskToResume != \null;
-  requires xTaskToResume != pxCurrentTCB;
+  requires xTaskToResume != pxCurrentTCB_ghost;
   requires \valid(xTaskToResume);
-  requires \valid(pxCurrentTCB);
+  requires \valid(pxCurrentTCB_ghost);
   requires TaskItem(&xTaskToResume->xStateListItem);
   requires In(&xTaskToResume->xStateListItem, &xSuspendedTaskList);
   requires xTaskToResume->xEventListItem.pxContainer == \null;
   requires xReadyTasksList.uxNumberOfItems > (UBaseType_t)0U;
-  requires EDFProperty(&xReadyTasksList, pxCurrentTCB);
+  requires EDFProperty(&xReadyTasksList, pxCurrentTCB_ghost);
   requires SchedulerSuspendedListContext(&xReadyTasksList,
-                                         pxDelayedTaskList,
-                                         pxOverflowDelayedTaskList,
+                                         pxDelayedTaskList_ghost,
+                                         pxOverflowDelayedTaskList_ghost,
                                          &xSuspendedTaskList);
   requires \separated(xTaskToResume,
-                      pxCurrentTCB,
+                      pxCurrentTCB_ghost,
                       &pxCurrentTCB,
                       &uxSchedulerSuspended,
                       &xYieldPendings[0],
@@ -318,27 +466,29 @@ static BaseType_t prvTaskIsTaskSuspended(const TaskHandle_t xTask) {
           xTaskToResume->xStateListItem.xItemValue,
           xTaskToResume->xStateListItem.pxContainer,
           pxCurrentTCB,
-          xYieldPendings[0];
+          pxCurrentTCB_ghost,
+          xYieldPendings[0],
+          xYieldPendings0_ghost;
 
-  ensures uxSchedulerSuspended == \old(uxSchedulerSuspended);
+  ensures uxSchedulerSuspended_ghost == \old(uxSchedulerSuspended_ghost);
   ensures SchedulerSuspendedListContext(&xReadyTasksList,
-                                        pxDelayedTaskList,
-                                        pxOverflowDelayedTaskList,
+                                        pxDelayedTaskList_ghost,
+                                        pxOverflowDelayedTaskList_ghost,
                                         &xSuspendedTaskList);
-  ensures EDFProperty(&xReadyTasksList, pxCurrentTCB);
+  ensures EDFProperty(&xReadyTasksList, pxCurrentTCB_ghost);
   ensures In(&xTaskToResume->xStateListItem, &xReadyTasksList);
   ensures !In(&xTaskToResume->xStateListItem, &xSuspendedTaskList);
   ensures xTaskToResume->xStateListItem.xItemValue ==
     xTaskToResume->xDeadline;
 
   behavior resumed_preempts:
-    assumes pxCurrentTCB->xDeadline > xTaskToResume->xDeadline;
-    ensures EDFProperty(&xReadyTasksList, pxCurrentTCB);
+    assumes pxCurrentTCB_ghost->xDeadline > xTaskToResume->xDeadline;
+    ensures EDFProperty(&xReadyTasksList, pxCurrentTCB_ghost);
 
   behavior resumed_without_preempting:
-    assumes pxCurrentTCB->xDeadline <= xTaskToResume->xDeadline;
-    ensures pxCurrentTCB == \old(pxCurrentTCB);
-    ensures EDFProperty(&xReadyTasksList, pxCurrentTCB);
+    assumes pxCurrentTCB_ghost->xDeadline <= xTaskToResume->xDeadline;
+    ensures pxCurrentTCB_ghost == \old(pxCurrentTCB_ghost);
+    ensures EDFProperty(&xReadyTasksList, pxCurrentTCB_ghost);
 
   complete behaviors;
   disjoint behaviors;
@@ -390,8 +540,8 @@ void vTaskResume(TaskHandle_t xTaskToResume) {
                 //@ assert In(&pxTCB->xStateListItem, &xReadyTasksList);
                 //@ assert pxTCB->xStateListItem.xItemValue == pxTCB->xDeadline;
                 /*@ assert SchedulerSuspendedListContext(&xReadyTasksList,
-                                                          pxDelayedTaskList,
-                                                          pxOverflowDelayedTaskList,
+                                                          pxDelayedTaskList_ghost,
+                                                          pxOverflowDelayedTaskList_ghost,
                                                           &xSuspendedTaskList); */
                 //@ assert xReadyTasksList.uxNumberOfItems > (UBaseType_t)0U;
 #endif
