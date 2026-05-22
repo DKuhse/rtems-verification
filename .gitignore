@@ -2,3 +2,4 @@
 cache/
 *.aux
 *.glob
+scripts/bench/results/
