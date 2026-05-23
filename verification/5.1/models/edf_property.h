@@ -185,19 +185,8 @@
 
 /*
  * EDF-specialized contract on `_RBTree_Minimum`.
- *
- * `_RBTree_Minimum` is a generic RBTree helper whose body lives outside the
- * abstract ready-set model.  We re-declare it here, after both
- * `edf_ready_set_from_root` (in edf_ready_set.h) and `edf_ready_earliest_node`
- * (above) are in scope, with a contract that ties the returned
- * `RBTree_Node *` to the embedded `Node` field of an EDF-earliest
- * `Scheduler_EDF_Node`.
- *
- * The EDF claim is conditional on the tree being interpretable as an
- * EDF ready set with at least one member.  For non-EDF callers the
- * `\result != \null` claim is preserved via the rbh_root case split, and
- * the existential is not activated.
- *
+ * In RTEMS 5.1 there's no EDF-specific minimum wrapper, so we annotate
+ * this here instead of in the generic rbtree.h.
  * This is the actual abstract-RBTree boundary: callers above this layer
  * never reason about RBTree pointer/color mechanics.
  */
@@ -209,14 +198,6 @@
   ensures the_rbtree->rbh_root == \null ==> \result == \null;
   ensures the_rbtree->rbh_root != \null ==> \result != \null;
 
-  // EDF claim: when the abstract ready set is non-empty, the container of
-  // the returned RBTree_Node is an EDF-earliest `Scheduler_EDF_Node`.
-  // The container is expressed using the same `(uintptr_t) ... -
-  // offsetof(...)` arithmetic that `RTEMS_CONTAINER_OF` expands to in the
-  // body, so WP canonicalizes both forms to the same address-arithmetic
-  // expression.  (ACSL annotations don't macro-expand `RTEMS_CONTAINER_OF`
-  // directly because `offsetof` is a C builtin that the ACSL parser
-  // rejects, so we write the expansion by hand.)
   ensures
     ( \exists Scheduler_EDF_Node *m;
         m \in edf_ready_set_from_root( the_rbtree->rbh_root ) ) ==>

@@ -91,13 +91,11 @@ struct timeval   sbttotv( int64_t );
   requires \valid(
     &_Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp );
 
-  requires edf_preemptible_heir_is_earliest_ready{Pre}(
+  requires edf_scheduler_decision{Pre}(
     (Scheduler_EDF_Context *) scheduler->context,
-    _Thread_Heir,
-    _Thread_Heir->is_preemptible );
-  requires edf_dispatch_set_if_heir_differs(
     _Per_CPU_Information[ 0 ].per_cpu.executing,
     _Thread_Heir,
+    _Thread_Heir->is_preemptible,
     _Thread_Dispatch_necessary_ghost );
 
   // In the heir branch, after extracting the_thread's node the ready set
@@ -154,14 +152,12 @@ struct timeval   sbttotv( int64_t );
               (Scheduler_EDF_Context *) scheduler->context ),
             (Scheduler_EDF_Node *) node );
 
-  // EDF property at exit.
-  ensures edf_preemptible_heir_is_earliest_ready{Post}(
+  // P3 at exit.
+  ensures edf_scheduler_decision{Post}(
     (Scheduler_EDF_Context *) scheduler->context,
-    _Thread_Heir,
-    _Thread_Heir->is_preemptible );
-  ensures edf_dispatch_set_if_heir_differs(
     _Per_CPU_Information[ 0 ].per_cpu.executing,
     _Thread_Heir,
+    _Thread_Heir->is_preemptible,
     _Thread_Dispatch_necessary_ghost );
 
   // Inductive invariant: the ready context remains well-formed at every

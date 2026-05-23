@@ -66,8 +66,6 @@ struct timeval   sbttotv( int64_t );
           _Per_CPU_Information[ 0 ].per_cpu.heir->cpu_time_used,
           _Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp;
 
-  // Either the heir survived (was non-preemptible, or already earliest),
-  // or it was replaced by the owner of an EDF-earliest ready node.
   ensures \at( _Thread_Heir, Pre ) == _Thread_Heir ||
           ( \exists Scheduler_EDF_Node *node;
               edf_ready_earliest_node{Pre}(

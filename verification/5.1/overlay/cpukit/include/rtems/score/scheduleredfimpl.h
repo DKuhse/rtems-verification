@@ -338,11 +338,6 @@ RTEMS_INLINE_ROUTINE void _Scheduler_EDF_Extract_body(
   assigns \at( _Thread_Heir, Pre )->cpu_time_used,
           _Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp;
 
-  // Either the previous heir survived (it was the EDF-earliest owner
-  // already, or it was non-preemptible without force_dispatch), or the
-  // new heir owns an EDF-earliest ready node.  Phrased through the
-  // existing `edf_thread_owns_earliest_ready_node` predicate so WP
-  // doesn't have to skolemize a raw `\exists` at the call site.
   ensures \at( _Thread_Heir, Pre ) == _Thread_Heir ||
           edf_thread_owns_earliest_ready_node{Pre}(
             edf_ready_set{Pre}(

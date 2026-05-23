@@ -103,15 +103,14 @@ struct timeval   sbttotv( int64_t );
   requires \valid(
     &_Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp );
 
-  // EDF property assumed at entry: heir is non-preemptible or owns the
-  // earliest-ready scheduler node. Proven again at exit (post-call heir).
-  requires edf_preemptible_heir_is_earliest_ready{Pre}(
+  // P3 assumed at entry: heir is non-preemptible or owns the earliest-ready
+  // scheduler node, and dispatch is set if heir differs from executing.
+  // Proven again at exit (post-call heir).
+  requires edf_scheduler_decision{Pre}(
     (Scheduler_EDF_Context *) scheduler->context,
-    _Thread_Heir,
-    _Thread_Heir->is_preemptible );
-  requires edf_dispatch_set_if_heir_differs(
     _Per_CPU_Information[ 0 ].per_cpu.executing,
     _Thread_Heir,
+    _Thread_Heir->is_preemptible,
     _Thread_Dispatch_necessary_ghost );
 
   // The new node belongs to the_thread; needed to make the_thread the
@@ -191,14 +190,13 @@ struct timeval   sbttotv( int64_t );
   ensures edf_ready_context_cache_consistent{Post}(
     (Scheduler_EDF_Context *) scheduler->context );
 
-  //edf property: the new heir is the earliest ready thread (if preemptible)
-  ensures edf_preemptible_heir_is_earliest_ready{Post}(
+  // P3 at exit: new heir is the earliest-ready thread (if preemptible),
+  // dispatch is set if heir differs from executing.
+  ensures edf_scheduler_decision{Post}(
     (Scheduler_EDF_Context *) scheduler->context,
-    _Thread_Heir,
-    _Thread_Heir->is_preemptible );
-  ensures edf_dispatch_set_if_heir_differs(
     _Per_CPU_Information[ 0 ].per_cpu.executing,
     _Thread_Heir,
+    _Thread_Heir->is_preemptible,
     _Thread_Dispatch_necessary_ghost );
 
   behavior keep_due_to_priority:

@@ -8,7 +8,7 @@
 #
 set -e
 
-WP_FCTS="${WP_FCTS:-_Scheduler_EDF_Schedule,_Scheduler_EDF_Schedule_body,_Scheduler_EDF_Get_context}"
+WP_FCTS="${WP_FCTS:-_Scheduler_EDF_Schedule,_Scheduler_EDF_Schedule_body,_Scheduler_EDF_Get_context,_Scheduler_EDF_Extract_body}"
 # _Scheduler_Update_heir is verified separately by verify-scheduler-update-heir.sh.
 # `_Scheduler_EDF_Schedule_body` is verifiable here against the EDF-specialized
 # `_RBTree_Minimum` contract in `models/edf_ready_set.h`, which is the actual

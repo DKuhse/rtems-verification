@@ -57,6 +57,6 @@ ${FRAMA_C_CMD} \
     -volatile \
     -then-on Volatile \
     -wp \
-    -wp-fct "_Scheduler_Update_heir" \
+    -wp-fct "_Scheduler_Update_heir,_Thread_Get_CPU" \
     ${WP_DEFAULTS} \
     "$@"

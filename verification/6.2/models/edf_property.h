@@ -92,14 +92,30 @@
         Thread_Control        *heir,
         boolean                is_preemptible
       ) =
-        !is_preemptible || edf_thread_is_earliest_ready{L}( context, heir );
+        is_preemptible ==> edf_thread_is_earliest_ready{L}( context, heir );
 
       predicate edf_dispatch_set_if_heir_differs(
         Thread_Control *executing,
         Thread_Control *heir,
         boolean         dispatch_necessary
       ) =
-        executing == heir || dispatch_necessary;
+        executing != heir ==> dispatch_necessary;
+
+
+      // EDF scheduler invariant
+      predicate edf_scheduler_decision{L}(
+        Scheduler_EDF_Context *context,
+        Thread_Control        *executing,
+        Thread_Control        *heir,
+        boolean                is_preemptible,
+        boolean                dispatch_necessary
+      ) =
+        // (P3.a) scheduler picks argmin from ready queue
+        edf_preemptible_heir_is_earliest_ready{L}(
+          context, heir, is_preemptible ) &&
+        // (P3.b) heir != executing ==> context switch scheduled
+        edf_dispatch_set_if_heir_differs(
+          executing, heir, dispatch_necessary );
 
       // --- Bridge ------------------------------------------------------
       // Existential introduction: a concrete witness satisfying the

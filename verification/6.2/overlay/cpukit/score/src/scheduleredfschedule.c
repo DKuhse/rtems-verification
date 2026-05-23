@@ -102,14 +102,12 @@ struct timeval   sbttotv( int64_t );
           _Per_CPU_Information[ 0 ].per_cpu.heir->cpu_time_used,
           _Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp;
 
-  // EDF property at exit. Note: no requires of the ready-order property at entry.
-  ensures edf_preemptible_heir_is_earliest_ready{Post}(
+  // P3 at exit. Note: no requires of the ready-order property at entry.
+  ensures edf_scheduler_decision{Post}(
     (Scheduler_EDF_Context *) scheduler->context,
-    _Thread_Heir,
-    _Thread_Heir->is_preemptible );
-  ensures edf_dispatch_set_if_heir_differs(
     _Per_CPU_Information[ 0 ].per_cpu.executing,
     _Thread_Heir,
+    _Thread_Heir->is_preemptible,
     _Thread_Dispatch_necessary_ghost );
 
   // Inductive invariant: the ready context remains well-formed at every
