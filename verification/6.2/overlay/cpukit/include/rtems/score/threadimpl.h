@@ -74,8 +74,11 @@ void _Thread_queue_Do_nothing_priority_actions(
 );
 
 /*@
+  // NOTE: the bare `\valid(the_thread)` / `\valid(heir)` clauses are
+  // deliberately omitted from these predicate bodies. `\valid(T*)` inside
+  // a predicate body is unsound for flexible-tail structs — Thread_Control
+  // has a trailing `extensions[ RTEMS_ZERO_LENGTH_ARRAY ]`
   predicate thread_priority_edf_node_valid{L}( Thread_Control *the_thread ) =
-    \valid( the_thread ) &&
     \valid_read( &the_thread->current_state ) &&
     \valid_read( &the_thread->Scheduler.nodes ) &&
     \valid( the_thread->Scheduler.nodes ) &&
@@ -85,8 +88,8 @@ void _Thread_queue_Do_nothing_priority_actions(
     ((Scheduler_EDF_Node *) the_thread->Scheduler.nodes)->Base.owner ==
       the_thread;
 
+  // NOTE: Same as above.
   predicate thread_priority_edf_heir_valid{L}( Thread_Control *heir ) =
-    \valid( heir ) &&
     \valid_read( &heir->is_preemptible ) &&
     \valid_read( &heir->Scheduler.nodes ) &&
     \valid( heir->Scheduler.nodes ) &&
@@ -1280,12 +1283,18 @@ void _Thread_Priority_replace(
   requires \valid( (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
   requires edf_ready_context_well_formed{Pre}(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
+  // `\valid(Thread_Control *)` lifted out of the predicate body — see note
+  // on the predicate definitions above.
+  requires \valid( _Thread_Heir );
   requires thread_priority_edf_heir_valid{Pre}( _Thread_Heir );
   requires edf_preemptible_heir_is_earliest_ready{Pre}(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
     _Thread_Heir,
     _Thread_Heir->is_preemptible );
 
+  // `\valid(Thread_Control *)` lifted out of the predicate body — gated.
+  requires queue_context->Priority.update_count == 1 ==>
+    \valid( queue_context->Priority.update[ 0 ] );
   requires queue_context->Priority.update_count == 1 ==>
     thread_priority_edf_node_valid{Pre}(
       queue_context->Priority.update[ 0 ] );

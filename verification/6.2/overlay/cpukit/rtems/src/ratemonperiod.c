@@ -184,12 +184,18 @@ static void _Rate_monotonic_Release_postponed_job(
   requires edf_ready_context_well_formed{Pre}(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
 
+  // `\valid(Thread_Control *)` lifted out of the predicate body — see note
+  // on the predicate definitions in threadimpl.h.
+  requires \valid( owner );
+  requires \valid( _Thread_Heir );
   requires thread_priority_edf_node_valid{Pre}( owner );
   requires thread_priority_edf_heir_valid{Pre}( _Thread_Heir );
-  requires edf_preemptible_heir_is_earliest_ready{Pre}(
+  requires edf_scheduler_decision{Pre}(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+    _Per_CPU_Information[ 0 ].per_cpu.executing,
     _Thread_Heir,
-    _Thread_Heir->is_preemptible );
+    _Thread_Heir->is_preemptible,
+    _Thread_Dispatch_necessary_ghost );
 
   requires priority_aggregation_well_formed{Pre}(
     &owner->Scheduler.nodes->Wait.Priority );
@@ -270,6 +276,7 @@ static void _Rate_monotonic_Release_postponed_job(
           ((Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context)->Ready,
           _Per_CPU_Information[ 0 ].per_cpu.heir,
           _Per_CPU_Information[ 0 ].per_cpu.dispatch_necessary,
+          _Thread_Dispatch_necessary_ghost,
           _Thread_Heir->cpu_time_used,
           _Per_CPU_Information[ 0 ].per_cpu.heir->cpu_time_used,
           _Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp;
@@ -288,10 +295,12 @@ static void _Rate_monotonic_Release_postponed_job(
       \at( _Per_CPU_Information[ 0 ].per_cpu.Watchdog.ticks, Pre ) +
       next_length
     );
-  ensures edf_preemptible_heir_is_earliest_ready{Post}(
+  ensures edf_scheduler_decision{Post}(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+    _Per_CPU_Information[ 0 ].per_cpu.executing,
     _Thread_Heir,
-    _Thread_Heir->is_preemptible );
+    _Thread_Heir->is_preemptible,
+    _Thread_Dispatch_necessary_ghost );
   ensures owner->current_state == STATES_READY ==>
     edf_ready_node_cache_consistent{Post}(
       (Scheduler_EDF_Node *) owner->Scheduler.nodes );

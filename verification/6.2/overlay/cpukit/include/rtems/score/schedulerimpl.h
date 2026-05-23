@@ -379,6 +379,10 @@ static inline void _Scheduler_Unblock( Thread_Control *the_thread )
   requires \valid( (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
   requires edf_ready_context_well_formed{Pre}(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
+  // `\valid(Thread_Control *)` lifted out of the predicate body — see note
+  // on the predicate definitions in threadimpl.h.
+  requires \valid( the_thread );
+  requires \valid( _Thread_Heir );
   requires thread_priority_edf_node_valid{Pre}( the_thread );
   requires thread_priority_edf_heir_valid{Pre}( _Thread_Heir );
   requires edf_preemptible_heir_is_earliest_ready{Pre}(
