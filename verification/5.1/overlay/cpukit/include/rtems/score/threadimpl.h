@@ -838,6 +838,10 @@ Thread_Control *_Thread_Get(
  *
  * @return The cpu of the thread's scheduler.
  */
+/*@
+  assigns \nothing;
+  ensures \result == &_Per_CPU_Information[ 0 ].per_cpu;
+*/
 RTEMS_INLINE_ROUTINE Per_CPU_Control *_Thread_Get_CPU(
   const Thread_Control *thread
 )
@@ -1126,6 +1130,9 @@ RTEMS_INLINE_ROUTINE Thread_Control *_Thread_Get_heir_and_make_it_executing(
  *      used.
  * @param cpu The cpu.
  */
+/*@
+assigns cpu->cpu_usage_timestamp, the_thread->cpu_time_used;
+*/
 RTEMS_INLINE_ROUTINE void _Thread_Update_CPU_time_used(
   Thread_Control  *the_thread,
   Per_CPU_Control *cpu

@@ -617,7 +617,31 @@ typedef struct {
  *
  *  This is an array of per CPU core information.
  */
+#if defined( __FRAMAC__ )
+/*
+ * Frama-C/WP does not handle a pristine unsized extern array well.  This is
+ * a non-SMP slice, so we expose it as a one-element array at index 0.
+ * Mirrors the active 6.2 overlay.
+ */
+extern Per_CPU_Control_envelope _Per_CPU_Information[1U] CPU_STRUCTURE_ALIGNMENT;
+
+/*@ ghost bool _Thread_Dispatch_necessary_ghost; */
+
+/*@
+  assigns *dispatch_necessary, _Thread_Dispatch_necessary_ghost;
+  ensures _Thread_Dispatch_necessary_ghost == value;
+*/
+bool _Thread_Dispatch_necessary_write(
+  volatile bool *dispatch_necessary,
+  bool           value
+);
+
+/*@ volatile _Per_CPU_Information[0].per_cpu.dispatch_necessary
+      writes _Thread_Dispatch_necessary_write;
+*/
+#else
 extern Per_CPU_Control_envelope _Per_CPU_Information[] CPU_STRUCTURE_ALIGNMENT;
+#endif
 
 #define _Per_CPU_Acquire( cpu, lock_context ) \
   _ISR_lock_Acquire( &( cpu )->Lock, lock_context )

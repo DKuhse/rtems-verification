@@ -5,6 +5,8 @@
 #ifndef VERIFICATION_5_1_EDF_PROPERTY_H
 #define VERIFICATION_5_1_EDF_PROPERTY_H
 
+#include <stddef.h>
+#include <stdint.h>
 #include <edf_ready_set.h>
 
 /*@ axiomatic EDFProperty {
@@ -157,5 +159,71 @@
             );
     }
 */
+
+/*@
+  // EDF analogue of the C `RTEMS_CONTAINER_OF( p, Scheduler_EDF_Node, Node )`
+  // expression.  Defined logic function (not abstract) so WP unfolds it on
+  // demand; the unfolded form uses `(uint64_t) ((uintptr_t) ... - 80)` to
+  // match the body's C macro expansion at the WP encoding level (both sides
+  // canonicalise to `addr_of_int(to_uint64(int_of_addr(p) - 80))`).
+  //
+  // The hardcoded `80` is `offsetof(Scheduler_EDF_Node, Node)` on this
+  // layout.  We cannot just write `RTEMS_CONTAINER_OF(...)` in the
+  // annotation: Frama-C does expand macros in annotations (default
+  // `-pp-annot`), but the expansion contains `offsetof(T, F)` which becomes
+  // `__builtin_offsetof(T, F)`, and the comma between args is rejected by
+  // the ACSL parser.  Redefining `RTEMS_CONTAINER_OF` under `__FRAMAC__` to
+  // an `offsetof`-free form lets the macro parse in ACSL, but the resulting
+  // WP encoding (using a `shiftfield_Node(null)` opaque offset) was harder
+  // for Alt-Ergo to bridge against the body than this hand-inlined form,
+  // which produces exactly the same term as the unmodified body macro.
+  logic Scheduler_EDF_Node *
+    edf_container_of_rbtree_node( RBTree_Node *p ) =
+      (Scheduler_EDF_Node *)
+        (uint64_t) ( (uintptr_t) p - (uintptr_t) 80 );
+*/
+
+/*
+ * EDF-specialized contract on `_RBTree_Minimum`.
+ *
+ * `_RBTree_Minimum` is a generic RBTree helper whose body lives outside the
+ * abstract ready-set model.  We re-declare it here, after both
+ * `edf_ready_set_from_root` (in edf_ready_set.h) and `edf_ready_earliest_node`
+ * (above) are in scope, with a contract that ties the returned
+ * `RBTree_Node *` to the embedded `Node` field of an EDF-earliest
+ * `Scheduler_EDF_Node`.
+ *
+ * The EDF claim is conditional on the tree being interpretable as an
+ * EDF ready set with at least one member.  For non-EDF callers the
+ * `\result != \null` claim is preserved via the rbh_root case split, and
+ * the existential is not activated.
+ *
+ * This is the actual abstract-RBTree boundary: callers above this layer
+ * never reason about RBTree pointer/color mechanics.
+ */
+/*@
+  requires \valid_read( the_rbtree );
+
+  assigns \nothing;
+
+  ensures the_rbtree->rbh_root == \null ==> \result == \null;
+  ensures the_rbtree->rbh_root != \null ==> \result != \null;
+
+  // EDF claim: when the abstract ready set is non-empty, the container of
+  // the returned RBTree_Node is an EDF-earliest `Scheduler_EDF_Node`.
+  // The container is expressed using the same `(uintptr_t) ... -
+  // offsetof(...)` arithmetic that `RTEMS_CONTAINER_OF` expands to in the
+  // body, so WP canonicalizes both forms to the same address-arithmetic
+  // expression.  (ACSL annotations don't macro-expand `RTEMS_CONTAINER_OF`
+  // directly because `offsetof` is a C builtin that the ACSL parser
+  // rejects, so we write the expansion by hand.)
+  ensures
+    ( \exists Scheduler_EDF_Node *m;
+        m \in edf_ready_set_from_root( the_rbtree->rbh_root ) ) ==>
+    edf_ready_earliest_node{Here}(
+      edf_ready_set_from_root( the_rbtree->rbh_root ),
+      edf_container_of_rbtree_node( \result ) );
+*/
+RBTree_Node *_RBTree_Minimum( const RBTree_Control *the_rbtree );
 
 #endif /* VERIFICATION_5_1_EDF_PROPERTY_H */

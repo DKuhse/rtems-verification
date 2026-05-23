@@ -88,6 +88,14 @@ extern "C" {
  * @param the_thread The thread for the initialization of @a node.
  * @param priority The priority value for @a node.
  */
+/*@
+  requires \valid( node );
+
+  assigns node->owner, node->Priority.value;
+
+  ensures node->owner == the_thread;
+  ensures node->Priority.value == priority;
+*/
 RTEMS_INLINE_ROUTINE void _Scheduler_Node_do_initialize(
   const struct _Scheduler_Control *scheduler,
   Scheduler_Node                  *node,

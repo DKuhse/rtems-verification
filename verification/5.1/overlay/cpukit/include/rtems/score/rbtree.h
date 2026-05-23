@@ -126,6 +126,9 @@ void _RBTree_Insert_color(
  *
  * @param[out] the_node The red-black tree node to initialize.
  */
+/*@
+  assigns \nothing;
+*/
 RTEMS_INLINE_ROUTINE void _RBTree_Initialize_node( RBTree_Node *the_node )
 {
 #if defined(RTEMS_DEBUG)

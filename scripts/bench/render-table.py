@@ -49,7 +49,6 @@ FREERTOS_GROUPS = [
     (r"vTaskSwitchContext",  ["vTaskSwitchContext"]),
     (r"vTaskSuspend",        ["vTaskSuspend"]),
     (r"vTaskResume",         ["vTaskResume"]),
-    (r"vTaskDelay",          ["vTaskDelay"]),
     # The verified/fixed body of xTaskDelayUntil is xTaskDelayUntilReadyRefresh.
     (r"xTaskDelayUntil",     ["h_xTaskDelayUntilReadyRefresh"]),
     (r"xTaskIncrementTick",  ["xTaskIncrementTick"]),

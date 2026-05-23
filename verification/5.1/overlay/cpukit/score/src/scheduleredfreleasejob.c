@@ -19,8 +19,31 @@
 #include "config.h"
 #endif
 
+#ifdef __FRAMAC__
+#include <stdint.h>
+#include <sys/time.h>
+#include <time.h>
+
+int64_t          tstosbt( struct timespec );
+struct timespec  sbttots( int64_t );
+struct timeval   sbttotv( int64_t );
+
+#ifndef SBT_1S
+#define SBT_1S ( (int64_t) 1 << 32 )
+#endif
+#endif
+
 #include <rtems/score/scheduleredfimpl.h>
 
+/*@
+  requires PRIORITY_MINIMUM < priority <= PRIORITY_DEFAULT_MAXIMUM;
+
+  assigns \nothing;
+
+  ensures \result == ( SCHEDULER_EDF_PRIO_MSB |
+    SCHEDULER_PRIORITY_MAP( priority ) );
+  ensures ( \result & SCHEDULER_EDF_PRIO_MSB ) == SCHEDULER_EDF_PRIO_MSB;
+*/
 Priority_Control _Scheduler_EDF_Map_priority(
   const Scheduler_Control *scheduler,
   Priority_Control         priority
@@ -29,6 +52,13 @@ Priority_Control _Scheduler_EDF_Map_priority(
   return SCHEDULER_EDF_PRIO_MSB | SCHEDULER_PRIORITY_MAP( priority );
 }
 
+/*@
+  assigns \nothing;
+
+  ensures \result == SCHEDULER_PRIORITY_UNMAP(
+    priority & ~SCHEDULER_EDF_PRIO_MSB );
+  ensures ( \result & SCHEDULER_EDF_PRIO_MSB ) == 0;
+*/
 Priority_Control _Scheduler_EDF_Unmap_priority(
   const Scheduler_Control *scheduler,
   Priority_Control         priority

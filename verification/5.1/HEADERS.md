@@ -30,9 +30,41 @@ place:
 - Source contracts for `_Scheduler_EDF_Initialize`,
   `_Scheduler_EDF_Node_initialize`
 
-**Smoke test (2026-05-20)**: `docker compose run --rm verify-5.1-active-fc32`
-proves 31/31 goals for the `_Scheduler_EDF_Initialize` slice. Same proof
-result as the 6.2 baseline.
+**Verified slices (2026-05-20)**:
+
+| Script | WP result | Notes |
+|---|---|---|
+| `verify-scheduler-update-heir.sh` | 23 / 23 | dedicated harness for `_Scheduler_Update_heir`; mirrors 6.2's `verify-scheduleruni-unblock.sh` two-tier setup |
+| `verify-edf-initialize.sh` | 31 / 31 | parity with 6.2 |
+| `verify-edf-node-initialize.sh` | 30 / 30 | parity with 6.2 |
+| `verify-edf-map-unmap.sh` | 10 / 10 | new, dedicated to the Map/Unmap helpers |
+| `verify-edf-schedule.sh` (function) | 44 / 44 | EDF entry point + `_Scheduler_EDF_Schedule_body` against its body. The `_RBTree_Minimum` contract (in `models/edf_property.h`) bridges the abstract ready set to the body's `RTEMS_CONTAINER_OF`. |
+| `verify-edf-schedule.sh` (model lemma) | 11 / 11 | parity with 6.2 |
+
+**Verification architecture** (two-tier, mirrors 6.2):
+
+1. Heir-update primitives are verified against their bodies in dedicated
+   harnesses (5.1: `verify-scheduler-update-heir.sh` →
+   `harnesses/scheduler-update-heir-harness.c`).
+2. EDF entry-point scripts verify the entry point AND its EDF inline
+   helpers (e.g. `_Scheduler_EDF_Schedule_body`) against their bodies,
+   using verified primitive contracts from (1). The only trusted boundary
+   is `_RBTree_Minimum` itself, contracted in
+   `models/edf_property.h` against the abstract ready-set model. 6.2
+   puts the same trust boundary at `_Scheduler_EDF_Get_highest_ready`,
+   which exists as a real function in 6.2 but not in 5.1.
+
+**Required helper contracts beyond 6.2**:
+
+- `_Thread_Get_CPU()` in `threadimpl.h` — must state the non-SMP result is
+  `&_Per_CPU_Information[0].per_cpu`. Without this, `_Scheduler_Update_heir`'s
+  cpu_time_used frame parts time out.
+- `_Scheduler_Get_context()` in `schedulerimpl.h` — required so the
+  `Scheduler_Context *` ↔ `Scheduler_EDF_Context *` cast bridges cleanly.
+
+Both contracts are forced by 5.1's helper layout (combined `_Scheduler_Update_heir`
+instead of 6.2's split uniprocessor helpers; pristine `Scheduler_Context`
+with empty body in non-SMP).
 
 Pending (copied as pristine, contracts not yet ported):
 

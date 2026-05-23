@@ -1188,6 +1188,42 @@ RTEMS_INLINE_ROUTINE bool _Scheduler_Unblock_node(
  * @param force_dispatch Indicates whether the dispatch happens also if the
  *      currently running thread is set as not preemptible.
  */
+/*@
+  requires \valid_read( &_Thread_Heir->is_preemptible );
+  requires \valid( &_Thread_Heir->cpu_time_used );
+  requires \separated(
+    _Thread_Heir + (..),
+    (Per_CPU_Control_envelope *) _Per_CPU_Information + (..)
+  );
+  requires \separated(
+    new_heir + (..),
+    (Per_CPU_Control_envelope *) _Per_CPU_Information + (..)
+  );
+  requires \separated(
+    &_Thread_Heir->cpu_time_used,
+    (Per_CPU_Control_envelope *) _Per_CPU_Information + (..)
+  );
+
+  behavior keep:
+    assumes \at( _Thread_Heir, Pre ) == new_heir ||
+            ( !\at( _Thread_Heir, Pre )->is_preemptible && !force_dispatch );
+    assigns \nothing;
+    ensures _Thread_Heir == \at( _Thread_Heir, Pre );
+
+  behavior update:
+    assumes \at( _Thread_Heir, Pre ) != new_heir &&
+            ( \at( _Thread_Heir, Pre )->is_preemptible || force_dispatch );
+    assigns _Per_CPU_Information[ 0 ].per_cpu.heir \from new_heir;
+    assigns _Per_CPU_Information[ 0 ].per_cpu.dispatch_necessary,
+            _Thread_Dispatch_necessary_ghost;
+    assigns \at( _Thread_Heir, Pre )->cpu_time_used,
+            _Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp;
+    ensures _Thread_Heir == new_heir;
+    ensures _Thread_Dispatch_necessary_ghost == true;
+
+  complete behaviors;
+  disjoint behaviors;
+*/
 RTEMS_INLINE_ROUTINE void _Scheduler_Update_heir(
   Thread_Control *new_heir,
   bool            force_dispatch

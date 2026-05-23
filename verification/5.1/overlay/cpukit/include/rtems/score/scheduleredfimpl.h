@@ -83,6 +83,16 @@ RTEMS_INLINE_ROUTINE Scheduler_EDF_Node *_Scheduler_EDF_Thread_get_node(
  *
  * @return The corresponding scheduler EDF node.
  */
+/*@
+  requires \valid( (Scheduler_EDF_Node *) node );
+  requires &((Scheduler_EDF_Node *) node)->Base == node;
+
+  assigns \result \from node;
+
+  ensures \result == (Scheduler_EDF_Node *) node;
+  ensures \valid( \result );
+  ensures &\result->Base == node;
+*/
 RTEMS_INLINE_ROUTINE Scheduler_EDF_Node * _Scheduler_EDF_Node_downcast(
   Scheduler_Node *node
 )
@@ -154,6 +164,31 @@ RTEMS_INLINE_ROUTINE bool _Scheduler_EDF_Priority_less_equal(
  * @param node The node to be inserted.
  * @param insert_priority The priority with which the node will be inserted.
  */
+/*@
+  requires edf_ready_context_well_formed{Pre}( context );
+  requires \valid( node );
+  requires !edf_ready_member{Pre}( context, node );
+  requires edf_ready_node_has_canonical_owner{Pre}( node );
+  requires edf_ready_node_cache_consistent{Pre}( node );
+
+  requires \forall Scheduler_EDF_Node *m;
+    m \in edf_ready_set{Pre}( context ) ==>
+      m->Base.owner != node->Base.owner;
+
+  assigns context->Ready;
+
+  ensures edf_ready_set{Post}( context ) ==
+    edf_ready_insert( edf_ready_set{Pre}( context ), node );
+  ensures \forall Scheduler_EDF_Node *n;
+    \valid_read( n ) ==> n->Base.owner == \old( n->Base.owner );
+  ensures edf_ready_node_has_canonical_owner{Post}( node );
+  ensures edf_ready_node_cache_consistent{Post}( node );
+  ensures edf_priority_cache_consistency_preserved{Pre,Post}(
+    edf_ready_set{Pre}( context ) );
+  ensures edf_ready_context_well_formed{Post}( context );
+  ensures edf_ready_context_cache_consistent{Pre}( context ) ==>
+    edf_ready_context_cache_consistent{Post}( context );
+*/
 RTEMS_INLINE_ROUTINE void _Scheduler_EDF_Enqueue(
   Scheduler_EDF_Context *context,
   Scheduler_EDF_Node    *node,
@@ -174,6 +209,26 @@ RTEMS_INLINE_ROUTINE void _Scheduler_EDF_Enqueue(
  * @param[in, out] context The context to extract the node from.
  * @param[in, out] node The node to extract.
  */
+/*@
+  requires edf_ready_context_well_formed{Pre}( context );
+  requires \valid( node );
+  requires edf_ready_member{Pre}( context, node );
+
+  assigns context->Ready;
+
+  ensures edf_ready_set{Post}( context ) ==
+    edf_ready_extract( edf_ready_set{Pre}( context ), node );
+  ensures \forall Scheduler_EDF_Node *n;
+    \valid_read( n ) ==> n->Base.owner == \old( n->Base.owner );
+  ensures edf_ready_node_has_canonical_owner{Post}( node );
+  ensures edf_ready_node_cache_consistent{Pre}( node ) ==>
+    edf_ready_node_cache_consistent{Post}( node );
+  ensures edf_priority_cache_consistency_preserved{Pre,Post}(
+    edf_ready_set{Pre}( context ) );
+  ensures edf_ready_context_well_formed{Post}( context );
+  ensures edf_ready_context_cache_consistent{Pre}( context ) ==>
+    edf_ready_context_cache_consistent{Post}( context );
+*/
 RTEMS_INLINE_ROUTINE void _Scheduler_EDF_Extract(
   Scheduler_EDF_Context *context,
   Scheduler_EDF_Node    *node
@@ -189,6 +244,35 @@ RTEMS_INLINE_ROUTINE void _Scheduler_EDF_Extract(
  * @param the_thread The thread is not used in this method.
  * @param[in, out] node The node to be extracted.
  */
+/*@
+  requires \valid_read( scheduler );
+  requires \valid( (Scheduler_EDF_Context *) scheduler->context );
+  requires edf_ready_context_well_formed{Pre}(
+    (Scheduler_EDF_Context *) scheduler->context );
+  requires \valid( node );
+  requires \valid( (Scheduler_EDF_Node *) node );
+  requires &((Scheduler_EDF_Node *) node)->Base == node;
+  requires edf_ready_member{Pre}(
+    (Scheduler_EDF_Context *) scheduler->context,
+    (Scheduler_EDF_Node *) node );
+
+  assigns ((Scheduler_EDF_Context *) scheduler->context)->Ready;
+
+  ensures edf_ready_set{Post}(
+            (Scheduler_EDF_Context *) scheduler->context ) ==
+          edf_ready_extract(
+            edf_ready_set{Pre}(
+              (Scheduler_EDF_Context *) scheduler->context ),
+            (Scheduler_EDF_Node *) node );
+  ensures edf_ready_context_well_formed{Post}(
+    (Scheduler_EDF_Context *) scheduler->context );
+  ensures edf_priority_cache_consistency_preserved{Pre,Post}(
+    edf_ready_set{Pre}( (Scheduler_EDF_Context *) scheduler->context ) );
+  ensures edf_ready_context_cache_consistent{Pre}(
+            (Scheduler_EDF_Context *) scheduler->context ) ==>
+          edf_ready_context_cache_consistent{Post}(
+            (Scheduler_EDF_Context *) scheduler->context );
+*/
 RTEMS_INLINE_ROUTINE void _Scheduler_EDF_Extract_body(
   const Scheduler_Control *scheduler,
   Thread_Control          *the_thread,
@@ -211,7 +295,60 @@ RTEMS_INLINE_ROUTINE void _Scheduler_EDF_Extract_body(
  * @param the_thread This parameter is not used.
  * @param force_dispatch Indicates whether the current heir is blocked even if it is
  *      not set as preemptible.
+ *
+ * The 5.1 EDF scheduler does not have the `_Scheduler_uniprocessor_*` helper
+ * family that 6.2 introduces. This function plays the combined role of
+ * `_Scheduler_EDF_Get_highest_ready()` + `_Scheduler_uniprocessor_Update_heir()`
+ * from the 6.2 model: it finds the EDF-earliest ready thread and delegates the
+ * heir update to `_Scheduler_Update_heir()` (which also gates on preemption /
+ * `force_dispatch`).
  */
+/*@
+  requires \valid_read( scheduler );
+  requires \valid( (Scheduler_EDF_Context *) scheduler->context );
+  requires edf_ready_context_well_formed{Pre}(
+    (Scheduler_EDF_Context *) scheduler->context );
+
+  // The ready set must be non-empty so _RBTree_Minimum returns a real node.
+  requires \exists Scheduler_EDF_Node *some;
+    some \in edf_ready_set{Pre}(
+      (Scheduler_EDF_Context *) scheduler->context );
+
+  // Frame/separation hypotheses required by _Scheduler_Update_heir
+  requires \valid_read( &_Thread_Heir->is_preemptible );
+  requires \valid( &_Thread_Heir->cpu_time_used );
+  requires \separated(
+    _Thread_Heir + (..),
+    (Per_CPU_Control_envelope *) _Per_CPU_Information + (..),
+    scheduler + (..),
+    (Scheduler_EDF_Context *) scheduler->context + (..)
+  );
+  requires \separated(
+    scheduler + (..),
+    (Per_CPU_Control_envelope *) _Per_CPU_Information + (..)
+  );
+  requires \separated(
+    &_Thread_Heir->cpu_time_used,
+    (Per_CPU_Control_envelope *) _Per_CPU_Information + (..)
+  );
+
+  assigns _Per_CPU_Information[ 0 ].per_cpu.heir;
+  assigns _Per_CPU_Information[ 0 ].per_cpu.dispatch_necessary,
+          _Thread_Dispatch_necessary_ghost;
+  assigns \at( _Thread_Heir, Pre )->cpu_time_used,
+          _Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp;
+
+  // Either the previous heir survived (it was the EDF-earliest owner
+  // already, or it was non-preemptible without force_dispatch), or the
+  // new heir owns an EDF-earliest ready node.  Phrased through the
+  // existing `edf_thread_owns_earliest_ready_node` predicate so WP
+  // doesn't have to skolemize a raw `\exists` at the call site.
+  ensures \at( _Thread_Heir, Pre ) == _Thread_Heir ||
+          edf_thread_owns_earliest_ready_node{Pre}(
+            edf_ready_set{Pre}(
+              (Scheduler_EDF_Context *) scheduler->context ),
+            _Thread_Heir );
+*/
 RTEMS_INLINE_ROUTINE void _Scheduler_EDF_Schedule_body(
   const Scheduler_Control *scheduler,
   Thread_Control          *the_thread,
