@@ -875,6 +875,16 @@ void _Thread_Priority_perform_actions(
             \at( queue_context->Priority.update_count, Pre ) ||
           queue_context->Priority.update_count ==
             \at( queue_context->Priority.update_count, Pre ) + 1;
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) + 1 ==>
+          queue_context->Priority.update[
+            \at( queue_context->Priority.update_count, Pre )
+          ] == the_thread;
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) + 1 ==>
+          SCHEDULER_PRIORITY_PURIFY(
+            the_thread->Scheduler.nodes->Priority.value ) ==
+          the_thread->Scheduler.nodes->Wait.Priority.Node.priority;
   ensures the_thread->Scheduler.nodes->Priority.value !=
             \at( the_thread->Scheduler.nodes->Priority.value, Pre ) ==>
           thread_priority_update_pending{Post}( queue_context, the_thread );
@@ -1004,6 +1014,16 @@ void _Thread_Priority_add(
             \at( queue_context->Priority.update_count, Pre ) ||
           queue_context->Priority.update_count ==
             \at( queue_context->Priority.update_count, Pre ) + 1;
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) + 1 ==>
+          queue_context->Priority.update[
+            \at( queue_context->Priority.update_count, Pre )
+          ] == the_thread;
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) + 1 ==>
+          SCHEDULER_PRIORITY_PURIFY(
+            the_thread->Scheduler.nodes->Priority.value ) ==
+          the_thread->Scheduler.nodes->Wait.Priority.Node.priority;
   ensures the_thread->Scheduler.nodes->Priority.value !=
             \at( the_thread->Scheduler.nodes->Priority.value, Pre ) ==>
           thread_priority_update_pending{Post}( queue_context, the_thread );
@@ -1127,6 +1147,16 @@ void _Thread_Priority_remove(
             \at( queue_context->Priority.update_count, Pre ) ||
           queue_context->Priority.update_count ==
             \at( queue_context->Priority.update_count, Pre ) + 1;
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) + 1 ==>
+          queue_context->Priority.update[
+            \at( queue_context->Priority.update_count, Pre )
+          ] == the_thread;
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) + 1 ==>
+          SCHEDULER_PRIORITY_PURIFY(
+            the_thread->Scheduler.nodes->Priority.value ) ==
+          the_thread->Scheduler.nodes->Wait.Priority.Node.priority;
   ensures the_thread->Scheduler.nodes->Priority.value !=
             \at( the_thread->Scheduler.nodes->Priority.value, Pre ) ==>
           thread_priority_update_pending{Post}( queue_context, the_thread );

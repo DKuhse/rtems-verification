@@ -588,6 +588,9 @@ static inline void _Scheduler_Node_destroy(
   requires \valid( (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
   requires edf_ready_context_well_formed{Pre}(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
+  requires thread_priority_edf_update_ready_pre{Pre}(
+    (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+    the_thread );
   requires \valid_read( &the_thread->Scheduler.nodes );
   requires \valid( priority_node );
   requires \valid( queue_context );
@@ -636,6 +639,13 @@ static inline void _Scheduler_Node_destroy(
   ensures the_thread->Scheduler.nodes->Priority.value !=
             \at( the_thread->Scheduler.nodes->Priority.value, Pre ) ==>
           thread_priority_update_pending{Post}( queue_context, the_thread );
+  ensures queue_context->Priority.update_count <= 1;
+  ensures queue_context->Priority.update_count == 1 ==>
+          queue_context->Priority.update[ 0 ] == the_thread;
+  ensures queue_context->Priority.update_count == 1 ==>
+          thread_priority_edf_update_ready_pre{Post}(
+            (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+            the_thread );
 
   behavior active:
     assumes priority_node_active{Pre}( priority_node );
@@ -805,6 +815,9 @@ static inline void _Scheduler_Release_job(
   requires \valid( (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
   requires edf_ready_context_well_formed{Pre}(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
+  requires thread_priority_edf_update_ready_pre{Pre}(
+    (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+    the_thread );
   requires \valid_read( &the_thread->Scheduler.nodes );
   requires \valid( priority_node );
   requires \valid( queue_context );
@@ -855,6 +868,13 @@ static inline void _Scheduler_Release_job(
   ensures the_thread->Scheduler.nodes->Priority.value !=
             \at( the_thread->Scheduler.nodes->Priority.value, Pre ) ==>
           thread_priority_update_pending{Post}( queue_context, the_thread );
+  ensures queue_context->Priority.update_count <= 1;
+  ensures queue_context->Priority.update_count == 1 ==>
+          queue_context->Priority.update[ 0 ] == the_thread;
+  ensures queue_context->Priority.update_count == 1 ==>
+          thread_priority_edf_update_ready_pre{Post}(
+            (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+            the_thread );
 
   behavior active:
     assumes priority_node_active{Pre}( priority_node );

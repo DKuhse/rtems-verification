@@ -98,6 +98,9 @@ Priority_Control _Scheduler_EDF_Unmap_priority(
   requires \valid( (Scheduler_EDF_Context *) scheduler->context );
   requires edf_ready_context_well_formed{Pre}(
     (Scheduler_EDF_Context *) scheduler->context );
+  requires thread_priority_edf_update_ready_pre{Pre}(
+    (Scheduler_EDF_Context *) scheduler->context,
+    the_thread );
   requires \valid_read( &the_thread->Scheduler.nodes );
   requires \valid( priority_node );
   requires \valid( queue_context );
@@ -142,6 +145,16 @@ Priority_Control _Scheduler_EDF_Unmap_priority(
   ensures the_thread->Scheduler.nodes->Priority.value !=
             \at( the_thread->Scheduler.nodes->Priority.value, Pre ) ==>
           thread_priority_update_pending{Post}( queue_context, the_thread );
+  ensures \at( queue_context->Priority.update_count, Pre ) == 0 ==>
+          queue_context->Priority.update_count <= 1;
+  ensures \at( queue_context->Priority.update_count, Pre ) == 0 &&
+          queue_context->Priority.update_count == 1 ==>
+          queue_context->Priority.update[ 0 ] == the_thread;
+  ensures \at( queue_context->Priority.update_count, Pre ) == 0 &&
+          queue_context->Priority.update_count == 1 ==>
+          thread_priority_edf_update_ready_pre{Post}(
+            (Scheduler_EDF_Context *) scheduler->context,
+            the_thread );
 
   behavior active:
     assumes priority_node_active{Pre}( priority_node );
@@ -329,6 +342,19 @@ void _Scheduler_EDF_Release_job(
   /*@ assert edf_ready_owners_canonical{Here}(
         edf_ready_set{Pre}(
           (Scheduler_EDF_Context *) scheduler->context ) ); */
+  /*@ assert edf_ready_set{Here}(
+        (Scheduler_EDF_Context *) scheduler->context ) ==
+        edf_ready_set{Pre}(
+          (Scheduler_EDF_Context *) scheduler->context ); */
+  /*@ assert edf_ready_valid_nodes{Here}(
+        edf_ready_set{Here}(
+          (Scheduler_EDF_Context *) scheduler->context ) ); */
+  /*@ assert edf_ready_owners_distinct{Here}(
+        edf_ready_set{Here}(
+          (Scheduler_EDF_Context *) scheduler->context ) ); */
+  /*@ assert edf_ready_owners_canonical{Here}(
+        edf_ready_set{Here}(
+          (Scheduler_EDF_Context *) scheduler->context ) ); */
   /*@ assert edf_ready_context_well_formed{Here}(
         (Scheduler_EDF_Context *) scheduler->context ); */
   _Thread_Wait_release_critical( the_thread, queue_context );
@@ -339,6 +365,9 @@ void _Scheduler_EDF_Release_job(
   requires \valid( (Scheduler_EDF_Context *) scheduler->context );
   requires edf_ready_context_well_formed{Pre}(
     (Scheduler_EDF_Context *) scheduler->context );
+  requires thread_priority_edf_update_ready_pre{Pre}(
+    (Scheduler_EDF_Context *) scheduler->context,
+    the_thread );
   requires \valid_read( &the_thread->Scheduler.nodes );
   requires \valid( priority_node );
   requires \valid( queue_context );
@@ -385,6 +414,16 @@ void _Scheduler_EDF_Release_job(
   ensures the_thread->Scheduler.nodes->Priority.value !=
             \at( the_thread->Scheduler.nodes->Priority.value, Pre ) ==>
           thread_priority_update_pending{Post}( queue_context, the_thread );
+  ensures \at( queue_context->Priority.update_count, Pre ) == 0 ==>
+          queue_context->Priority.update_count <= 1;
+  ensures \at( queue_context->Priority.update_count, Pre ) == 0 &&
+          queue_context->Priority.update_count == 1 ==>
+          queue_context->Priority.update[ 0 ] == the_thread;
+  ensures \at( queue_context->Priority.update_count, Pre ) == 0 &&
+          queue_context->Priority.update_count == 1 ==>
+          thread_priority_edf_update_ready_pre{Post}(
+            (Scheduler_EDF_Context *) scheduler->context,
+            the_thread );
 
   behavior active:
     assumes priority_node_active{Pre}( priority_node );
