@@ -76,7 +76,7 @@ void _RM_Assume_Watchdog_Per_CPU_remove_ticks(
 );
 
 /*@
-  requires \valid_read( lock_context );
+  requires \valid( lock_context );
   assigns \nothing;
   ensures \valid( \result );
   ensures \result == &_Per_CPU_Information[ 0 ].per_cpu;
@@ -114,7 +114,7 @@ void _RM_Assume_Thread_Dispatch_enable( Per_CPU_Control *cpu_self );
 /*@
   requires \valid( the_period );
   requires \valid( owner );
-  requires \valid_read( lock_context );
+  requires \valid( lock_context );
   requires the_period->owner == owner;
 
   requires \valid_read( _Scheduler_Table + ( 0 .. 0 ) );
