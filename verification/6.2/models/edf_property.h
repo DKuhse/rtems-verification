@@ -171,6 +171,33 @@
               edf_ready_insert( nodes, added ),
               added
             );
+
+      lemma edf_preemptible_heir_earliest_preserved{L1,L2}:
+        \forall Scheduler_EDF_Context *context;
+        \forall Thread_Control *heir;
+        \forall boolean is_preemptible;
+          edf_preemptible_heir_is_earliest_ready{L1}(
+            context,
+            heir,
+            is_preemptible
+          ) &&
+          edf_ready_valid_nodes{L2}( edf_ready_set{L2}( context ) ) &&
+          edf_ready_set{L2}( context ) == edf_ready_set{L1}( context ) &&
+          (
+            \forall Scheduler_EDF_Node *node;
+              node \in edf_ready_set{L1}( context ) ==>
+                \at( node->priority, L2 ) == \at( node->priority, L1 )
+          ) &&
+          (
+            \forall Scheduler_EDF_Node *node;
+              node \in edf_ready_set{L1}( context ) ==>
+                \at( node->Base.owner, L2 ) == \at( node->Base.owner, L1 )
+          ) ==>
+            edf_preemptible_heir_is_earliest_ready{L2}(
+              context,
+              heir,
+              is_preemptible
+            );
     }
 */
 

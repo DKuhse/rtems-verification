@@ -379,10 +379,6 @@ static inline void _Scheduler_Unblock( Thread_Control *the_thread )
   requires \valid( (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
   requires edf_ready_context_well_formed{Pre}(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
-  // `\valid(Thread_Control *)` lifted out of the predicate body — see note
-  // on the predicate definitions in threadimpl.h.
-  requires \valid( the_thread );
-  requires \valid( _Thread_Heir );
   requires thread_priority_edf_node_valid{Pre}( the_thread );
   requires thread_priority_edf_heir_valid{Pre}( _Thread_Heir );
   requires edf_preemptible_heir_is_earliest_ready{Pre}(
@@ -588,6 +584,11 @@ static inline void _Scheduler_Node_destroy(
   requires \valid( (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
   requires edf_ready_context_well_formed{Pre}(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
+  requires thread_priority_edf_heir_valid{Pre}( _Thread_Heir );
+  requires edf_preemptible_heir_is_earliest_ready{Pre}(
+    (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+    _Thread_Heir,
+    _Thread_Heir->is_preemptible );
   requires thread_priority_edf_update_ready_pre{Pre}(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
     the_thread );
@@ -617,6 +618,22 @@ static inline void _Scheduler_Node_destroy(
     priority_node + (..),
     queue_context + (..)
   );
+  requires \forall Scheduler_EDF_Node *node;
+    node \in edf_ready_set{Pre}(
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context ) ==>
+      \separated( queue_context + (..), node + (..) );
+  requires \forall Scheduler_EDF_Node *node;
+    node \in edf_ready_set{Pre}(
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context ) ==>
+      \separated( &node->priority, &priority_node->priority );
+  requires \forall Scheduler_EDF_Node *node;
+    node \in edf_ready_set{Pre}(
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context ) ==>
+      \separated(
+        &node->priority,
+        &the_thread->Scheduler.nodes->Wait.Priority,
+        &the_thread->Scheduler.nodes->Priority.value
+      );
 
   assigns priority_node->priority,
           the_thread->Scheduler.nodes->Wait.Priority,
@@ -636,6 +653,11 @@ static inline void _Scheduler_Node_destroy(
             (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
   ensures edf_ready_context_well_formed{Post}(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
+  ensures thread_priority_edf_heir_valid{Post}( _Thread_Heir );
+  ensures edf_preemptible_heir_is_earliest_ready{Post}(
+    (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+    _Thread_Heir,
+    _Thread_Heir->is_preemptible );
   ensures the_thread->Scheduler.nodes->Priority.value !=
             \at( the_thread->Scheduler.nodes->Priority.value, Pre ) ==>
           thread_priority_update_pending{Post}( queue_context, the_thread );
@@ -789,6 +811,17 @@ static inline void _Scheduler_Release_job(
   const Scheduler_Control *scheduler = _Thread_Scheduler_get_home( the_thread );
 
   _Thread_queue_Context_clear_priority_updates( queue_context );
+  /*@ assert scheduler == &_Scheduler_Table[ 0 ]; */
+  /*@ assert (Scheduler_EDF_Context *) scheduler->context ==
+        (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context; */
+  /*@ assert edf_preemptible_heir_is_earliest_ready{Here}(
+        (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+        _Thread_Heir,
+        _Thread_Heir->is_preemptible ); */
+  /*@ assert edf_preemptible_heir_is_earliest_ready{Here}(
+        (Scheduler_EDF_Context *) scheduler->context,
+        _Thread_Heir,
+        _Thread_Heir->is_preemptible ); */
   /*@ calls _Scheduler_EDF_Release_job; */
   ( *scheduler->Operations.release_job )(
     scheduler,
@@ -815,6 +848,11 @@ static inline void _Scheduler_Release_job(
   requires \valid( (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
   requires edf_ready_context_well_formed{Pre}(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
+  requires thread_priority_edf_heir_valid{Pre}( _Thread_Heir );
+  requires edf_preemptible_heir_is_earliest_ready{Pre}(
+    (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+    _Thread_Heir,
+    _Thread_Heir->is_preemptible );
   requires thread_priority_edf_update_ready_pre{Pre}(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
     the_thread );
@@ -846,6 +884,10 @@ static inline void _Scheduler_Release_job(
     priority_node + (..),
     queue_context + (..)
   );
+  requires \forall Scheduler_EDF_Node *node;
+    node \in edf_ready_set{Pre}(
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context ) ==>
+      \separated( queue_context + (..), node + (..) );
 
   assigns priority_node->Node.RBTree.Node.rbe_color,
           the_thread->Scheduler.nodes->Wait.Priority,
@@ -865,6 +907,11 @@ static inline void _Scheduler_Release_job(
             (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
   ensures edf_ready_context_well_formed{Post}(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
+  ensures thread_priority_edf_heir_valid{Post}( _Thread_Heir );
+  ensures edf_preemptible_heir_is_earliest_ready{Post}(
+    (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+    _Thread_Heir,
+    _Thread_Heir->is_preemptible );
   ensures the_thread->Scheduler.nodes->Priority.value !=
             \at( the_thread->Scheduler.nodes->Priority.value, Pre ) ==>
           thread_priority_update_pending{Post}( queue_context, the_thread );
@@ -960,6 +1007,17 @@ static inline void _Scheduler_Cancel_job(
   const Scheduler_Control *scheduler = _Thread_Scheduler_get_home( the_thread );
 
   _Thread_queue_Context_clear_priority_updates( queue_context );
+  /*@ assert scheduler == &_Scheduler_Table[ 0 ]; */
+  /*@ assert (Scheduler_EDF_Context *) scheduler->context ==
+        (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context; */
+  /*@ assert edf_preemptible_heir_is_earliest_ready{Here}(
+        (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+        _Thread_Heir,
+        _Thread_Heir->is_preemptible ); */
+  /*@ assert edf_preemptible_heir_is_earliest_ready{Here}(
+        (Scheduler_EDF_Context *) scheduler->context,
+        _Thread_Heir,
+        _Thread_Heir->is_preemptible ); */
   /*@ calls _Scheduler_EDF_Cancel_job; */
   ( *scheduler->Operations.cancel_job )(
     scheduler,

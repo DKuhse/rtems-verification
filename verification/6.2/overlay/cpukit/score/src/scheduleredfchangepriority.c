@@ -63,7 +63,6 @@ struct timeval   sbttotv( int64_t );
 
 /*@
   requires \valid_read( scheduler );
-  requires \valid( the_thread );
   requires \valid( node );
   requires \valid( (Scheduler_EDF_Node *) node );
   requires \valid( &((Scheduler_EDF_Node *) node)->Base );
@@ -75,7 +74,6 @@ struct timeval   sbttotv( int64_t );
   requires \valid_read( &the_thread->current_state );
   requires \valid_read( &the_thread->Scheduler.nodes );
 
-  requires \valid( _Thread_Heir );
   requires \valid_read( &_Thread_Heir->is_preemptible );
   requires \valid_read( &_Thread_Heir->Scheduler.nodes );
   requires \valid( _Thread_Heir->Scheduler.nodes );

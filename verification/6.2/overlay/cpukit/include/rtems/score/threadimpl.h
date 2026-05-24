@@ -851,6 +851,8 @@ void _Thread_Priority_perform_actions(
   assigns the_thread->Scheduler.nodes->Wait.Priority,
           the_thread->Scheduler.nodes->Priority.value,
           queue_context->Priority;
+  allocates \nothing;
+  frees \nothing;
 
   ensures priority_contributors{Post}(
             &the_thread->Scheduler.nodes->Wait.Priority ) ==
@@ -990,6 +992,8 @@ void _Thread_Priority_add(
   assigns the_thread->Scheduler.nodes->Wait.Priority,
           the_thread->Scheduler.nodes->Priority.value,
           queue_context->Priority;
+  allocates \nothing;
+  frees \nothing;
 
   ensures priority_contributors{Post}(
             &the_thread->Scheduler.nodes->Wait.Priority ) ==
@@ -1125,6 +1129,8 @@ void _Thread_Priority_remove(
   assigns the_thread->Scheduler.nodes->Wait.Priority,
           the_thread->Scheduler.nodes->Priority.value,
           queue_context->Priority;
+  allocates \nothing;
+  frees \nothing;
 
   ensures priority_contributors{Post}(
             &the_thread->Scheduler.nodes->Wait.Priority ) ==
@@ -1313,18 +1319,12 @@ void _Thread_Priority_replace(
   requires \valid( (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
   requires edf_ready_context_well_formed{Pre}(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
-  // `\valid(Thread_Control *)` lifted out of the predicate body — see note
-  // on the predicate definitions above.
-  requires \valid( _Thread_Heir );
   requires thread_priority_edf_heir_valid{Pre}( _Thread_Heir );
   requires edf_preemptible_heir_is_earliest_ready{Pre}(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
     _Thread_Heir,
     _Thread_Heir->is_preemptible );
 
-  // `\valid(Thread_Control *)` lifted out of the predicate body — gated.
-  requires queue_context->Priority.update_count == 1 ==>
-    \valid( queue_context->Priority.update[ 0 ] );
   requires queue_context->Priority.update_count == 1 ==>
     thread_priority_edf_node_valid{Pre}(
       queue_context->Priority.update[ 0 ] );
@@ -1343,8 +1343,7 @@ void _Thread_Priority_replace(
       queue_context->Priority.update[ 0 ]->Scheduler.nodes + (..),
       (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context + (..),
       (Per_CPU_Control_envelope *) _Per_CPU_Information + (..),
-      _Scheduler_Table + ( 0 .. 0 ),
-      _Thread_Heir + (..)
+      _Scheduler_Table + ( 0 .. 0 )
     );
   requires \separated(
     queue_context + (..),
@@ -2550,6 +2549,8 @@ static inline void _Thread_Wait_release_queue_critical(
 #if !defined(RTEMS_SMP)
 /*@
   assigns \nothing;
+  allocates \nothing;
+  frees \nothing;
 */
 #endif
 static inline void _Thread_Wait_acquire_critical(
@@ -2630,6 +2631,8 @@ static inline void _Thread_Wait_acquire(
 #if !defined(RTEMS_SMP)
 /*@
   assigns \nothing;
+  allocates \nothing;
+  frees \nothing;
 */
 #endif
 static inline void _Thread_Wait_release_critical(

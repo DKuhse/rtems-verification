@@ -288,7 +288,17 @@ void _Rate_monotonic_Cancel(
   );
 
   cpu_self = _Thread_Dispatch_disable_critical( lock_context );
+  /*@ assert thread_priority_edf_heir_valid{Here}( _Thread_Heir ); */
+  /*@ assert edf_preemptible_heir_is_earliest_ready{Here}(
+        (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+        _Thread_Heir,
+        _Thread_Heir->is_preemptible ); */
   _Rate_monotonic_Release( the_period, lock_context );
+  /*@ assert thread_priority_edf_heir_valid{Here}( _Thread_Heir ); */
+  /*@ assert edf_preemptible_heir_is_earliest_ready{Here}(
+        (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+        _Thread_Heir,
+        _Thread_Heir->is_preemptible ); */
   _Thread_Priority_update( &queue_context );
   _Thread_Dispatch_enable( cpu_self );
 }

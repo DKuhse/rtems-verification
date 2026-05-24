@@ -310,6 +310,8 @@ static void _Thread_Priority_action_change(
   assigns the_thread->Scheduler.nodes->Wait.Priority,
           the_thread->Scheduler.nodes->Priority.value,
           queue_context->Priority;
+  allocates \nothing;
+  frees \nothing;
 
   ensures queue_context->Priority.Actions.actions == \null;
   ensures queue_context->Priority.update_count ==
@@ -666,6 +668,8 @@ void _Thread_Priority_perform_actions(
   assigns the_thread->Scheduler.nodes->Wait.Priority,
           the_thread->Scheduler.nodes->Priority.value,
           queue_context->Priority;
+  allocates \nothing;
+  frees \nothing;
 
   ensures priority_aggregation_well_formed{Post}(
     &the_thread->Scheduler.nodes->Wait.Priority );

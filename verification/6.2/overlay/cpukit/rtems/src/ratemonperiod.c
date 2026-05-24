@@ -267,6 +267,18 @@ static void _Rate_monotonic_Release_postponed_job(
         &_Priority_Verify_scheduler_node_of_aggregation(
           &owner->Scheduler.nodes->Wait.Priority )->Priority.value
       );
+  requires \forall Scheduler_EDF_Node *node;
+    node \in edf_ready_set{Pre}(
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context ) ==>
+      \separated( &node->priority, &the_period->Priority.priority );
+  requires \forall Scheduler_EDF_Node *node;
+    node \in edf_ready_set{Pre}(
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context ) ==>
+      \separated(
+        &node->priority,
+        &owner->Scheduler.nodes->Wait.Priority,
+        &owner->Scheduler.nodes->Priority.value
+      );
 
   assigns the_period->Priority.priority,
           owner->Scheduler.nodes->Wait.Priority,
@@ -354,6 +366,11 @@ static void _Rate_monotonic_Release_job(
   );
 
   _Rate_monotonic_Release( the_period, lock_context );
+  /*@ assert thread_priority_edf_heir_valid{Here}( _Thread_Heir ); */
+  /*@ assert edf_preemptible_heir_is_earliest_ready{Here}(
+        (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+        _Thread_Heir,
+        _Thread_Heir->is_preemptible ); */
   _Thread_Priority_update( &queue_context );
   _Thread_Dispatch_enable( cpu_self );
 }
