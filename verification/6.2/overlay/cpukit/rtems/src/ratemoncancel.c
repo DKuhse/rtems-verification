@@ -184,9 +184,14 @@ static Thread_queue_Context _Rate_monotonic_Cancel_queue_context;
     _Priority_Verify_wait_priority_node_offset;
   requires (uintptr_t) &owner->Scheduler.nodes->Wait.Priority <= UINTPTR_MAX;
 
-  requires thread_priority_edf_update_ready_pre{Pre}(
-    (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
-    owner );
+  requires owner->current_state == STATES_READY ==>
+    edf_ready_member{Pre}(
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+      (Scheduler_EDF_Node *) owner->Scheduler.nodes );
+  requires owner->current_state == STATES_READY ==>
+    SCHEDULER_PRIORITY_PURIFY( owner->Scheduler.nodes->Priority.value ) ==
+      ((Scheduler_EDF_Node *)
+        owner->Scheduler.nodes)->Base.Wait.Priority.Node.priority;
   requires thread_priority_edf_update_separated{Pre}(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
     owner );
@@ -361,10 +366,6 @@ void _Rate_monotonic_Cancel(
         _Thread_Heir->is_preemptible ); */
   /*@ assert queue_context->Priority.update_count == 1 ==>
         queue_context->Priority.update[ 0 ] == owner; */
-  /*@ assert queue_context->Priority.update_count == 1 ==>
-        thread_priority_edf_update_ready_pre{Here}(
-          (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
-          queue_context->Priority.update[ 0 ] ); */
   /*@ assert queue_context->Priority.update_count == 1 &&
         queue_context->Priority.update[ 0 ]->current_state == STATES_READY ==>
           edf_ready_member{Here}(

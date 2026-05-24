@@ -99,19 +99,6 @@ void _Thread_queue_Do_nothing_priority_actions(
     \valid( &heir->cpu_time_used ) &&
     \valid( &_Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp );
 
-  predicate thread_priority_edf_update_ready_pre{L}(
-    Scheduler_EDF_Context *context,
-    Thread_Control        *the_thread
-  ) =
-    the_thread->current_state == STATES_READY ==>
-      edf_ready_member{L}(
-        context,
-        (Scheduler_EDF_Node *) the_thread->Scheduler.nodes ) &&
-      SCHEDULER_PRIORITY_PURIFY(
-        the_thread->Scheduler.nodes->Priority.value ) ==
-        ((Scheduler_EDF_Node *) the_thread->Scheduler.nodes)->
-          Base.Wait.Priority.Node.priority;
-
   predicate thread_priority_edf_update_separated{L}(
     Scheduler_EDF_Context *context,
     Thread_Control        *the_thread
@@ -1397,10 +1384,6 @@ void _Thread_Priority_replace(
 
   requires queue_context->Priority.update_count == 1 ==>
     thread_priority_edf_node_valid{Pre}(
-      queue_context->Priority.update[ 0 ] );
-  requires queue_context->Priority.update_count == 1 ==>
-    thread_priority_edf_update_ready_pre{Pre}(
-      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
       queue_context->Priority.update[ 0 ] );
   requires queue_context->Priority.update_count == 1 &&
     queue_context->Priority.update[ 0 ]->current_state == STATES_READY ==>

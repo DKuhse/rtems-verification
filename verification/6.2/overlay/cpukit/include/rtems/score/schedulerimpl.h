@@ -395,9 +395,6 @@ static inline void _Scheduler_Unblock( Thread_Control *the_thread )
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
     _Thread_Heir,
     _Thread_Heir->is_preemptible );
-  requires thread_priority_edf_update_ready_pre{Pre}(
-    (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
-    the_thread );
   requires the_thread->current_state == STATES_READY ==>
     edf_ready_member{Pre}(
       (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
@@ -723,10 +720,15 @@ static inline void _Scheduler_Node_destroy(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
     _Thread_Heir,
     _Thread_Heir->is_preemptible );
-  requires thread_priority_edf_update_ready_pre{Pre}(
-    (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
-    the_thread );
   requires thread_priority_edf_node_valid{Pre}( the_thread );
+  requires the_thread->current_state == STATES_READY ==>
+    edf_ready_member{Pre}(
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+      (Scheduler_EDF_Node *) the_thread->Scheduler.nodes );
+  requires the_thread->current_state == STATES_READY ==>
+    SCHEDULER_PRIORITY_PURIFY( the_thread->Scheduler.nodes->Priority.value ) ==
+      ((Scheduler_EDF_Node *)
+        the_thread->Scheduler.nodes)->Base.Wait.Priority.Node.priority;
   requires \valid_read( &the_thread->Scheduler.nodes );
   requires \valid( priority_node );
   requires \valid( queue_context );
@@ -802,15 +804,17 @@ static inline void _Scheduler_Node_destroy(
   ensures queue_context->Priority.update_count <= 1;
   ensures queue_context->Priority.update_count == 1 ==>
           queue_context->Priority.update[ 0 ] == the_thread;
-  ensures queue_context->Priority.update_count == 1 ==>
-          thread_priority_edf_update_ready_pre{Post}(
-            (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
-            the_thread );
   ensures queue_context->Priority.update_count == 1 &&
           the_thread->current_state == STATES_READY ==>
           edf_ready_member{Post}(
             (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
             (Scheduler_EDF_Node *) the_thread->Scheduler.nodes );
+  ensures queue_context->Priority.update_count == 1 &&
+          the_thread->current_state == STATES_READY ==>
+          SCHEDULER_PRIORITY_PURIFY(
+            the_thread->Scheduler.nodes->Priority.value ) ==
+          ((Scheduler_EDF_Node *) the_thread->Scheduler.nodes)->
+            Base.Wait.Priority.Node.priority;
   ensures queue_context->Priority.update_count == 0 &&
           the_thread->current_state == STATES_READY &&
           \at( edf_ready_node_cache_consistent(
@@ -984,10 +988,17 @@ Before_Release_job:
     queue_context
   );
   /*@ assert \at( queue_context->Priority.update_count, Before_Release_job ) == 0; */
-  /*@ assert queue_context->Priority.update_count == 1 ==>
-        thread_priority_edf_update_ready_pre{Here}(
-          (Scheduler_EDF_Context *) scheduler->context,
-          the_thread ); */
+  /*@ assert queue_context->Priority.update_count == 1 &&
+        the_thread->current_state == STATES_READY ==>
+          edf_ready_member{Here}(
+            (Scheduler_EDF_Context *) scheduler->context,
+            (Scheduler_EDF_Node *) the_thread->Scheduler.nodes ); */
+  /*@ assert queue_context->Priority.update_count == 1 &&
+        the_thread->current_state == STATES_READY ==>
+          SCHEDULER_PRIORITY_PURIFY(
+            the_thread->Scheduler.nodes->Priority.value ) ==
+          ((Scheduler_EDF_Node *) the_thread->Scheduler.nodes)->
+            Base.Wait.Priority.Node.priority; */
   /*@ assert (Scheduler_EDF_Context *) scheduler->context ==
         (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context; */
 }
@@ -1013,10 +1024,15 @@ Before_Release_job:
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
     _Thread_Heir,
     _Thread_Heir->is_preemptible );
-  requires thread_priority_edf_update_ready_pre{Pre}(
-    (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
-    the_thread );
   requires thread_priority_edf_node_valid{Pre}( the_thread );
+  requires the_thread->current_state == STATES_READY ==>
+    edf_ready_member{Pre}(
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+      (Scheduler_EDF_Node *) the_thread->Scheduler.nodes );
+  requires the_thread->current_state == STATES_READY ==>
+    SCHEDULER_PRIORITY_PURIFY( the_thread->Scheduler.nodes->Priority.value ) ==
+      ((Scheduler_EDF_Node *)
+        the_thread->Scheduler.nodes)->Base.Wait.Priority.Node.priority;
   requires \valid_read( &the_thread->Scheduler.nodes );
   requires \valid( priority_node );
   requires \valid( queue_context );
@@ -1084,10 +1100,6 @@ Before_Release_job:
   ensures queue_context->Priority.update_count <= 1;
   ensures queue_context->Priority.update_count == 1 ==>
           queue_context->Priority.update[ 0 ] == the_thread;
-  ensures queue_context->Priority.update_count == 1 ==>
-          thread_priority_edf_update_ready_pre{Post}(
-            (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
-            the_thread );
   ensures queue_context->Priority.update_count == 1 &&
           the_thread->current_state == STATES_READY ==>
           edf_ready_member{Post}(

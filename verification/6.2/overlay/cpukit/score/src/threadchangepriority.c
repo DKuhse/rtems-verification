@@ -1198,6 +1198,15 @@ void _Thread_Priority_update( Thread_queue_Context *queue_context )
   }
 
   /*@ assert n == 1; */
+  /*@ assert queue_context->Priority.update_count == 1; */
+  /*@ assert queue_context->Priority.update_count == 1 &&
+        queue_context->Priority.update[ 0 ]->current_state == STATES_READY ==>
+          SCHEDULER_PRIORITY_PURIFY(
+            queue_context->Priority.update[ 0 ]->Scheduler.nodes->
+              Priority.value ) ==
+          ((Scheduler_EDF_Node *)
+            queue_context->Priority.update[ 0 ]->Scheduler.nodes)->
+              Base.Wait.Priority.Node.priority; */
   /*@
     loop invariant 0 <= i <= n;
     loop invariant n == 1;
@@ -1259,10 +1268,6 @@ void _Thread_Priority_update( Thread_queue_Context *queue_context )
       _Thread_Heir->is_preemptible );
     loop invariant i == 0 ==>
       thread_priority_edf_heir_valid{Here}( _Thread_Heir );
-    loop invariant i == 0 ==>
-      thread_priority_edf_update_ready_pre{Here}(
-        (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
-        queue_context->Priority.update[ 0 ] );
     loop invariant i == 0 &&
       queue_context->Priority.update[ 0 ]->current_state == STATES_READY ==>
         edf_ready_member{Here}(
@@ -1339,9 +1344,6 @@ void _Thread_Priority_update( Thread_queue_Context *queue_context )
           _Thread_Heir,
           _Thread_Heir->is_preemptible,
           _Thread_Dispatch_necessary_ghost ); */
-    /*@ assert thread_priority_edf_update_ready_pre{Here}(
-          (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
-          the_thread ); */
     /*@ assert the_thread->current_state == STATES_READY ==>
           edf_ready_member{Here}(
             (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,

@@ -17,8 +17,12 @@ set -e
 
 WP_FCTS="${WP_FCTS:-_Scheduler_EDF_Map_priority,_Scheduler_EDF_Unmap_priority,_Scheduler_EDF_Release_job,_Scheduler_EDF_Cancel_job}"
 
-WP_FCT_DEFAULTS="${WP_FCT_DEFAULTS:--wp -wp-fct ${WP_FCTS} -wp-model Typed+Cast -wp-timeout 30}"
-WP_LEMMA_DEFAULTS="${WP_LEMMA_DEFAULTS:--wp -wp-prop=@lemma -wp-model Typed+Cast -wp-timeout 30}"
+# -wp-split splits compound goals (conjunctions, behavior cases) into
+# smaller pieces before sending to Alt-Ergo. Without it the EDF-cast
+# purify-identity ensures on _Scheduler_EDF_Release_job times out under
+# the heavy hypothesis load of the contract.
+WP_FCT_DEFAULTS="${WP_FCT_DEFAULTS:--wp -wp-fct ${WP_FCTS} -wp-model Typed+Cast -wp-timeout 30 -wp-split}"
+WP_LEMMA_DEFAULTS="${WP_LEMMA_DEFAULTS:--wp -wp-prop=@lemma -wp-model Typed+Cast -wp-timeout 30 -wp-split}"
 
 if command -v opam >/dev/null 2>&1; then
     eval $(opam env)

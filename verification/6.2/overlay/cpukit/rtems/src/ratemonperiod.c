@@ -236,9 +236,14 @@ static void _Rate_monotonic_Release_postponed_job(
     _Priority_Verify_wait_priority_node_offset;
   requires (uintptr_t) &owner->Scheduler.nodes->Wait.Priority <= UINTPTR_MAX;
 
-  requires thread_priority_edf_update_ready_pre{Pre}(
-    (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
-    owner );
+  requires owner->current_state == STATES_READY ==>
+    edf_ready_member{Pre}(
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+      (Scheduler_EDF_Node *) owner->Scheduler.nodes );
+  requires owner->current_state == STATES_READY ==>
+    SCHEDULER_PRIORITY_PURIFY( owner->Scheduler.nodes->Priority.value ) ==
+      ((Scheduler_EDF_Node *)
+        owner->Scheduler.nodes)->Base.Wait.Priority.Node.priority;
   requires thread_priority_edf_update_separated{Pre}(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
     owner );
@@ -419,16 +424,20 @@ static void _Rate_monotonic_Release_job(
           \at( _Per_CPU_Information[ 0 ].per_cpu.heir, Pre ))->cpu_time_used; */
   /*@ assert queue_context->Priority.update_count == 1 ==>
         queue_context->Priority.update[ 0 ] == owner; */
-  /*@ assert queue_context->Priority.update_count == 1 ==>
-        thread_priority_edf_update_ready_pre{Here}(
-          (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
-          queue_context->Priority.update[ 0 ] ); */
   /*@ assert queue_context->Priority.update_count == 1 &&
         queue_context->Priority.update[ 0 ]->current_state == STATES_READY ==>
           edf_ready_member{Here}(
             (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
             (Scheduler_EDF_Node *)
               queue_context->Priority.update[ 0 ]->Scheduler.nodes ); */
+  /*@ assert queue_context->Priority.update_count == 1 &&
+        queue_context->Priority.update[ 0 ]->current_state == STATES_READY ==>
+          SCHEDULER_PRIORITY_PURIFY(
+            queue_context->Priority.update[ 0 ]->Scheduler.nodes->
+              Priority.value ) ==
+          ((Scheduler_EDF_Node *)
+            queue_context->Priority.update[ 0 ]->Scheduler.nodes)->
+              Base.Wait.Priority.Node.priority; */
   _Thread_Priority_update( queue_context );
   /*@ assert priority_contributor_member{Here}(
         &owner->Scheduler.nodes->Wait.Priority,
