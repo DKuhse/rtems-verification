@@ -393,6 +393,9 @@ static void _Rate_monotonic_Release_job(
     deadline,
     queue_context
   );
+  /*@ assert priority_contributor_member{Here}(
+        &owner->Scheduler.nodes->Wait.Priority,
+        &the_period->Priority ); */
 
   _Rate_monotonic_Release( the_period, lock_context );
   /*@ assert thread_priority_edf_heir_valid{Here}( _Thread_Heir ); */
@@ -406,6 +409,14 @@ static void _Rate_monotonic_Release_job(
         (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
         _Thread_Heir,
         _Thread_Heir->is_preemptible ); */
+  /*@ assert _Thread_Heir == \at( _Thread_Heir, Pre ); */
+  /*@ assert _Per_CPU_Information[ 0 ].per_cpu.heir ==
+        \at( _Per_CPU_Information[ 0 ].per_cpu.heir, Pre ); */
+  /*@ assert &_Thread_Heir->cpu_time_used ==
+        &((Thread_Control *) \at( _Thread_Heir, Pre ))->cpu_time_used; */
+  /*@ assert &_Per_CPU_Information[ 0 ].per_cpu.heir->cpu_time_used ==
+        &((Thread_Control *)
+          \at( _Per_CPU_Information[ 0 ].per_cpu.heir, Pre ))->cpu_time_used; */
   /*@ assert queue_context->Priority.update_count == 1 ==>
         queue_context->Priority.update[ 0 ] == owner; */
   /*@ assert queue_context->Priority.update_count == 1 ==>
@@ -418,14 +429,10 @@ static void _Rate_monotonic_Release_job(
             (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
             (Scheduler_EDF_Node *)
               queue_context->Priority.update[ 0 ]->Scheduler.nodes ); */
-  /*@ assert queue_context->Priority.update_count == 1 &&
-        queue_context->Priority.update[ 0 ]->current_state == STATES_READY ==>
-          SCHEDULER_PRIORITY_PURIFY(
-            queue_context->Priority.update[ 0 ]->Scheduler.nodes->Priority.value ) ==
-            ((Scheduler_EDF_Node *)
-              queue_context->Priority.update[ 0 ]->Scheduler.nodes)->
-                Base.Wait.Priority.Node.priority; */
   _Thread_Priority_update( queue_context );
+  /*@ assert priority_contributor_member{Here}(
+        &owner->Scheduler.nodes->Wait.Priority,
+        &the_period->Priority ); */
   _Thread_Dispatch_enable( cpu_self );
 }
 

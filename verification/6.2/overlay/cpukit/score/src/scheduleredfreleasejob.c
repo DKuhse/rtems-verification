@@ -168,6 +168,9 @@ Priority_Control _Scheduler_EDF_Unmap_priority(
     (Scheduler_EDF_Context *) scheduler->context,
     _Thread_Heir,
     _Thread_Heir->is_preemptible );
+  ensures _Thread_Heir == \at( _Thread_Heir, Pre );
+  ensures _Per_CPU_Information[ 0 ].per_cpu.heir ==
+    \at( _Per_CPU_Information[ 0 ].per_cpu.heir, Pre );
   ensures the_thread->Scheduler.nodes->Priority.value !=
             \at( the_thread->Scheduler.nodes->Priority.value, Pre ) ==>
           thread_priority_update_pending{Post}( queue_context, the_thread );
@@ -181,6 +184,18 @@ Priority_Control _Scheduler_EDF_Unmap_priority(
           thread_priority_edf_update_ready_pre{Post}(
             (Scheduler_EDF_Context *) scheduler->context,
             the_thread );
+  ensures \at( queue_context->Priority.update_count, Pre ) == 0 &&
+          queue_context->Priority.update_count == 1 &&
+          the_thread->current_state == STATES_READY ==>
+          edf_ready_member{Post}(
+            (Scheduler_EDF_Context *) scheduler->context,
+            (Scheduler_EDF_Node *) the_thread->Scheduler.nodes );
+  ensures queue_context->Priority.update_count == 0 &&
+          the_thread->current_state == STATES_READY &&
+          \at( edf_ready_node_cache_consistent(
+            (Scheduler_EDF_Node *) the_thread->Scheduler.nodes ), Pre ) ==>
+          edf_ready_node_cache_consistent{Post}(
+            (Scheduler_EDF_Node *) the_thread->Scheduler.nodes );
 
   behavior active:
     assumes priority_node_active{Pre}( priority_node );
@@ -447,6 +462,12 @@ void _Scheduler_EDF_Release_job(
         _Thread_Heir,
         _Thread_Heir->is_preemptible ); */
   _Thread_Wait_release_critical( the_thread, queue_context );
+  /*@ assert queue_context->Priority.update_count == 0 &&
+        the_thread->current_state == STATES_READY &&
+        \at( edf_ready_node_cache_consistent(
+          (Scheduler_EDF_Node *) the_thread->Scheduler.nodes ), Pre ) ==>
+        edf_ready_node_cache_consistent{Here}(
+          (Scheduler_EDF_Node *) the_thread->Scheduler.nodes ); */
 }
 
 /*@

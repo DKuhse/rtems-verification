@@ -793,6 +793,9 @@ static inline void _Scheduler_Node_destroy(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
     _Thread_Heir,
     _Thread_Heir->is_preemptible );
+  ensures _Thread_Heir == \at( _Thread_Heir, Pre );
+  ensures _Per_CPU_Information[ 0 ].per_cpu.heir ==
+    \at( _Per_CPU_Information[ 0 ].per_cpu.heir, Pre );
   ensures the_thread->Scheduler.nodes->Priority.value !=
             \at( the_thread->Scheduler.nodes->Priority.value, Pre ) ==>
           thread_priority_update_pending{Post}( queue_context, the_thread );
@@ -803,6 +806,17 @@ static inline void _Scheduler_Node_destroy(
           thread_priority_edf_update_ready_pre{Post}(
             (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
             the_thread );
+  ensures queue_context->Priority.update_count == 1 &&
+          the_thread->current_state == STATES_READY ==>
+          edf_ready_member{Post}(
+            (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+            (Scheduler_EDF_Node *) the_thread->Scheduler.nodes );
+  ensures queue_context->Priority.update_count == 0 &&
+          the_thread->current_state == STATES_READY &&
+          \at( edf_ready_node_cache_consistent(
+            (Scheduler_EDF_Node *) the_thread->Scheduler.nodes ), Pre ) ==>
+          edf_ready_node_cache_consistent{Post}(
+            (Scheduler_EDF_Node *) the_thread->Scheduler.nodes );
 
   behavior active:
     assumes priority_node_active{Pre}( priority_node );
