@@ -1217,6 +1217,10 @@ RTEMS_INLINE_ROUTINE bool _Scheduler_Unblock_node(
             ( !\at( _Thread_Heir, Pre )->is_preemptible && !force_dispatch );
     assigns \nothing;
     ensures _Thread_Heir == \at( _Thread_Heir, Pre );
+    // Explicit exact preservation of dispatch in the keep behavior, so
+    // callers don't have to rely on `assigns \nothing` being case-split.
+    ensures _Thread_Dispatch_necessary_ghost ==
+              \at( _Thread_Dispatch_necessary_ghost, Pre );
 
   behavior update:
     assumes \at( _Thread_Heir, Pre ) != new_heir &&
@@ -1228,6 +1232,20 @@ RTEMS_INLINE_ROUTINE bool _Scheduler_Unblock_node(
             _Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp;
     ensures _Thread_Heir == new_heir;
     ensures _Thread_Dispatch_necessary_ghost == true;
+
+  // Dispatch monotonicity: WP's frame analysis at call sites uses the union
+  // of behavior assigns, not the keep-side `assigns \nothing`. A top-level
+  // ensures lets callers carry dispatch state across the call.
+  ensures \at( _Thread_Dispatch_necessary_ghost, Pre ) ==>
+            _Thread_Dispatch_necessary_ghost;
+  // executing is not assigned. State it explicitly so callers can carry
+  // executing-side invariants across the call.
+  ensures _Per_CPU_Information[ 0 ].per_cpu.executing ==
+          \at( _Per_CPU_Information[ 0 ].per_cpu.executing, Pre );
+  // Heir-unchanged disjunction: keep gives the left disjunct, update gives
+  // the right (dispatch becomes true).
+  ensures _Thread_Heir == \at( _Thread_Heir, Pre ) ||
+          _Thread_Dispatch_necessary_ghost;
 
   complete behaviors;
   disjoint behaviors;

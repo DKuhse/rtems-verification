@@ -26,6 +26,31 @@ ACSL contracts to the RTEMS 5.1 code shape.
 
 ## What requires adaptation
 
+### Pseudo-ISR force-dispatch in `_Scheduler_EDF_Unblock` (carved out)
+
+5.1's `_Scheduler_EDF_Unblock` has a pseudo-ISR escape hatch that 6.2 does
+not: `_Scheduler_Update_heir(the_thread, priority == (SCHEDULER_EDF_PRIO_MSB |
+PRIORITY_PSEUDO_ISR))`. When a non-preemptible heir is force-dispatched to a
+pseudo-ISR-priority `the_thread`, the new heir is not generally the
+earliest-ready node (deadline threads with smaller priority values may be
+present), so P3.a (`is_preemptible ==> heir owns earliest-ready`) cannot
+hold if the new heir is preemptible.
+
+The 5.1 active contract carves this path out via the precondition
+
+```
+requires SCHEDULER_PRIORITY_PURIFY( node->Priority.value ) !=
+  ( SCHEDULER_EDF_PRIO_MSB | PRIORITY_PSEUDO_ISR );
+```
+
+so the verified region matches 6.2's behavior exactly (no force-dispatch).
+RTEMS callers honor this naturally: pseudo-ISR-priority threads are
+limited to the MPCI receive server (`mpci.c:135`) and the timer server
+(`timerserver.c:163`), both configured non-preemptible by convention
+(`timerserver.c:187` uses `RTEMS_NO_PREEMPT`; `mpci.c` zero-inits its
+config so `is_preemptible = false`). Ratemon period tasks have
+deadline-derived priorities and are never pseudo-ISR.
+
 ### `_Scheduler_uniprocessor_*` helpers do not exist in 5.1
 
 6.2 introduces a `<rtems/score/scheduleruniimpl.h>` family

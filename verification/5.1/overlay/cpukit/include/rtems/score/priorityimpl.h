@@ -267,6 +267,13 @@ RTEMS_INLINE_ROUTINE bool _Priority_Is_empty(
  *
  * @return The priority of @a aggregation.
  */
+/*@
+  requires \valid_read( &aggregation->Node.priority );
+
+  assigns \result \from aggregation->Node.priority;
+
+  ensures \result == \at( aggregation->Node.priority, Pre );
+*/
 RTEMS_INLINE_ROUTINE Priority_Control _Priority_Get_priority(
   const Priority_Aggregation *aggregation
 )

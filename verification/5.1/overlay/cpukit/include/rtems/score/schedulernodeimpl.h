@@ -154,6 +154,14 @@ RTEMS_INLINE_ROUTINE Thread_Control *_Scheduler_Node_get_owner(
  *
  * @return The priority of the node.
  */
+/*@
+  requires \valid( node );
+
+  assigns node->Priority;
+
+  ensures node->Priority.value == \at( node->Priority.value, Pre );
+  ensures \result == \at( node->Priority.value, Pre );
+*/
 RTEMS_INLINE_ROUTINE Priority_Control _Scheduler_Node_get_priority(
   Scheduler_Node *node
 )

@@ -1416,6 +1416,15 @@ RTEMS_INLINE_ROUTINE const Scheduler_Control *_Thread_Scheduler_get_home(
  *
  * @return The thread's home node.
  */
+#if !defined(RTEMS_SMP)
+/*@
+  requires \valid_read( &the_thread->Scheduler.nodes );
+
+  assigns \result \from the_thread->Scheduler.nodes;
+
+  ensures \result == \at( the_thread->Scheduler.nodes, Pre );
+*/
+#endif
 RTEMS_INLINE_ROUTINE Scheduler_Node *_Thread_Scheduler_get_home_node(
   const Thread_Control *the_thread
 )
@@ -1588,6 +1597,17 @@ RTEMS_INLINE_ROUTINE void _Thread_Scheduler_remove_wait_node(
  *
  * @return The priority of the thread.
  */
+/*@
+  requires \valid_read( &the_thread->Scheduler.nodes );
+  requires \valid_read( the_thread->Scheduler.nodes );
+
+  assigns \result \from
+    the_thread->Scheduler.nodes,
+    the_thread->Scheduler.nodes->Wait.Priority.Node.priority;
+
+  ensures \result ==
+    \at( the_thread->Scheduler.nodes->Wait.Priority.Node.priority, Pre );
+*/
 RTEMS_INLINE_ROUTINE Priority_Control _Thread_Get_priority(
   const Thread_Control *the_thread
 )

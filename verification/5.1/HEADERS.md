@@ -30,18 +30,16 @@ place:
 - Source contracts for `_Scheduler_EDF_Initialize`,
   `_Scheduler_EDF_Node_initialize`
 
-**Verified slices (2026-05-20)**:
+**Verified slices (2026-05-25)**:
 
 | Script | WP result | Notes |
 |---|---|---|
-| `verify-scheduler-update-heir.sh` | 28 / 28 | dedicated harness for `_Scheduler_Update_heir`; mirrors 6.2's `verify-scheduleruni-unblock.sh` two-tier setup |
+| `verify-scheduler-update-heir.sh` | 23 / 23 | dedicated harness for `_Scheduler_Update_heir`; mirrors 6.2's `verify-scheduleruni-unblock.sh` two-tier setup |
 | `verify-edf-initialize.sh` | 31 / 31 | parity with 6.2 |
 | `verify-edf-node-initialize.sh` | 30 / 30 | parity with 6.2 |
 | `verify-edf-map-unmap.sh` | 10 / 10 | new, dedicated to the Map/Unmap helpers |
-| `verify-edf-schedule.sh` (function) | 68 / 68 | EDF entry point + `_Scheduler_EDF_Schedule_body` against its body. The `_RBTree_Minimum` contract (in `models/edf_property.h`) bridges the abstract ready set to the body's `RTEMS_CONTAINER_OF`. |
+| `verify-edf-schedule.sh` (function) | 44 / 44 | EDF entry point + `_Scheduler_EDF_Schedule_body` against its body. The `_RBTree_Minimum` contract (in `models/edf_property.h`) bridges the abstract ready set to the body's `RTEMS_CONTAINER_OF`. |
 | `verify-edf-schedule.sh` (model lemma) | 11 / 11 | parity with 6.2 |
-| `verify-edf-yield.sh` (function) | 54 / 54 | EDF Yield entry point. Mirrors 6.2's contract using `edf_scheduler_decision{Post}`, but routes through `_Scheduler_EDF_Schedule_body(scheduler, the_thread, true)` instead of 6.2's `_Scheduler_uniprocessor_Yield`. |
-| `verify-edf-yield.sh` (model lemma) | 11 / 11 | parity with 6.2 |
 
 **Verification architecture** (two-tier, mirrors 6.2):
 
@@ -88,9 +86,8 @@ Pending (copied as pristine, contracts not yet ported):
   update, so the contract is shaped like 6.2's
   `_Scheduler_uniprocessor_Unblock` contract but applied to the EDF entry
   point directly.
-- `scheduleredfyield.c` — DONE. Entry-point contract mirrors 6.2 using
-  `edf_scheduler_decision{Post}`. Routes through `_Scheduler_EDF_Schedule_body`
-  with `force_dispatch=true` (5.1 has no `_Scheduler_uniprocessor_*` family).
+- `scheduleredfyield.c` — needs entry-point contract, structurally similar to
+  block.
 - `scheduleredfchangepriority.c` — needs update-priority contract
 - `scheduleredfreleasejob.c` — needs release/cancel contracts (depend on
   priority aggregation)
