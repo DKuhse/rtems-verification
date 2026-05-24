@@ -1377,7 +1377,8 @@ void _Thread_Priority_replace(
       \separated(
         &node->priority,
         &((Scheduler_EDF_Node *)
-          queue_context->Priority.update[ 0 ]->Scheduler.nodes)->priority
+          \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes,
+               Pre ))->priority
       ) ) ==>
       node->priority == \at( node->priority, Pre );
 
@@ -1406,16 +1407,20 @@ void _Thread_Priority_replace(
   behavior one:
     assumes queue_context->Priority.update_count == 1;
     assigns ((Scheduler_EDF_Node *)
-              queue_context->Priority.update[ 0 ]->Scheduler.nodes)->priority,
+              \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes,
+                   Pre ))->priority,
             ((Scheduler_EDF_Node *)
-              queue_context->Priority.update[ 0 ]->Scheduler.nodes)->
+              \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes,
+                   Pre ))->
                 Base.Priority,
             ((Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context)->Ready,
             _Per_CPU_Information[ 0 ].per_cpu.heir,
             _Per_CPU_Information[ 0 ].per_cpu.dispatch_necessary,
             _Thread_Dispatch_necessary_ghost,
-            _Thread_Heir->cpu_time_used,
-            _Per_CPU_Information[ 0 ].per_cpu.heir->cpu_time_used,
+            ((Thread_Control *) \at( _Thread_Heir, Pre ))->cpu_time_used,
+            ((Thread_Control *)
+              \at( _Per_CPU_Information[ 0 ].per_cpu.heir, Pre ))->
+                cpu_time_used,
             _Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp;
     ensures edf_scheduler_decision{Post}(
       (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
@@ -1444,6 +1449,8 @@ void _Thread_Priority_replace(
       \at( queue_context->Priority.update_count, Pre );
     ensures queue_context->Priority.update[ 0 ] ==
       \at( queue_context->Priority.update[ 0 ], Pre );
+    ensures queue_context->Priority.update[ 0 ]->Scheduler.nodes ==
+      \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes, Pre );
 
   complete behaviors empty, one;
   disjoint behaviors empty, one;
