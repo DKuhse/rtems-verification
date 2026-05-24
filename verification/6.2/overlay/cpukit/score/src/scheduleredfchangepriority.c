@@ -94,6 +94,22 @@ struct timeval   sbttotv( int64_t );
 
   // The node belongs to the_thread.
   requires ((Scheduler_EDF_Node *) node)->Base.owner == the_thread;
+  requires \separated(
+    the_thread + (..),
+    node + (..)
+  );
+  requires \separated(
+    &node->Wait.Priority.Node.priority,
+    &node->Priority.value,
+    &((Scheduler_EDF_Node *) node)->priority
+  );
+  requires \forall Priority_Node *contributor;
+    contributor \in priority_contributors{Pre}( &node->Wait.Priority ) ==>
+      \separated(
+        contributor + (..),
+        &node->Priority.value,
+        &((Scheduler_EDF_Node *) node)->priority
+      );
 
   // If the_thread is ready, the_node is already in the ready set
   // required so Extract's precondition holds in the extract_enqueue path.
@@ -167,6 +183,20 @@ struct timeval   sbttotv( int64_t );
     edf_ready_set{Pre}( (Scheduler_EDF_Context *) scheduler->context ) );
   ensures the_thread->current_state == STATES_READY ==>
     edf_ready_node_cache_consistent{Post}( (Scheduler_EDF_Node *) node );
+  ensures the_thread->Scheduler.nodes ==
+          \at( the_thread->Scheduler.nodes, Pre );
+  ensures priority_contributors{Post}( &node->Wait.Priority ) ==
+          priority_contributors{Pre}( &node->Wait.Priority );
+  ensures \at(
+    priority_aggregation_well_formed( &node->Wait.Priority ),
+    Pre
+  ) ==>
+    priority_aggregation_well_formed{Post}( &node->Wait.Priority );
+  ensures \at(
+    priority_aggregation_cached_minimum( &node->Wait.Priority ),
+    Pre
+  ) ==>
+    priority_aggregation_cached_minimum{Post}( &node->Wait.Priority );
   ensures \forall Priority_Node *priority_node;
     \valid_read( priority_node ) &&
     \separated(
@@ -214,6 +244,18 @@ void _Scheduler_EDF_Update_priority(
           _Per_CPU_Information[ 0 ].per_cpu.executing,
           _Thread_Heir,
           _Thread_Dispatch_necessary_ghost ); */
+    /*@ assert priority_contributors{Here}( &node->Wait.Priority ) ==
+          priority_contributors{Pre}( &node->Wait.Priority ); */
+    /*@ assert \at(
+          priority_aggregation_well_formed( &node->Wait.Priority ),
+          Pre
+        ) ==>
+          priority_aggregation_well_formed{Here}( &node->Wait.Priority ); */
+    /*@ assert \at(
+          priority_aggregation_cached_minimum( &node->Wait.Priority ),
+          Pre
+        ) ==>
+          priority_aggregation_cached_minimum{Here}( &node->Wait.Priority ); */
     return;
   }
 
@@ -227,6 +269,18 @@ void _Scheduler_EDF_Update_priority(
           _Per_CPU_Information[ 0 ].per_cpu.executing,
           _Thread_Heir,
           _Thread_Dispatch_necessary_ghost ); */
+    /*@ assert priority_contributors{Here}( &node->Wait.Priority ) ==
+          priority_contributors{Pre}( &node->Wait.Priority ); */
+    /*@ assert \at(
+          priority_aggregation_well_formed( &node->Wait.Priority ),
+          Pre
+        ) ==>
+          priority_aggregation_well_formed{Here}( &node->Wait.Priority ); */
+    /*@ assert \at(
+          priority_aggregation_cached_minimum( &node->Wait.Priority ),
+          Pre
+        ) ==>
+          priority_aggregation_cached_minimum{Here}( &node->Wait.Priority ); */
     return;
   }
 
@@ -255,6 +309,23 @@ void _Scheduler_EDF_Update_priority(
         _Per_CPU_Information[ 0 ].per_cpu.executing,
         _Thread_Heir,
         _Thread_Dispatch_necessary_ghost ); */
+  /*@ assert priority_contributors{Here}( &node->Wait.Priority ) ==
+        priority_contributors{Pre}( &node->Wait.Priority ); */
+  /*@ assert \at(
+        priority_aggregation_well_formed( &node->Wait.Priority ),
+        Pre
+      ) ==>
+        priority_aggregation_well_formed{Here}( &node->Wait.Priority ); */
+  /*@ assert node->Wait.Priority.Node.priority ==
+        \at( node->Wait.Priority.Node.priority, Pre ); */
+  /*@ assert \forall Priority_Node *contributor;
+        contributor \in priority_contributors{Pre}( &node->Wait.Priority ) ==>
+          contributor->priority == \at( contributor->priority, Pre ); */
+  /*@ assert \at(
+        priority_aggregation_cached_minimum( &node->Wait.Priority ),
+        Pre
+      ) ==>
+        priority_aggregation_cached_minimum{Here}( &node->Wait.Priority ); */
 
   // Pin the witness for the post-condition existentials
   /*@ assert \at( _Thread_Heir, Pre )->is_preemptible ==>

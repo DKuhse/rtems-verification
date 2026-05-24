@@ -900,15 +900,38 @@ static inline void _Priority_Non_empty_insert(
 
   _Assert( !_Priority_Is_empty( aggregation ) );
   is_new_minimum = _Priority_Plain_insert( aggregation, node, node->priority );
+  /*@ assert priority_contributors{Here}( aggregation ) ==
+        priority_contributors_insert(
+          priority_contributors{Pre}( aggregation ),
+          node
+        ); */
 
   if ( is_new_minimum ) {
+    /*@ assert priority_contributors_minimum_node{Here}(
+          priority_contributors{Here}( aggregation ),
+          node
+        ); */
     aggregation->Node.priority = node->priority;
+    /*@ assert priority_aggregation_cached_minimum{Here}( aggregation ); */
     /*@ calls _Thread_Priority_action_change; */
     ( *change )( aggregation, PRIORITY_GROUP_LAST, actions, arg );
     /*@ assert actions->actions == aggregation; */
+    /*@ assert priority_aggregation_cached_minimum{Here}( aggregation ); */
+  } else {
+    /*@ assert \forall Priority_Node *old_minimum;
+          priority_contributors_minimum_node{Pre}(
+            priority_contributors{Pre}( aggregation ),
+            old_minimum
+          ) ==>
+          priority_contributors_minimum_node{Here}(
+            priority_contributors{Here}( aggregation ),
+            old_minimum
+          ); */
+    /*@ assert priority_aggregation_cached_minimum{Here}( aggregation ); */
   }
 
   /*@ assert actions->actions == \null || actions->actions == aggregation; */
+  /*@ assert priority_aggregation_cached_minimum{Here}( aggregation ); */
 }
 
 /**

@@ -699,9 +699,25 @@ void _Thread_Priority_perform_actions(
           SCHEDULER_PRIORITY_PURIFY(
             the_thread->Scheduler.nodes->Priority.value ) ==
           the_thread->Scheduler.nodes->Wait.Priority.Node.priority;
+  ensures \at( queue_context->Priority.update_count, Pre ) == 0 &&
+          queue_context->Priority.update_count == 1 ==>
+          SCHEDULER_PRIORITY_PURIFY(
+            the_thread->Scheduler.nodes->Priority.value ) ==
+          the_thread->Scheduler.nodes->Wait.Priority.Node.priority;
   ensures the_thread->Scheduler.nodes->Priority.value !=
             \at( the_thread->Scheduler.nodes->Priority.value, Pre ) ==>
           thread_priority_update_pending{Post}( queue_context, the_thread );
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) &&
+          \at(
+            SCHEDULER_PRIORITY_PURIFY(
+              the_thread->Scheduler.nodes->Priority.value ) ==
+            the_thread->Scheduler.nodes->Wait.Priority.Node.priority,
+            Pre
+          ) ==>
+          SCHEDULER_PRIORITY_PURIFY(
+            the_thread->Scheduler.nodes->Priority.value ) ==
+          the_thread->Scheduler.nodes->Wait.Priority.Node.priority;
 
   behavior add:
     assumes priority_action_type == PRIORITY_ACTION_ADD;
@@ -1191,6 +1207,24 @@ void _Thread_Priority_update( Thread_queue_Context *queue_context )
       \at( queue_context->Priority.update[ 0 ], Pre );
     loop invariant queue_context->Priority.update[ 0 ]->Scheduler.nodes ==
       \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes, Pre );
+    loop invariant \at(
+      priority_aggregation_well_formed(
+        &queue_context->Priority.update[ 0 ]->Scheduler.nodes->Wait.Priority ),
+      Pre
+    ) ==>
+      priority_aggregation_well_formed{Here}(
+        &queue_context->Priority.update[ 0 ]->Scheduler.nodes->Wait.Priority );
+    loop invariant \at(
+      priority_aggregation_cached_minimum(
+        &queue_context->Priority.update[ 0 ]->Scheduler.nodes->Wait.Priority ),
+      Pre
+    ) ==>
+      priority_aggregation_cached_minimum{Here}(
+        &queue_context->Priority.update[ 0 ]->Scheduler.nodes->Wait.Priority );
+    loop invariant priority_contributors{Here}(
+      &queue_context->Priority.update[ 0 ]->Scheduler.nodes->Wait.Priority ) ==
+      priority_contributors{Pre}(
+        &queue_context->Priority.update[ 0 ]->Scheduler.nodes->Wait.Priority );
     loop invariant i == 0 ==> _Thread_Heir == \at( _Thread_Heir, Pre );
     loop invariant i == 0 ==>
       _Per_CPU_Information[ 0 ].per_cpu.heir ==
