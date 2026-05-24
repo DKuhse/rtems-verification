@@ -1351,6 +1351,10 @@ void _Thread_Priority_replace(
     (Scheduler_Control const *) _Scheduler_Table + (..)
   );
 
+  ensures \forall Priority_Node *node;
+    \valid_read( &node->priority ) ==>
+      node->priority == \at( node->priority, Pre );
+
   behavior empty:
     assumes queue_context->Priority.update_count == 0;
     assigns \nothing;
