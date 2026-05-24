@@ -343,6 +343,27 @@ RTEMS_INLINE_ROUTINE void _Scheduler_EDF_Extract_body(
             edf_ready_set{Pre}(
               (Scheduler_EDF_Context *) scheduler->context ),
             _Thread_Heir );
+
+  // With force_dispatch the heir is set unconditionally to the EDF-earliest
+  // ready owner. Required by _Scheduler_EDF_Yield (which mirrors 6.2's
+  // _Scheduler_uniprocessor_Update_heir_if_necessary, also unconditional).
+  ensures force_dispatch ==>
+          edf_thread_owns_earliest_ready_node{Post}(
+            edf_ready_set{Post}(
+              (Scheduler_EDF_Context *) scheduler->context ),
+            _Thread_Heir );
+
+  // Mirror of _Scheduler_Update_heir's update behavior: when the heir is
+  // replaced, the dispatch ghost becomes true. Used by Yield/Block to keep
+  // the P3.b dispatch-set invariant across the call.
+  ensures \at( _Thread_Heir, Pre ) == _Thread_Heir ||
+          _Thread_Dispatch_necessary_ghost == \true;
+
+  // Dispatch monotonicity: the keep behavior of _Scheduler_Update_heir has
+  // assigns \nothing (so dispatch is preserved); the update behavior sets
+  // it to true. Either way, a Pre dispatch-necessary remains at Post.
+  ensures \at( _Thread_Dispatch_necessary_ghost, Pre ) ==>
+          _Thread_Dispatch_necessary_ghost;
 */
 RTEMS_INLINE_ROUTINE void _Scheduler_EDF_Schedule_body(
   const Scheduler_Control *scheduler,
