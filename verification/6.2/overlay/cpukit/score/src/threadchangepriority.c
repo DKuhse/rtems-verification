@@ -1202,6 +1202,16 @@ void _Thread_Priority_update( Thread_queue_Context *queue_context )
       (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
       _Thread_Heir,
       _Thread_Heir->is_preemptible );
+    loop invariant i == 0 ==>
+      thread_priority_edf_heir_valid{Here}( _Thread_Heir );
+    loop invariant i == 0 ==>
+      thread_priority_edf_update_ready_pre{Here}(
+        (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+        queue_context->Priority.update[ 0 ] );
+    loop invariant i == 0 ==>
+      thread_priority_edf_update_separated{Here}(
+        (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+        queue_context->Priority.update[ 0 ] );
     loop invariant i == 1 &&
       queue_context->Priority.update[ 0 ]->current_state == STATES_READY ==>
         edf_ready_node_cache_consistent{Here}(
@@ -1228,6 +1238,13 @@ void _Thread_Priority_update( Thread_queue_Context *queue_context )
     /*@ assert i == 0; */
     /*@ assert the_thread == queue_context->Priority.update[ 0 ]; */
     _Thread_State_acquire( the_thread, &lock_context );
+    /*@ assert thread_priority_edf_heir_valid{Here}( _Thread_Heir ); */
+    /*@ assert thread_priority_edf_update_ready_pre{Here}(
+          (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+          the_thread ); */
+    /*@ assert thread_priority_edf_update_separated{Here}(
+          (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+          the_thread ); */
     _Scheduler_Update_priority( the_thread );
     _Thread_State_release( the_thread, &lock_context );
   }
