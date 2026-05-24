@@ -310,12 +310,27 @@ static void _Rate_monotonic_Release_postponed_job(
           owner->Scheduler.nodes->Priority.value,
           ((Scheduler_EDF_Node *) owner->Scheduler.nodes)->priority,
           ((Scheduler_EDF_Node *) owner->Scheduler.nodes)->Base.Priority,
+          ((Scheduler_EDF_Node *) \at( owner->Scheduler.nodes, Pre ))->priority,
+          ((Scheduler_EDF_Node *)
+            \at( owner->Scheduler.nodes, Pre ))->Base.Priority,
+          ((Scheduler_EDF_Node *) \at(
+            _Rate_monotonic_Release_job_queue_context.Priority.update[ 0 ]->
+              Scheduler.nodes,
+            Pre ))->priority,
+          ((Scheduler_EDF_Node *) \at(
+            _Rate_monotonic_Release_job_queue_context.Priority.update[ 0 ]->
+              Scheduler.nodes,
+            Pre ))->Base.Priority,
           ((Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context)->Ready,
           _Per_CPU_Information[ 0 ].per_cpu.heir,
           _Per_CPU_Information[ 0 ].per_cpu.dispatch_necessary,
           _Thread_Dispatch_necessary_ghost,
           _Thread_Heir->cpu_time_used,
           _Per_CPU_Information[ 0 ].per_cpu.heir->cpu_time_used,
+          ((Thread_Control *) \at( _Thread_Heir, Pre ))->cpu_time_used,
+          ((Thread_Control *)
+            \at( _Per_CPU_Information[ 0 ].per_cpu.heir, Pre ))->
+              cpu_time_used,
           _Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp;
 
   ensures edf_ready_context_well_formed{Post}(
@@ -422,8 +437,50 @@ static void _Rate_monotonic_Release_job(
   /*@ assert &_Per_CPU_Information[ 0 ].per_cpu.heir->cpu_time_used ==
         &((Thread_Control *)
           \at( _Per_CPU_Information[ 0 ].per_cpu.heir, Pre ))->cpu_time_used; */
+  /*@ assert owner->Scheduler.nodes ==
+        \at( owner->Scheduler.nodes, Pre ); */
   /*@ assert queue_context->Priority.update_count == 1 ==>
         queue_context->Priority.update[ 0 ] == owner; */
+  /*@ assert queue_context->Priority.update_count == 1 ==>
+        queue_context->Priority.update[ 0 ]->Scheduler.nodes ==
+          \at( owner->Scheduler.nodes, Pre ); */
+  /*@ assert queue_context->Priority.update_count == 1 ==>
+        &((Scheduler_EDF_Node *)
+          queue_context->Priority.update[ 0 ]->Scheduler.nodes)->priority ==
+        &((Scheduler_EDF_Node *)
+          \at( owner->Scheduler.nodes, Pre ))->priority; */
+  /*@ assert queue_context->Priority.update_count == 1 ==>
+        &((Scheduler_EDF_Node *)
+          queue_context->Priority.update[ 0 ]->Scheduler.nodes)->
+            Base.Priority ==
+        &((Scheduler_EDF_Node *)
+          \at( owner->Scheduler.nodes, Pre ))->Base.Priority; */
+  /*@ assert queue_context == &_Rate_monotonic_Release_job_queue_context; */
+  /*@ assert queue_context->Priority.update_count == 0 ==>
+        queue_context->Priority.update[ 0 ] ==
+        \at( _Rate_monotonic_Release_job_queue_context.Priority.update[ 0 ],
+             Pre ); */
+  /*@ assert queue_context->Priority.update_count == 0 ==>
+        queue_context->Priority.update[ 0 ]->Scheduler.nodes ==
+        \at(
+          _Rate_monotonic_Release_job_queue_context.Priority.update[ 0 ]->
+            Scheduler.nodes,
+          Pre ); */
+  /*@ assert queue_context->Priority.update_count == 0 ==>
+        &((Scheduler_EDF_Node *)
+          queue_context->Priority.update[ 0 ]->Scheduler.nodes)->priority ==
+        &((Scheduler_EDF_Node *) \at(
+          _Rate_monotonic_Release_job_queue_context.Priority.update[ 0 ]->
+            Scheduler.nodes,
+          Pre ))->priority; */
+  /*@ assert queue_context->Priority.update_count == 0 ==>
+        &((Scheduler_EDF_Node *)
+          queue_context->Priority.update[ 0 ]->Scheduler.nodes)->
+            Base.Priority ==
+        &((Scheduler_EDF_Node *) \at(
+          _Rate_monotonic_Release_job_queue_context.Priority.update[ 0 ]->
+            Scheduler.nodes,
+          Pre ))->Base.Priority; */
   /*@ assert queue_context->Priority.update_count == 1 &&
         queue_context->Priority.update[ 0 ]->current_state == STATES_READY ==>
           edf_ready_member{Here}(

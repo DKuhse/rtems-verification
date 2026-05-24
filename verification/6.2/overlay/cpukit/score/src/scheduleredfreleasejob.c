@@ -182,6 +182,14 @@ Priority_Control _Scheduler_EDF_Unmap_priority(
   ensures \at( queue_context->Priority.update_count, Pre ) == 0 ==>
           queue_context->Priority.update_count <= 1;
   ensures \at( queue_context->Priority.update_count, Pre ) == 0 &&
+          queue_context->Priority.update_count == 0 ==>
+          queue_context->Priority.update[ 0 ] ==
+            \at( queue_context->Priority.update[ 0 ], Pre );
+  ensures \at( queue_context->Priority.update_count, Pre ) == 0 &&
+          queue_context->Priority.update_count == 0 ==>
+          queue_context->Priority.update[ 0 ]->Scheduler.nodes ==
+            \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes, Pre );
+  ensures \at( queue_context->Priority.update_count, Pre ) == 0 &&
           queue_context->Priority.update_count == 1 ==>
           queue_context->Priority.update[ 0 ] == the_thread;
   ensures \at( queue_context->Priority.update_count, Pre ) == 0 &&
@@ -552,6 +560,14 @@ void _Scheduler_EDF_Release_job(
           thread_priority_update_pending{Post}( queue_context, the_thread );
   ensures \at( queue_context->Priority.update_count, Pre ) == 0 ==>
           queue_context->Priority.update_count <= 1;
+  ensures \at( queue_context->Priority.update_count, Pre ) == 0 &&
+          queue_context->Priority.update_count == 0 ==>
+          queue_context->Priority.update[ 0 ] ==
+            \at( queue_context->Priority.update[ 0 ], Pre );
+  ensures \at( queue_context->Priority.update_count, Pre ) == 0 &&
+          queue_context->Priority.update_count == 0 ==>
+          queue_context->Priority.update[ 0 ]->Scheduler.nodes ==
+            \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes, Pre );
   ensures \at( queue_context->Priority.update_count, Pre ) == 0 &&
           queue_context->Priority.update_count == 1 ==>
           queue_context->Priority.update[ 0 ] == the_thread;

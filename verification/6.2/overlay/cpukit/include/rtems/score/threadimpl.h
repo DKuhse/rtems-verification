@@ -881,6 +881,14 @@ void _Thread_Priority_perform_actions(
           queue_context->Priority.update_count ==
             \at( queue_context->Priority.update_count, Pre ) + 1;
   ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) ==>
+          queue_context->Priority.update[ 0 ] ==
+            \at( queue_context->Priority.update[ 0 ], Pre );
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) ==>
+          queue_context->Priority.update[ 0 ]->Scheduler.nodes ==
+            \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes, Pre );
+  ensures queue_context->Priority.update_count ==
             \at( queue_context->Priority.update_count, Pre ) + 1 ==>
           queue_context->Priority.update[
             \at( queue_context->Priority.update_count, Pre )
@@ -1038,6 +1046,14 @@ void _Thread_Priority_add(
           queue_context->Priority.update_count ==
             \at( queue_context->Priority.update_count, Pre ) + 1;
   ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) ==>
+          queue_context->Priority.update[ 0 ] ==
+            \at( queue_context->Priority.update[ 0 ], Pre );
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) ==>
+          queue_context->Priority.update[ 0 ]->Scheduler.nodes ==
+            \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes, Pre );
+  ensures queue_context->Priority.update_count ==
             \at( queue_context->Priority.update_count, Pre ) + 1 ==>
           queue_context->Priority.update[
             \at( queue_context->Priority.update_count, Pre )
@@ -1188,6 +1204,14 @@ void _Thread_Priority_remove(
             \at( queue_context->Priority.update_count, Pre ) ||
           queue_context->Priority.update_count ==
             \at( queue_context->Priority.update_count, Pre ) + 1;
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) ==>
+          queue_context->Priority.update[ 0 ] ==
+            \at( queue_context->Priority.update[ 0 ], Pre );
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) ==>
+          queue_context->Priority.update[ 0 ]->Scheduler.nodes ==
+            \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes, Pre );
   ensures queue_context->Priority.update_count ==
             \at( queue_context->Priority.update_count, Pre ) + 1 ==>
           queue_context->Priority.update[

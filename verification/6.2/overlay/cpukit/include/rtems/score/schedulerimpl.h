@@ -802,6 +802,12 @@ static inline void _Scheduler_Node_destroy(
             \at( the_thread->Scheduler.nodes->Priority.value, Pre ) ==>
           thread_priority_update_pending{Post}( queue_context, the_thread );
   ensures queue_context->Priority.update_count <= 1;
+  ensures queue_context->Priority.update_count == 0 ==>
+          queue_context->Priority.update[ 0 ] ==
+            \at( queue_context->Priority.update[ 0 ], Pre );
+  ensures queue_context->Priority.update_count == 0 ==>
+          queue_context->Priority.update[ 0 ]->Scheduler.nodes ==
+            \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes, Pre );
   ensures queue_context->Priority.update_count == 1 ==>
           queue_context->Priority.update[ 0 ] == the_thread;
   ensures queue_context->Priority.update_count == 1 &&
@@ -1098,6 +1104,12 @@ Before_Release_job:
             \at( the_thread->Scheduler.nodes->Priority.value, Pre ) ==>
           thread_priority_update_pending{Post}( queue_context, the_thread );
   ensures queue_context->Priority.update_count <= 1;
+  ensures queue_context->Priority.update_count == 0 ==>
+          queue_context->Priority.update[ 0 ] ==
+            \at( queue_context->Priority.update[ 0 ], Pre );
+  ensures queue_context->Priority.update_count == 0 ==>
+          queue_context->Priority.update[ 0 ]->Scheduler.nodes ==
+            \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes, Pre );
   ensures queue_context->Priority.update_count == 1 ==>
           queue_context->Priority.update[ 0 ] == the_thread;
   ensures queue_context->Priority.update_count == 1 &&
