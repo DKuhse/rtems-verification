@@ -125,6 +125,9 @@ to `-c11` so quick compatibility checks can run on `verify-6.2-active`.
   the public thread-priority wrappers against the `_Thread_Priority_apply()`
   contract used by EDF release/cancel. Priority RBTree/plain helpers remain
   permanently abstract and out of scope for this project.
+- `verify-thread-priority-update.sh` — runs Frama-C/WP on
+  `_Thread_Priority_update()`, the composition step that consumes queued
+  priority updates and calls the scheduler update-priority operation.
 - `verify-scheduleruni-unblock.sh` — runs Frama-C/WP on the header harness for
   `_Scheduler_uniprocessor_Update_heir()`,
   `_Scheduler_uniprocessor_Update_heir_if_necessary()`,

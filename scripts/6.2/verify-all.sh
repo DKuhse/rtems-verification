@@ -61,6 +61,7 @@ SCRIPTS=(
     verify-scheduler-release-job.sh
     verify-scheduleruni-unblock.sh
     verify-thread-change-priority.sh
+    verify-thread-priority-update.sh
 )
 
 if [ "${INCLUDE_TMP}" = "1" ]; then
