@@ -152,6 +152,7 @@ void _Thread_queue_Do_nothing_priority_actions(
       &((Scheduler_EDF_Node *) the_thread->Scheduler.nodes)->priority,
       &(_Per_CPU_Information[ 0 ].per_cpu.heir)->cpu_time_used
     );
+
 */
 #endif
 
@@ -1320,6 +1321,12 @@ void _Thread_Priority_replace(
   requires edf_ready_context_well_formed{Pre}(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
   requires thread_priority_edf_heir_valid{Pre}( _Thread_Heir );
+  requires edf_scheduler_decision{Pre}(
+    (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+    _Per_CPU_Information[ 0 ].per_cpu.executing,
+    _Thread_Heir,
+    _Thread_Heir->is_preemptible,
+    _Thread_Dispatch_necessary_ghost );
   requires edf_preemptible_heir_is_earliest_ready{Pre}(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
     _Thread_Heir,
@@ -1332,6 +1339,19 @@ void _Thread_Priority_replace(
     thread_priority_edf_update_ready_pre{Pre}(
       (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
       queue_context->Priority.update[ 0 ] );
+  requires queue_context->Priority.update_count == 1 &&
+    queue_context->Priority.update[ 0 ]->current_state == STATES_READY ==>
+      edf_ready_member{Pre}(
+        (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+        (Scheduler_EDF_Node *)
+          queue_context->Priority.update[ 0 ]->Scheduler.nodes );
+  requires queue_context->Priority.update_count == 1 &&
+    queue_context->Priority.update[ 0 ]->current_state == STATES_READY ==>
+      SCHEDULER_PRIORITY_PURIFY(
+        queue_context->Priority.update[ 0 ]->Scheduler.nodes->Priority.value ) ==
+        ((Scheduler_EDF_Node *)
+          queue_context->Priority.update[ 0 ]->Scheduler.nodes)->
+            Base.Wait.Priority.Node.priority;
   requires queue_context->Priority.update_count == 1 ==>
     thread_priority_edf_update_separated{Pre}(
       (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
@@ -1352,12 +1372,24 @@ void _Thread_Priority_replace(
   );
 
   ensures \forall Priority_Node *node;
-    \valid_read( &node->priority ) ==>
+    \valid_read( node ) &&
+    ( queue_context->Priority.update_count == 1 ==>
+      \separated(
+        &node->priority,
+        &((Scheduler_EDF_Node *)
+          queue_context->Priority.update[ 0 ]->Scheduler.nodes)->priority
+      ) ) ==>
       node->priority == \at( node->priority, Pre );
 
   behavior empty:
     assumes queue_context->Priority.update_count == 0;
     assigns \nothing;
+    ensures edf_scheduler_decision{Post}(
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+      _Per_CPU_Information[ 0 ].per_cpu.executing,
+      _Thread_Heir,
+      _Thread_Heir->is_preemptible,
+      _Thread_Dispatch_necessary_ghost );
     ensures edf_preemptible_heir_is_earliest_ready{Post}(
       (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
       _Thread_Heir,
@@ -1381,9 +1413,16 @@ void _Thread_Priority_replace(
             ((Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context)->Ready,
             _Per_CPU_Information[ 0 ].per_cpu.heir,
             _Per_CPU_Information[ 0 ].per_cpu.dispatch_necessary,
+            _Thread_Dispatch_necessary_ghost,
             _Thread_Heir->cpu_time_used,
             _Per_CPU_Information[ 0 ].per_cpu.heir->cpu_time_used,
             _Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp;
+    ensures edf_scheduler_decision{Post}(
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+      _Per_CPU_Information[ 0 ].per_cpu.executing,
+      _Thread_Heir,
+      _Thread_Heir->is_preemptible,
+      _Thread_Dispatch_necessary_ghost );
     ensures edf_preemptible_heir_is_earliest_ready{Post}(
       (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
       _Thread_Heir,
@@ -2137,6 +2176,15 @@ static inline bool _Thread_Owns_resources(
  *
  * @return The thread's home scheduler.
  */
+#if !defined(RTEMS_SMP)
+/*@
+  requires \valid_read( _Scheduler_Table + ( 0 .. 0 ) );
+
+  assigns \result \from \nothing;
+
+  ensures \result == &_Scheduler_Table[ 0 ];
+*/
+#endif
 static inline const Scheduler_Control *_Thread_Scheduler_get_home(
   const Thread_Control *the_thread
 )

@@ -167,6 +167,13 @@ struct timeval   sbttotv( int64_t );
     edf_ready_set{Pre}( (Scheduler_EDF_Context *) scheduler->context ) );
   ensures the_thread->current_state == STATES_READY ==>
     edf_ready_node_cache_consistent{Post}( (Scheduler_EDF_Node *) node );
+  ensures \forall Priority_Node *priority_node;
+    \valid_read( priority_node ) &&
+    \separated(
+      &priority_node->priority,
+      &((Scheduler_EDF_Node *) node)->priority
+    ) ==>
+      priority_node->priority == \at( priority_node->priority, Pre );
 
   behavior not_ready:
     assumes the_thread->current_state != STATES_READY;
@@ -224,6 +231,10 @@ void _Scheduler_EDF_Update_priority(
   }
 
   the_node->priority = priority;
+  /*@ assert \forall Priority_Node *priority_node;
+        \valid_read( priority_node ) &&
+        \separated( &priority_node->priority, &the_node->priority ) ==>
+          priority_node->priority == \at( priority_node->priority, Pre ); */
   context = _Scheduler_EDF_Get_context( scheduler );
   /*@ assert edf_ready_node_cache_consistent{Here}( the_node ); */
 

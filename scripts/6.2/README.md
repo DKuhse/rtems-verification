@@ -119,6 +119,10 @@ to `-c11` so quick compatibility checks can run on `verify-6.2-active`.
   operation to `_Scheduler_EDF_Release_job()` with `@calls`, and verifies the
   wrapper-level priority-update clearing step before the EDF operation
   contract is applied.
+- `verify-scheduler-update-priority.sh` — runs Frama-C/WP on the generic
+  `_Scheduler_Update_priority()` inline wrapper, pins the indirect scheduler
+  operation to `_Scheduler_EDF_Update_priority()` with `@calls`, and checks
+  that the wrapper passes through the EDF update-priority operation contract.
 - `verify-thread-change-priority.sh` — runs Frama-C/WP on the active
   `threadchangepriority.c` slice for `_Thread_Priority_add()`,
   `_Thread_Priority_changed()`, and `_Thread_Priority_remove()`. This verifies

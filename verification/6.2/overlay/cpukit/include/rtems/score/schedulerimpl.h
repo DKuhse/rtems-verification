@@ -381,6 +381,12 @@ static inline void _Scheduler_Unblock( Thread_Control *the_thread )
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
   requires thread_priority_edf_node_valid{Pre}( the_thread );
   requires thread_priority_edf_heir_valid{Pre}( _Thread_Heir );
+  requires edf_scheduler_decision{Pre}(
+    (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+    _Per_CPU_Information[ 0 ].per_cpu.executing,
+    _Thread_Heir,
+    _Thread_Heir->is_preemptible,
+    _Thread_Dispatch_necessary_ghost );
   requires edf_preemptible_heir_is_earliest_ready{Pre}(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
     _Thread_Heir,
@@ -388,6 +394,14 @@ static inline void _Scheduler_Unblock( Thread_Control *the_thread )
   requires thread_priority_edf_update_ready_pre{Pre}(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
     the_thread );
+  requires the_thread->current_state == STATES_READY ==>
+    edf_ready_member{Pre}(
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+      (Scheduler_EDF_Node *) the_thread->Scheduler.nodes );
+  requires the_thread->current_state == STATES_READY ==>
+    SCHEDULER_PRIORITY_PURIFY( the_thread->Scheduler.nodes->Priority.value ) ==
+      ((Scheduler_EDF_Node *)
+        the_thread->Scheduler.nodes)->Base.Wait.Priority.Node.priority;
   requires thread_priority_edf_update_separated{Pre}(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
     the_thread );
@@ -422,10 +436,17 @@ static inline void _Scheduler_Unblock( Thread_Control *the_thread )
           ((Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context)->Ready,
           _Per_CPU_Information[ 0 ].per_cpu.heir,
           _Per_CPU_Information[ 0 ].per_cpu.dispatch_necessary,
+          _Thread_Dispatch_necessary_ghost,
           _Thread_Heir->cpu_time_used,
           _Per_CPU_Information[ 0 ].per_cpu.heir->cpu_time_used,
           _Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp;
 
+  ensures edf_scheduler_decision{Post}(
+    (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+    _Per_CPU_Information[ 0 ].per_cpu.executing,
+    _Thread_Heir,
+    _Thread_Heir->is_preemptible,
+    _Thread_Dispatch_necessary_ghost );
   ensures edf_preemptible_heir_is_earliest_ready{Post}(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
     _Thread_Heir,
@@ -441,6 +462,13 @@ static inline void _Scheduler_Unblock( Thread_Control *the_thread )
   ensures the_thread->current_state == STATES_READY ==>
     edf_ready_node_cache_consistent{Post}(
       (Scheduler_EDF_Node *) the_thread->Scheduler.nodes );
+  ensures \forall Priority_Node *priority_node;
+    \valid_read( priority_node ) &&
+    \separated(
+      &priority_node->priority,
+      &((Scheduler_EDF_Node *) \at( the_thread->Scheduler.nodes, Pre ))->priority
+    ) ==>
+      priority_node->priority == \at( priority_node->priority, Pre );
 */
 #endif
 static inline void _Scheduler_Update_priority( Thread_Control *the_thread )
@@ -474,13 +502,56 @@ static inline void _Scheduler_Update_priority( Thread_Control *the_thread )
   } while ( node != tail );
 #else
   const Scheduler_Control *scheduler;
+  Scheduler_Node          *scheduler_node;
 
   scheduler = _Thread_Scheduler_get_home( the_thread );
+  scheduler_node = _Thread_Scheduler_get_home_node( the_thread );
+  /*@ assert scheduler == &_Scheduler_Table[ 0 ]; */
+  /*@ assert scheduler_node == the_thread->Scheduler.nodes; */
+  /*@ assert (Scheduler_EDF_Context *) scheduler->context ==
+        (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context; */
+  /*@ assert &((Scheduler_EDF_Node *) scheduler_node)->Base == scheduler_node; */
+  /*@ assert ((Scheduler_EDF_Node *) scheduler_node)->Base.owner == the_thread; */
+  /*@ assert edf_scheduler_decision{Here}(
+        (Scheduler_EDF_Context *) scheduler->context,
+        _Per_CPU_Information[ 0 ].per_cpu.executing,
+        _Thread_Heir,
+        _Thread_Heir->is_preemptible,
+        _Thread_Dispatch_necessary_ghost ); */
+  /*@ assert the_thread->current_state == STATES_READY ==>
+        edf_ready_member{Here}(
+          (Scheduler_EDF_Context *) scheduler->context,
+          (Scheduler_EDF_Node *) scheduler_node ); */
+  /*@ assert the_thread->current_state == STATES_READY ==>
+        SCHEDULER_PRIORITY_PURIFY( the_thread->Scheduler.nodes->Priority.value ) ==
+          ((Scheduler_EDF_Node *)
+            the_thread->Scheduler.nodes)->Base.Wait.Priority.Node.priority; */
+  /*@ assert the_thread->current_state == STATES_READY ==>
+        SCHEDULER_PRIORITY_PURIFY( scheduler_node->Priority.value ) ==
+          ((Scheduler_EDF_Node *) scheduler_node)->Base.Wait.Priority.Node.priority; */
+  /*@ calls _Scheduler_EDF_Update_priority; */
   ( *scheduler->Operations.update_priority )(
     scheduler,
     the_thread,
-    _Thread_Scheduler_get_home_node( the_thread )
+    scheduler_node
   );
+  /*@ assert edf_scheduler_decision{Here}(
+        (Scheduler_EDF_Context *) scheduler->context,
+        _Per_CPU_Information[ 0 ].per_cpu.executing,
+        _Thread_Heir,
+        _Thread_Heir->is_preemptible,
+        _Thread_Dispatch_necessary_ghost ); */
+  /*@ assert edf_preemptible_heir_is_earliest_ready{Here}(
+        (Scheduler_EDF_Context *) scheduler->context,
+        _Thread_Heir,
+        _Thread_Heir->is_preemptible ); */
+  /*@ assert \forall Priority_Node *priority_node;
+        \valid_read( priority_node ) &&
+        \separated(
+          &priority_node->priority,
+          &((Scheduler_EDF_Node *) scheduler_node)->priority
+        ) ==>
+          priority_node->priority == \at( priority_node->priority, Pre ); */
 #endif
 }
 

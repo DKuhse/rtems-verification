@@ -367,10 +367,35 @@ static void _Rate_monotonic_Release_job(
 
   _Rate_monotonic_Release( the_period, lock_context );
   /*@ assert thread_priority_edf_heir_valid{Here}( _Thread_Heir ); */
+  /*@ assert edf_scheduler_decision{Here}(
+        (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+        _Per_CPU_Information[ 0 ].per_cpu.executing,
+        _Thread_Heir,
+        _Thread_Heir->is_preemptible,
+        _Thread_Dispatch_necessary_ghost ); */
   /*@ assert edf_preemptible_heir_is_earliest_ready{Here}(
         (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
         _Thread_Heir,
         _Thread_Heir->is_preemptible ); */
+  /*@ assert queue_context.Priority.update_count == 1 ==>
+        queue_context.Priority.update[ 0 ] == owner; */
+  /*@ assert queue_context.Priority.update_count == 1 ==>
+        thread_priority_edf_update_ready_pre{Here}(
+          (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+          queue_context.Priority.update[ 0 ] ); */
+  /*@ assert queue_context.Priority.update_count == 1 &&
+        queue_context.Priority.update[ 0 ]->current_state == STATES_READY ==>
+          edf_ready_member{Here}(
+            (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+            (Scheduler_EDF_Node *)
+              queue_context.Priority.update[ 0 ]->Scheduler.nodes ); */
+  /*@ assert queue_context.Priority.update_count == 1 &&
+        queue_context.Priority.update[ 0 ]->current_state == STATES_READY ==>
+          SCHEDULER_PRIORITY_PURIFY(
+            queue_context.Priority.update[ 0 ]->Scheduler.nodes->Priority.value ) ==
+            ((Scheduler_EDF_Node *)
+              queue_context.Priority.update[ 0 ]->Scheduler.nodes)->
+                Base.Wait.Priority.Node.priority; */
   _Thread_Priority_update( &queue_context );
   _Thread_Dispatch_enable( cpu_self );
 }

@@ -59,6 +59,7 @@ SCRIPTS=(
     verify-ratemon-cancel.sh
     verify-ratemon-release-job.sh
     verify-scheduler-release-job.sh
+    verify-scheduler-update-priority.sh
     verify-scheduleruni-unblock.sh
     verify-thread-change-priority.sh
     verify-thread-priority-update.sh
