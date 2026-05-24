@@ -1204,6 +1204,14 @@ RTEMS_INLINE_ROUTINE bool _Scheduler_Unblock_node(
     (Per_CPU_Control_envelope *) _Per_CPU_Information + (..)
   );
 
+  // Dispatch monotonicity: regardless of which behavior is taken, a Pre
+  // dispatch-necessary remains dispatch-necessary at Post. Used by
+  // Schedule_body and its EDF entry-point callers (Yield, Block) to keep
+  // the P3.b dispatch-set invariant across the call without needing WP
+  // to case-split on Update_heir's behaviors.
+  ensures \at( _Thread_Dispatch_necessary_ghost, Pre ) ==>
+          _Thread_Dispatch_necessary_ghost;
+
   behavior keep:
     assumes \at( _Thread_Heir, Pre ) == new_heir ||
             ( !\at( _Thread_Heir, Pre )->is_preemptible && !force_dispatch );

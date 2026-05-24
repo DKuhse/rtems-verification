@@ -1,0 +1,80 @@
+#!/bin/bash
+#
+# Verify _Scheduler_EDF_Yield on the active RTEMS 5.1 port.
+#
+# Two WP passes:
+#   1. function goals for _Scheduler_EDF_Yield + immediate helpers
+#   2. the EDF property lemma in the model
+#
+set -e
+
+WP_FCTS="${WP_FCTS:-_Scheduler_EDF_Yield,_Scheduler_EDF_Get_context,_Scheduler_EDF_Node_downcast}"
+# _Scheduler_EDF_Schedule_body is verified separately by verify-edf-schedule.sh
+# against its body and the EDF-specialized `_RBTree_Minimum` contract. Here
+# the strengthened force_dispatch=true ensures of that function discharge the
+# Yield postcondition.
+
+WP_FCT_DEFAULTS="${WP_FCT_DEFAULTS:--wp -wp-fct ${WP_FCTS} -wp-model Typed+Cast -wp-timeout 30}"
+WP_LEMMA_DEFAULTS="${WP_LEMMA_DEFAULTS:--wp -wp-prop=@lemma -wp-model Typed+Cast -wp-timeout 30}"
+
+if command -v opam >/dev/null 2>&1; then
+    eval $(opam env)
+fi
+
+FRAMA_C_CMD="frama-c"
+GUI=0
+if [ "$1" = "--gui" ]; then
+    FRAMA_C_CMD="frama-c-gui"
+    GUI=1
+    shift
+fi
+
+C_STD_FLAGS=(-std c11)
+if [[ "$(${FRAMA_C_CMD} -version 2>/dev/null)" == 25.* ]]; then
+    C_STD_FLAGS=(-c11)
+fi
+
+RTEMS_SRC="${RTEMS_SRC:-/workspace/rtems/src/rtems-5.1-pristine}"
+RTEMS_PREFIX="${RTEMS_PREFIX:-/opt/rtems5}"
+OVERLAY="${OVERLAY:-/workspace/verification/5.1}"
+RTEMS_BUILD_BSP="${RTEMS_BUILD_BSP:-/workspace/rtems/build/amd64/x86_64-rtems5/c/amd64/include}"
+
+SRC="${OVERLAY}/overlay/cpukit/score/src/scheduleredfyield.c"
+MODEL="${OVERLAY}/models/edf_ready_set.h"
+
+[ -f "${SRC}" ] || { echo "missing overlay source: ${SRC}" >&2; exit 1; }
+[ -f "${MODEL}" ] || { echo "missing EDF ready model: ${MODEL}" >&2; exit 1; }
+
+run_fc() {
+    local defaults="$1"; shift
+    ${FRAMA_C_CMD} \
+        -cpp-command "${RTEMS_PREFIX}/bin/x86_64-rtems5-gcc -C -E \
+            -D__FRAMAC__ \
+            -D__rtems__ \
+            -I${OVERLAY}/overlay/cpukit/include \
+            -I${OVERLAY}/models \
+            -I${RTEMS_SRC}/cpukit/include \
+            -I${RTEMS_SRC}/cpukit/score/cpu/x86_64/include \
+            -I${RTEMS_BUILD_BSP} \
+            -I${RTEMS_PREFIX}/x86_64-rtems5/include \
+            -I${RTEMS_PREFIX}/lib/gcc/x86_64-rtems5/9.3.0/include \
+            -I${RTEMS_SRC}/bsps/include \
+            -I${RTEMS_SRC}/bsps/x86_64/include \
+            -I${RTEMS_SRC}/bsps/x86_64/amd64/include \
+            -nostdinc" \
+        -machdep gcc_x86_64 -cpp-frama-c-compliant "${C_STD_FLAGS[@]}" \
+        "${SRC}" \
+        -volatile \
+        -then-on Volatile \
+        ${defaults} \
+        "$@"
+}
+
+if [ "${GUI}" = "1" ]; then
+    run_fc "${WP_FCT_DEFAULTS}" "$@"
+else
+    echo "=== EDF Yield (RTEMS 5.1 active port): function ==="
+    run_fc "${WP_FCT_DEFAULTS}" "$@"
+    echo "=== EDF Yield (RTEMS 5.1 active port): model lemma ==="
+    run_fc "${WP_LEMMA_DEFAULTS}" "$@"
+fi
