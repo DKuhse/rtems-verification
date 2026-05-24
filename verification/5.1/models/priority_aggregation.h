@@ -175,6 +175,19 @@
               priority_contributors_insert( nodes, added ),
               added
             );
+
+      lemma priority_aggregation_cached_minimum_preserved{L1,L2}:
+        \forall Priority_Aggregation *aggregation;
+          priority_aggregation_well_formed{L2}( aggregation ) &&
+          priority_aggregation_cached_minimum{L1}( aggregation ) &&
+          priority_contributors{L2}( aggregation ) ==
+            priority_contributors{L1}( aggregation ) &&
+          \at( aggregation->Node.priority, L2 ) ==
+            \at( aggregation->Node.priority, L1 ) &&
+          ( \forall Priority_Node *node;
+              node \in priority_contributors{L1}( aggregation ) ==>
+                \at( node->priority, L2 ) == \at( node->priority, L1 ) ) ==>
+            priority_aggregation_cached_minimum{L2}( aggregation );
     }
 */
 

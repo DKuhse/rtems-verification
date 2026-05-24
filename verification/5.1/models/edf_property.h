@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <edf_ready_set.h>
 
+
 /*@ axiomatic EDFProperty {
 
       // --- Base ordering predicates (set-level) -------------------------
@@ -94,14 +95,30 @@
         Thread_Control        *heir,
         boolean                is_preemptible
       ) =
-        !is_preemptible || edf_thread_is_earliest_ready{L}( context, heir );
+        is_preemptible ==> edf_thread_is_earliest_ready{L}( context, heir );
 
       predicate edf_dispatch_set_if_heir_differs(
         Thread_Control *executing,
         Thread_Control *heir,
         boolean         dispatch_necessary
       ) =
-        executing == heir || dispatch_necessary;
+        executing != heir ==> dispatch_necessary;
+
+
+      // EDF scheduler invariant
+      predicate edf_scheduler_decision{L}(
+        Scheduler_EDF_Context *context,
+        Thread_Control        *executing,
+        Thread_Control        *heir,
+        boolean                is_preemptible,
+        boolean                dispatch_necessary
+      ) =
+        // (P3.a) scheduler picks argmin from ready queue
+        edf_preemptible_heir_is_earliest_ready{L}(
+          context, heir, is_preemptible ) &&
+        // (P3.b) heir != executing ==> context switch scheduled
+        edf_dispatch_set_if_heir_differs(
+          executing, heir, dispatch_necessary );
 
       // --- Bridge ------------------------------------------------------
       // Existential introduction: a concrete witness satisfying the
@@ -156,6 +173,33 @@
             edf_ready_earliest_node{L}(
               edf_ready_insert( nodes, added ),
               added
+            );
+
+      lemma edf_preemptible_heir_earliest_preserved{L1,L2}:
+        \forall Scheduler_EDF_Context *context;
+        \forall Thread_Control *heir;
+        \forall boolean is_preemptible;
+          edf_preemptible_heir_is_earliest_ready{L1}(
+            context,
+            heir,
+            is_preemptible
+          ) &&
+          edf_ready_valid_nodes{L2}( edf_ready_set{L2}( context ) ) &&
+          edf_ready_set{L2}( context ) == edf_ready_set{L1}( context ) &&
+          (
+            \forall Scheduler_EDF_Node *node;
+              node \in edf_ready_set{L1}( context ) ==>
+                \at( node->priority, L2 ) == \at( node->priority, L1 )
+          ) &&
+          (
+            \forall Scheduler_EDF_Node *node;
+              node \in edf_ready_set{L1}( context ) ==>
+                \at( node->Base.owner, L2 ) == \at( node->Base.owner, L1 )
+          ) ==>
+            edf_preemptible_heir_is_earliest_ready{L2}(
+              context,
+              heir,
+              is_preemptible
             );
     }
 */
