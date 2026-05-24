@@ -101,6 +101,8 @@ void _RM_Assume_Rate_monotonic_Release(
 */
 void _RM_Assume_Thread_Dispatch_enable( Per_CPU_Control *cpu_self );
 
+static Thread_queue_Context _Rate_monotonic_Cancel_queue_context;
+
 #define _Rate_monotonic_Acquire_critical \
   _RM_Assume_Rate_monotonic_Acquire_critical
 #define _Watchdog_Per_CPU_remove_ticks \
@@ -124,6 +126,8 @@ void _RM_Assume_Thread_Dispatch_enable( Per_CPU_Control *cpu_self );
     _Scheduler_EDF_Update_priority;
   requires \valid( (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
   requires edf_ready_context_well_formed{Pre}(
+    (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
+  requires edf_ready_context_cache_consistent{Pre}(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
 
   // `\valid(Thread_Control *)` lifted out of the predicate body — see note
@@ -159,6 +163,13 @@ void _RM_Assume_Thread_Dispatch_enable( Per_CPU_Control *cpu_self );
     node \in priority_contributors{Pre}(
       &owner->Scheduler.nodes->Wait.Priority ) ==>
         \separated( the_period + (..), node + (..) );
+  requires \forall Priority_Node *node;
+    node \in priority_contributors{Pre}(
+      &owner->Scheduler.nodes->Wait.Priority ) ==>
+        \separated(
+          &_Rate_monotonic_Cancel_queue_context + (..),
+          node + (..)
+        );
 
   requires \valid_read( &owner->Wait.operations );
   requires \valid( owner->Wait.operations );
@@ -188,8 +199,16 @@ void _RM_Assume_Thread_Dispatch_enable( Per_CPU_Control *cpu_self );
     owner + (..),
     owner->Scheduler.nodes + (..),
     owner->Wait.operations + (..),
+    &_Rate_monotonic_Cancel_queue_context + (..),
     lock_context
   );
+  requires \forall Scheduler_EDF_Node *node;
+    node \in edf_ready_set{Pre}(
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context ) ==>
+      \separated(
+        &_Rate_monotonic_Cancel_queue_context + (..),
+        node + (..)
+      );
   requires \separated(
     &the_period->Priority.Node.RBTree.Node.rbe_color,
     &the_period->postponed_jobs,
@@ -217,6 +236,7 @@ void _RM_Assume_Thread_Dispatch_enable( Per_CPU_Control *cpu_self );
   assigns the_period->postponed_jobs,
           the_period->state,
           the_period->Priority.Node.RBTree.Node.rbe_color,
+          _Rate_monotonic_Cancel_queue_context.Priority,
           owner->Scheduler.nodes->Wait.Priority,
           owner->Scheduler.nodes->Priority.value,
           ((Scheduler_EDF_Node *) owner->Scheduler.nodes)->priority,
@@ -286,8 +306,17 @@ void _Rate_monotonic_Cancel(
   ISR_lock_Context       *lock_context
 )
 {
-  Per_CPU_Control      *cpu_self;
-  Thread_queue_Context  queue_context;
+  Per_CPU_Control       *cpu_self;
+  Thread_queue_Context  *queue_context;
+#ifndef __FRAMAC__
+  Thread_queue_Context   local_queue_context;
+#endif
+
+#ifdef __FRAMAC__
+  queue_context = &_Rate_monotonic_Cancel_queue_context;
+#else
+  queue_context = &local_queue_context;
+#endif
 
   _Rate_monotonic_Acquire_critical( the_period, lock_context );
 
@@ -297,7 +326,7 @@ void _Rate_monotonic_Cancel(
   _Scheduler_Cancel_job(
     the_period->owner,
     &the_period->Priority,
-    &queue_context
+    queue_context
   );
   /*@ assert edf_scheduler_decision{Here}(
         (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
@@ -330,26 +359,26 @@ void _Rate_monotonic_Cancel(
         (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
         _Thread_Heir,
         _Thread_Heir->is_preemptible ); */
-  /*@ assert queue_context.Priority.update_count == 1 ==>
-        queue_context.Priority.update[ 0 ] == owner; */
-  /*@ assert queue_context.Priority.update_count == 1 ==>
+  /*@ assert queue_context->Priority.update_count == 1 ==>
+        queue_context->Priority.update[ 0 ] == owner; */
+  /*@ assert queue_context->Priority.update_count == 1 ==>
         thread_priority_edf_update_ready_pre{Here}(
           (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
-          queue_context.Priority.update[ 0 ] ); */
-  /*@ assert queue_context.Priority.update_count == 1 &&
-        queue_context.Priority.update[ 0 ]->current_state == STATES_READY ==>
+          queue_context->Priority.update[ 0 ] ); */
+  /*@ assert queue_context->Priority.update_count == 1 &&
+        queue_context->Priority.update[ 0 ]->current_state == STATES_READY ==>
           edf_ready_member{Here}(
             (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
             (Scheduler_EDF_Node *)
-              queue_context.Priority.update[ 0 ]->Scheduler.nodes ); */
-  /*@ assert queue_context.Priority.update_count == 1 &&
-        queue_context.Priority.update[ 0 ]->current_state == STATES_READY ==>
+              queue_context->Priority.update[ 0 ]->Scheduler.nodes ); */
+  /*@ assert queue_context->Priority.update_count == 1 &&
+        queue_context->Priority.update[ 0 ]->current_state == STATES_READY ==>
           SCHEDULER_PRIORITY_PURIFY(
-            queue_context.Priority.update[ 0 ]->Scheduler.nodes->Priority.value ) ==
+            queue_context->Priority.update[ 0 ]->Scheduler.nodes->Priority.value ) ==
             ((Scheduler_EDF_Node *)
-              queue_context.Priority.update[ 0 ]->Scheduler.nodes)->
+              queue_context->Priority.update[ 0 ]->Scheduler.nodes)->
                 Base.Wait.Priority.Node.priority; */
-  _Thread_Priority_update( &queue_context );
+  _Thread_Priority_update( queue_context );
   _Thread_Dispatch_enable( cpu_self );
 }
 
