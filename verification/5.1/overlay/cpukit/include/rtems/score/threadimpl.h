@@ -372,6 +372,13 @@ void _Thread_Close(
  * @retval true The thread is currently in the ready state.
  * @retval false The thread is currently not ready.
  */
+/*@
+  requires \valid_read( &the_thread->current_state );
+
+  assigns \result \from the_thread->current_state;
+
+  ensures \result == ( the_thread->current_state == STATES_READY );
+*/
 RTEMS_INLINE_ROUTINE bool _Thread_Is_ready( const Thread_Control *the_thread )
 {
   return _States_Is_ready( the_thread->current_state );

@@ -353,6 +353,13 @@ RTEMS_INLINE_ROUTINE void _Scheduler_EDF_Extract_body(
               (Scheduler_EDF_Context *) scheduler->context ),
             _Thread_Heir );
 
+  // If the selected heir is preemptible, it must be represented by an
+  // EDF-earliest ready node. A non-preemptible old heir may be kept.
+  ensures edf_preemptible_heir_is_earliest_ready{Post}(
+    (Scheduler_EDF_Context *) scheduler->context,
+    _Thread_Heir,
+    _Thread_Heir->is_preemptible );
+
   // Mirror of _Scheduler_Update_heir's update behavior: when the heir is
   // replaced, the dispatch ghost becomes true. Used by Yield/Block to keep
   // the P3.b dispatch-set invariant across the call.
@@ -380,8 +387,17 @@ RTEMS_INLINE_ROUTINE void _Scheduler_EDF_Schedule_body(
   context = _Scheduler_EDF_Get_context( scheduler );
   first = _RBTree_Minimum( &context->Ready );
   node = RTEMS_CONTAINER_OF( first, Scheduler_EDF_Node, Node );
+  /*@ assert edf_thread_owns_earliest_ready_node{Here}(
+        edf_ready_set{Here}( context ),
+        node->Base.owner
+      ); */
 
   _Scheduler_Update_heir( node->Base.owner, force_dispatch );
+  /*@ assert edf_preemptible_heir_is_earliest_ready{Here}(
+        context,
+        _Thread_Heir,
+        _Thread_Heir->is_preemptible
+      ); */
 }
 
 /** @} */

@@ -26,9 +26,10 @@ place:
 - `_RBTree_Initialize_empty()` contract in `rbtree.h`
 - `scheduleredfimpl.h` contracts for `_Scheduler_EDF_Get_context`,
   `_Scheduler_EDF_Node_downcast`, `_Scheduler_EDF_Enqueue`,
-  `_Scheduler_EDF_Extract`, `_Scheduler_EDF_Extract_body`
+  `_Scheduler_EDF_Extract`, `_Scheduler_EDF_Extract_body`,
+  `_Scheduler_EDF_Schedule_body`
 - Source contracts for `_Scheduler_EDF_Initialize`,
-  `_Scheduler_EDF_Node_initialize`
+  `_Scheduler_EDF_Node_initialize`, `_Scheduler_EDF_Update_priority`
 
 **Verified slices (2026-05-25)**:
 
@@ -38,10 +39,12 @@ place:
 | `verify-edf-initialize.sh` | 31 / 31 | parity with 6.2 |
 | `verify-edf-node-initialize.sh` | 30 / 30 | parity with 6.2 |
 | `verify-edf-map-unmap.sh` | 10 / 10 | new, dedicated to the Map/Unmap helpers |
-| `verify-edf-schedule.sh` (function) | 44 / 44 | EDF entry point + `_Scheduler_EDF_Schedule_body` against its body. The `_RBTree_Minimum` contract (in `models/edf_property.h`) bridges the abstract ready set to the body's `RTEMS_CONTAINER_OF`. |
-| `verify-edf-schedule.sh` (model lemma) | 11 / 11 | parity with 6.2 |
+| `verify-edf-schedule.sh` (function) | 71 / 71 | EDF entry point + `_Scheduler_EDF_Schedule_body` against its body. The `_RBTree_Minimum` contract (in `models/edf_property.h`) bridges the abstract ready set to the body's `RTEMS_CONTAINER_OF`. |
+| `verify-edf-schedule.sh` (model lemma) | 13 / 13 | includes the ready-set non-empty-after-extract lemma used by block |
 | `verify-edf-block.sh` (function) | 74 / 74 | 5.1-specific `_Scheduler_Generic_block` path with EDF callback contracts |
 | `verify-edf-block.sh` (model lemma) | 13 / 13 | adds non-empty-after-extract ready-set lemma |
+| `verify-edf-update-priority.sh` (function) | 156 / 156 | port of the 6.2 update-priority contract, using 5.1's direct `_Scheduler_EDF_Schedule_body()` call |
+| `verify-edf-update-priority.sh` (model lemma) | 19 / 19 | EDF ready/property lemmas plus priority aggregation lemmas needed by the cache-preservation postconditions |
 
 **Verification architecture** (two-tier, mirrors 6.2):
 
@@ -86,7 +89,6 @@ Pending (copied as pristine, contracts not yet ported):
   point directly.
 - `scheduleredfyield.c` — needs entry-point contract, structurally similar to
   block.
-- `scheduleredfchangepriority.c` — needs update-priority contract
 - `scheduleredfreleasejob.c` — needs release/cancel contracts (depend on
   priority aggregation)
 - `threadchangepriority.c` — needs `_Thread_Priority_apply` and

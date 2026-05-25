@@ -192,6 +192,11 @@ RTEMS_INLINE_ROUTINE States_Control _States_Clear (
  * @retval true The state is ready.
  * @retval false The state is not ready.
  */
+/*@
+  assigns \result \from the_states;
+
+  ensures \result == ( the_states == STATES_READY );
+*/
 RTEMS_INLINE_ROUTINE bool _States_Is_ready (
   States_Control the_states
 )
