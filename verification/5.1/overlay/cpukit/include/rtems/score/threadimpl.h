@@ -2354,6 +2354,13 @@ RTEMS_INLINE_ROUTINE void _Thread_Wait_release_queue_critical(
  * @param[in, out] queue_context The thread queue context for the corresponding
  *   _Thread_Wait_release_critical().
  */
+#if !defined(RTEMS_SMP)
+/*@
+  assigns \nothing;
+  allocates \nothing;
+  frees \nothing;
+*/
+#endif
 RTEMS_INLINE_ROUTINE void _Thread_Wait_acquire_critical(
   Thread_Control       *the_thread,
   Thread_queue_Context *queue_context
@@ -2429,6 +2436,13 @@ RTEMS_INLINE_ROUTINE void _Thread_Wait_acquire(
  * @param[in, out] queue_context The thread queue context used for corresponding
  *   _Thread_Wait_acquire_critical().
  */
+#if !defined(RTEMS_SMP)
+/*@
+  assigns \nothing;
+  allocates \nothing;
+  frees \nothing;
+*/
+#endif
 RTEMS_INLINE_ROUTINE void _Thread_Wait_release_critical(
   Thread_Control       *the_thread,
   Thread_queue_Context *queue_context
