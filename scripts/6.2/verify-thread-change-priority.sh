@@ -3,10 +3,14 @@
 # Verify the UP thread-priority aggregation operations used by EDF
 # release/cancel job on the active RTEMS 6.2 port.
 #
+# Two WP passes:
+#   1. function goals for the thread-priority change slice
+#   2. ACSL lemmas consumed by the function contracts
+#
 # The priority RBTree/plain operations remain an intentional abstraction
-# boundary for this project. This script targets the priority combinators plus
-# the action-list helper, change callback, scheduler-node setter helper, and
-# the public thread-priority wrappers.
+# boundary for this project. This script targets the public thread-priority
+# change wrappers, the internal apply/do-perform composition layer, and the
+# no-op priority-actions callback used by the EDF thread-priority path.
 #
 # Usage:
 #   verify-thread-change-priority.sh                 # default proof
@@ -15,17 +19,20 @@
 #
 set -e
 
-WP_FCTS="${WP_FCTS:-_Priority_Actions_add,_Priority_Non_empty_insert,_Priority_Extract_non_empty,_Priority_Changed,_Thread_Set_scheduler_node_priority,_Thread_Priority_action_change,_Thread_Priority_add,_Thread_Priority_changed,_Thread_Priority_remove}"
+WP_FCTS="${WP_FCTS:-_Thread_queue_Do_nothing_priority_actions,_Thread_Priority_add,_Thread_Priority_remove,_Thread_Priority_changed,_Thread_Priority_do_perform_actions,_Thread_Priority_apply}"
 
 WP_FCT_DEFAULTS="${WP_FCT_DEFAULTS:--wp -wp-fct ${WP_FCTS} -wp-model Typed+Cast -wp-timeout 30}"
+WP_LEMMA_DEFAULTS="${WP_LEMMA_DEFAULTS:--wp -wp-prop=@lemma -wp-model Typed+Cast -wp-timeout 30}"
 
 if command -v opam >/dev/null 2>&1; then
     eval $(opam env)
 fi
 
 FRAMA_C_CMD="frama-c"
+GUI=0
 if [ "$1" = "--gui" ]; then
     FRAMA_C_CMD="frama-c-gui"
+    GUI=1
     shift
 fi
 
@@ -43,23 +50,34 @@ SRC="${OVERLAY}/overlay/cpukit/score/src/threadchangepriority.c"
 
 [ -f "${SRC}" ] || { echo "missing overlay source: ${SRC}" >&2; exit 1; }
 
-echo "=== Thread Change Priority (RTEMS 6.2 active port) ==="
-${FRAMA_C_CMD} \
-    -cpp-command "${RTEMS_PREFIX}/bin/x86_64-rtems5-gcc -C -E \
-        -D__FRAMAC__ \
-        -D__rtems__ \
-        -I${OVERLAY}/overlay/cpukit/include \
-        -I${OVERLAY}/models \
-        -I${RTEMS_SRC}/cpukit/include \
-        -I${RTEMS_SRC}/cpukit/score/cpu/x86_64/include \
-        -I${RTEMS_BUILD_BSP} \
-        -I${RTEMS_PREFIX}/x86_64-rtems5/include \
-        -I${RTEMS_PREFIX}/lib/gcc/x86_64-rtems5/9.3.0/include \
-        -I${RTEMS_SRC}/bsps/include \
-        -I${RTEMS_SRC}/bsps/x86_64/include \
-        -I${RTEMS_SRC}/bsps/x86_64/amd64/include \
-        -nostdinc" \
-    -machdep gcc_x86_64 -cpp-frama-c-compliant "${C_STD_FLAGS[@]}" \
-    "${SRC}" \
-    ${WP_FCT_DEFAULTS} \
-    "$@"
+run_fc() {
+    local defaults="$1"; shift
+    ${FRAMA_C_CMD} \
+        -cpp-command "${RTEMS_PREFIX}/bin/x86_64-rtems5-gcc -C -E \
+            -D__FRAMAC__ \
+            -D__rtems__ \
+            -I${OVERLAY}/overlay/cpukit/include \
+            -I${OVERLAY}/models \
+            -I${RTEMS_SRC}/cpukit/include \
+            -I${RTEMS_SRC}/cpukit/score/cpu/x86_64/include \
+            -I${RTEMS_BUILD_BSP} \
+            -I${RTEMS_PREFIX}/x86_64-rtems5/include \
+            -I${RTEMS_PREFIX}/lib/gcc/x86_64-rtems5/9.3.0/include \
+            -I${RTEMS_SRC}/bsps/include \
+            -I${RTEMS_SRC}/bsps/x86_64/include \
+            -I${RTEMS_SRC}/bsps/x86_64/amd64/include \
+            -nostdinc" \
+        -machdep gcc_x86_64 -cpp-frama-c-compliant "${C_STD_FLAGS[@]}" \
+        "${SRC}" \
+        ${defaults} \
+        "$@"
+}
+
+if [ "${GUI}" = "1" ]; then
+    run_fc "${WP_FCT_DEFAULTS}" "$@"
+else
+    echo "=== Thread Change Priority (RTEMS 6.2 active port): function ==="
+    run_fc "${WP_FCT_DEFAULTS}" "$@"
+    echo "=== Thread Change Priority (RTEMS 6.2 active port): lemma ==="
+    run_fc "${WP_LEMMA_DEFAULTS}" "$@"
+fi

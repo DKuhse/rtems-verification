@@ -121,9 +121,12 @@ struct timeval   sbttotv( int64_t );
   // Update_priority repairs cache consistency for the node it is called on.
   // Several priority updates can be queued, so others may still be stale.
   requires the_thread->current_state == STATES_READY ==>
+    priority_purifies_to(
+      node->Priority.value,
+      node->Wait.Priority.Node.priority );
+  requires the_thread->current_state == STATES_READY ==>
     SCHEDULER_PRIORITY_PURIFY( node->Priority.value ) ==
-      ((Scheduler_EDF_Node *) node)->Base.Wait.Priority.Node.priority;
-
+      node->Wait.Priority.Node.priority;
   requires \separated(
     (Scheduler_EDF_Node *) node + (..),
     (Scheduler_EDF_Context *) scheduler->context + (..)
@@ -262,6 +265,15 @@ void _Scheduler_EDF_Update_priority(
   the_node = _Scheduler_EDF_Node_downcast( node );
   insert_priority = _Scheduler_Node_get_priority( &the_node->Base );
   priority = SCHEDULER_PRIORITY_PURIFY( insert_priority );
+  /*@ assert insert_priority == node->Priority.value; */
+  /*@ assert priority_purifies_to(
+        insert_priority,
+        node->Wait.Priority.Node.priority ); */
+  /*@ assert SCHEDULER_PRIORITY_PURIFY( insert_priority ) ==
+        node->Wait.Priority.Node.priority; */
+  /*@ assert priority ==
+        (Priority_Control) SCHEDULER_PRIORITY_PURIFY( insert_priority ); */
+  /*@ assert priority == node->Wait.Priority.Node.priority; */
 
   if ( priority == the_node->priority ) {
     /* Nothing to do */

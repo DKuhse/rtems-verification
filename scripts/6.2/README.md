@@ -124,11 +124,12 @@ to `-c11` so quick compatibility checks can run on `verify-6.2-active`.
   operation to `_Scheduler_EDF_Update_priority()` with `@calls`, and checks
   that the wrapper passes through the EDF update-priority operation contract.
 - `verify-thread-change-priority.sh` — runs Frama-C/WP on the active
-  `threadchangepriority.c` slice for `_Thread_Priority_add()`,
-  `_Thread_Priority_changed()`, and `_Thread_Priority_remove()`. This verifies
-  the public thread-priority wrappers against the `_Thread_Priority_apply()`
-  contract used by EDF release/cancel. Priority RBTree/plain helpers remain
-  permanently abstract and out of scope for this project.
+  `threadchangepriority.c` slice for
+  `_Thread_queue_Do_nothing_priority_actions()`, `_Thread_Priority_add()`,
+  `_Thread_Priority_remove()`, `_Thread_Priority_changed()`,
+  `_Thread_Priority_apply()`, and `_Thread_Priority_do_perform_actions()`,
+  plus the ACSL lemma pass used by those contracts. Priority RBTree/plain
+  helpers remain permanently abstract and out of scope for this project.
 - `verify-thread-priority-update.sh` — runs Frama-C/WP on
   `_Thread_Priority_update()`, the composition step that consumes queued
   priority updates and calls the scheduler update-priority operation.

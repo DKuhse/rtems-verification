@@ -159,6 +159,13 @@ static Thread_queue_Context _Rate_monotonic_Cancel_queue_context;
         other != &the_period->Priority &&
         other \in priority_contributors{Pre}(
           &owner->Scheduler.nodes->Wait.Priority ) );
+  requires priority_is_pure( the_period->Priority.priority );
+  requires priority_is_pure(
+    owner->Scheduler.nodes->Wait.Priority.Node.priority );
+  requires \forall Priority_Node *contributor;
+    contributor \in priority_contributors{Pre}(
+      &owner->Scheduler.nodes->Wait.Priority ) ==>
+      priority_is_pure( contributor->priority );
   requires \forall Priority_Node *node;
     node \in priority_contributors{Pre}(
       &owner->Scheduler.nodes->Wait.Priority ) ==>
@@ -175,6 +182,10 @@ static Thread_queue_Context _Rate_monotonic_Cancel_queue_context;
   requires \valid( owner->Wait.operations );
   requires owner->Wait.operations->priority_actions ==
     _Thread_queue_Do_nothing_priority_actions;
+  requires thread_priority_apply_noop_context_fields{Pre}(
+    owner,
+    &the_period->Priority,
+    &_Rate_monotonic_Cancel_queue_context );
   requires \valid( _Priority_Verify_scheduler_node_of_aggregation(
     &owner->Scheduler.nodes->Wait.Priority ) );
   requires &owner->Scheduler.nodes->Wait.Priority ==
@@ -192,9 +203,24 @@ static Thread_queue_Context _Rate_monotonic_Cancel_queue_context;
     SCHEDULER_PRIORITY_PURIFY( owner->Scheduler.nodes->Priority.value ) ==
       ((Scheduler_EDF_Node *)
         owner->Scheduler.nodes)->Base.Wait.Priority.Node.priority;
+  requires owner->current_state == STATES_READY ==>
+    priority_purifies_to(
+      owner->Scheduler.nodes->Priority.value,
+      owner->Scheduler.nodes->Wait.Priority.Node.priority );
   requires thread_priority_edf_update_separated{Pre}(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
     owner );
+  requires \valid_read(
+    &_Rate_monotonic_Cancel_queue_context.Priority.update[ 0 ]->
+      Scheduler.nodes );
+  requires \separated(
+    &_Rate_monotonic_Cancel_queue_context.Priority.update[ 0 ]->
+      Scheduler.nodes,
+    the_period + (..),
+    &_Rate_monotonic_Cancel_queue_context + (..),
+    &owner->Scheduler.nodes->Wait.Priority,
+    &owner->Scheduler.nodes->Priority.value
+  );
 
   requires \separated(
     (Scheduler_Control const *) _Scheduler_Table + (..),
@@ -237,6 +263,50 @@ static Thread_queue_Context _Rate_monotonic_Cancel_queue_context;
         &_Priority_Verify_scheduler_node_of_aggregation(
           &owner->Scheduler.nodes->Wait.Priority )->Priority.value
       );
+  requires \forall Scheduler_EDF_Node *node;
+    node \in edf_ready_set{Pre}(
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context ) ==>
+      \separated(
+        &node->priority,
+        &the_period->Priority.Node.RBTree.Node.rbe_color
+      );
+  requires \forall Scheduler_EDF_Node *node;
+    node \in edf_ready_set{Pre}(
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context ) ==>
+      \separated(
+        &node->priority,
+        &owner->Scheduler.nodes->Wait.Priority,
+        &owner->Scheduler.nodes->Priority.value
+      );
+  requires \forall Scheduler_EDF_Node *node;
+    node \in edf_ready_set{Pre}(
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context ) ==>
+      \separated(
+        &node->Base.owner,
+        the_period + (..),
+        &_Rate_monotonic_Cancel_queue_context + (..),
+        &owner->Scheduler.nodes->Wait.Priority,
+        &owner->Scheduler.nodes->Priority.value
+      );
+  requires \forall Scheduler_EDF_Node *node;
+    node \in edf_ready_set{Pre}(
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context ) ==>
+      \separated(
+        &node->Base.owner->Scheduler.nodes,
+        the_period + (..),
+        &_Rate_monotonic_Cancel_queue_context + (..),
+        &owner->Scheduler.nodes->Wait.Priority,
+        &owner->Scheduler.nodes->Priority.value
+      );
+  requires \separated(
+    &_Thread_Heir->is_preemptible,
+    &_Thread_Heir->Scheduler.nodes,
+    &_Thread_Heir->cpu_time_used,
+    the_period + (..),
+    &_Rate_monotonic_Cancel_queue_context + (..),
+    &owner->Scheduler.nodes->Wait.Priority,
+    &owner->Scheduler.nodes->Priority.value
+  );
 
   assigns the_period->postponed_jobs,
           the_period->state,
@@ -439,11 +509,23 @@ void _Rate_monotonic_Cancel(
               queue_context->Priority.update[ 0 ]->Scheduler.nodes ); */
   /*@ assert queue_context->Priority.update_count == 1 &&
         queue_context->Priority.update[ 0 ]->current_state == STATES_READY ==>
+          priority_purifies_to(
+            queue_context->Priority.update[ 0 ]->Scheduler.nodes->
+              Priority.value,
+            queue_context->Priority.update[ 0 ]->Scheduler.nodes->
+              Wait.Priority.Node.priority ); */
+  /*@ assert queue_context->Priority.update_count == 1 &&
+        queue_context->Priority.update[ 0 ]->current_state == STATES_READY ==>
           SCHEDULER_PRIORITY_PURIFY(
-            queue_context->Priority.update[ 0 ]->Scheduler.nodes->Priority.value ) ==
-            ((Scheduler_EDF_Node *)
-              queue_context->Priority.update[ 0 ]->Scheduler.nodes)->
-                Base.Wait.Priority.Node.priority; */
+            queue_context->Priority.update[ 0 ]->Scheduler.nodes->
+              Priority.value ) ==
+            queue_context->Priority.update[ 0 ]->Scheduler.nodes->
+              Wait.Priority.Node.priority; */
+  /*@ assert queue_context->Priority.update_count == 1 &&
+        queue_context->Priority.update[ 0 ]->current_state == STATES_READY ==>
+          &((Scheduler_EDF_Node *)
+            queue_context->Priority.update[ 0 ]->Scheduler.nodes)->Base ==
+            queue_context->Priority.update[ 0 ]->Scheduler.nodes; */
   _Thread_Priority_update( queue_context );
   _Thread_Dispatch_enable( cpu_self );
 }

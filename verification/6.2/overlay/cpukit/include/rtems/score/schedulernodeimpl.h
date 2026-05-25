@@ -72,8 +72,10 @@ extern "C" {
 /**
  * @brief Clears the priority append indicator bit.
  */
+#ifndef SCHEDULER_PRIORITY_PURIFY
 #define SCHEDULER_PRIORITY_PURIFY( priority )  \
   ( ( priority ) & ~( (Priority_Control) PRIORITY_GROUP_LAST ) )
+#endif
 
 /**
  * @brief Returns the priority control with the append indicator bit set.
