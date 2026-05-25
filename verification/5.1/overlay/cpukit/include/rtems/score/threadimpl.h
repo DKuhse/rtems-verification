@@ -39,8 +39,105 @@
 #include <rtems/score/watchdogimpl.h>
 #include <rtems/config.h>
 
+#ifdef __FRAMAC__
+#include <rtems/score/scheduleredf.h>
+#include <thread_priority_updates.h>
+
+extern const Scheduler_Control _Scheduler_Table[ 1 ];
+#endif
+
 #ifdef __cplusplus
 extern "C" {
+#endif
+
+#ifdef __FRAMAC__
+void _Thread_queue_Do_nothing_priority_actions(
+  Thread_queue_Queue *queue,
+  Priority_Actions   *priority_actions
+);
+
+/*@
+  // NOTE: the bare `\valid(the_thread)` / `\valid(heir)` clauses are
+  // deliberately omitted from these predicate bodies. `\valid(T*)` inside
+  // a predicate body is unsound for flexible-tail structs.
+  predicate thread_priority_edf_node_valid{L}( Thread_Control *the_thread ) =
+    \valid_read( &the_thread->current_state ) &&
+    \valid_read( &the_thread->Scheduler.nodes ) &&
+    \valid( the_thread->Scheduler.nodes ) &&
+    \valid( (Scheduler_EDF_Node *) the_thread->Scheduler.nodes ) &&
+    &((Scheduler_EDF_Node *) the_thread->Scheduler.nodes)->Base ==
+      the_thread->Scheduler.nodes &&
+    ((Scheduler_EDF_Node *) the_thread->Scheduler.nodes)->Base.owner ==
+      the_thread;
+
+  // NOTE: Same as above.
+  predicate thread_priority_edf_heir_valid{L}( Thread_Control *heir ) =
+    \valid_read( &heir->is_preemptible ) &&
+    \valid_read( &heir->Scheduler.nodes ) &&
+    \valid( heir->Scheduler.nodes ) &&
+    \valid_read( (Scheduler_EDF_Node *) heir->Scheduler.nodes ) &&
+    &((Scheduler_EDF_Node *) heir->Scheduler.nodes)->Base ==
+      heir->Scheduler.nodes &&
+    \valid( &heir->cpu_time_used ) &&
+    \valid( &_Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp );
+
+  predicate thread_priority_edf_update_separated{L}(
+    Scheduler_EDF_Context *context,
+    Thread_Control        *the_thread
+  ) =
+    \separated(
+      (Scheduler_EDF_Node *) the_thread->Scheduler.nodes + (..),
+      context + (..)
+    ) &&
+    (
+      the_thread->current_state != STATES_READY ||
+      \forall Scheduler_EDF_Node *m;
+        m \in edf_ready_set{L}( context ) &&
+        m != (Scheduler_EDF_Node *) the_thread->Scheduler.nodes ==>
+          \separated(
+            (Scheduler_EDF_Node *) the_thread->Scheduler.nodes + (..),
+            m + (..)
+          )
+    ) &&
+    \separated(
+      the_thread->Scheduler.nodes + (..),
+      (Per_CPU_Control_envelope *) _Per_CPU_Information + (..)
+    ) &&
+    \separated(
+      &the_thread->Scheduler.nodes->Wait.Priority.Node.priority,
+      &the_thread->Scheduler.nodes->Priority.value,
+      &((Scheduler_EDF_Node *) the_thread->Scheduler.nodes)->priority
+    ) &&
+    (
+      \forall Priority_Node *contributor;
+        contributor \in priority_contributors{L}(
+          &the_thread->Scheduler.nodes->Wait.Priority ) ==>
+          \separated(
+            contributor + (..),
+            &the_thread->Scheduler.nodes->Priority.value,
+            &((Scheduler_EDF_Node *) the_thread->Scheduler.nodes)->priority
+          )
+    ) &&
+    \separated(
+      the_thread + (..),
+      (Per_CPU_Control_envelope *) _Per_CPU_Information + (..)
+    ) &&
+    \separated(
+      _Thread_Heir + (..),
+      (Per_CPU_Control_envelope *) _Per_CPU_Information + (..),
+      _Scheduler_Table + ( 0 .. 0 ),
+      context + (..)
+    ) &&
+    \separated(
+      (Per_CPU_Control_envelope *) _Per_CPU_Information + (..),
+      (Scheduler_Control const *) _Scheduler_Table + (..),
+      &context->Ready,
+      &((Scheduler_EDF_Node *) the_thread->Scheduler.nodes)->Base.Priority,
+      &((Scheduler_EDF_Node *) the_thread->Scheduler.nodes)->priority,
+      &(_Per_CPU_Information[ 0 ].per_cpu.heir)->cpu_time_used
+    );
+
+*/
 #endif
 
 /**
@@ -1418,6 +1515,15 @@ RTEMS_INLINE_ROUTINE void _Thread_Scheduler_cancel_need_for_help(
  *
  * @return The thread's home scheduler.
  */
+#if !defined(RTEMS_SMP)
+/*@
+  requires \valid_read( _Scheduler_Table + ( 0 .. 0 ) );
+
+  assigns \result \from \nothing;
+
+  ensures \result == &_Scheduler_Table[ 0 ];
+*/
+#endif
 RTEMS_INLINE_ROUTINE const Scheduler_Control *_Thread_Scheduler_get_home(
   const Thread_Control *the_thread
 )

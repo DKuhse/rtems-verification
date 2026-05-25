@@ -26,6 +26,20 @@
 #include <rtems/score/priority.h>
 #include <rtems/score/scheduler.h>
 
+#ifdef __FRAMAC__
+#include <priority_aggregation.h>
+#include <rtems/score/schedulernode.h>
+
+static const uintptr_t _Priority_Verify_wait_priority_node_offset =
+  offsetof( Scheduler_Node, Wait.Priority.Node.Node.Chain );
+
+#define _Priority_Verify_scheduler_node_of_aggregation( aggregation ) \
+  ( (Scheduler_Node *) ( \
+    (uintptr_t) ( aggregation ) - \
+    _Priority_Verify_wait_priority_node_offset \
+  ) )
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */

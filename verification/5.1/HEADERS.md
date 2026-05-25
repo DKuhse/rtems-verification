@@ -23,6 +23,8 @@ place:
 - Abstract models (`models/`) — same content as 6.2 modulo include-guard
 - `_Scheduler_Get_context()` contract in `schedulerimpl.h` (required to
   unhang the cast-through-empty-struct path)
+- `_Scheduler_Update_priority()` contract and EDF callback dispatch cut in
+  `schedulerimpl.h`
 - `_RBTree_Initialize_empty()` contract in `rbtree.h`
 - `scheduleredfimpl.h` contracts for `_Scheduler_EDF_Get_context`,
   `_Scheduler_EDF_Node_downcast`, `_Scheduler_EDF_Enqueue`,
@@ -45,6 +47,7 @@ place:
 | `verify-edf-block.sh` (model lemma) | 13 / 13 | adds non-empty-after-extract ready-set lemma |
 | `verify-edf-update-priority.sh` (function) | 156 / 156 | port of the 6.2 update-priority contract, using 5.1's direct `_Scheduler_EDF_Schedule_body()` call |
 | `verify-edf-update-priority.sh` (model lemma) | 19 / 19 | EDF ready/property lemmas plus priority aggregation lemmas needed by the cache-preservation postconditions |
+| `verify-scheduler-update-priority.sh` | 72 / 72 | generic `_Scheduler_Update_priority()` wrapper; binds the home node before the EDF callback so the `calls` annotation attaches cleanly |
 
 **Verification architecture** (two-tier, mirrors 6.2):
 
@@ -73,13 +76,14 @@ with empty body in non-SMP).
 
 Pending (copied as pristine, contracts not yet ported):
 
-- `schedulerimpl.h` — `_Scheduler_Get_context()` has its contract; the
-  `_Scheduler_Generic_block` EDF callback call sites are covered for block.
+- `schedulerimpl.h` — `_Scheduler_Get_context()` and `_Scheduler_Update_priority()`
+  have contracts; the `_Scheduler_Generic_block` EDF callback call sites are
+  covered for block.
 - `priorityimpl.h`, `schedulernodeimpl.h` — needs `_Priority_Get_priority`,
   `_Scheduler_Node_get_priority`, `_Scheduler_Node_set_priority` contracts.
   `set_priority` uses 5.1's `bool prepend_it` calling convention.
 - `threadimpl.h`, `threadqimpl.h` — needs `_Thread_Get_priority`,
-  `_Thread_Scheduler_get_home_node`, `_Thread_Priority_add/remove/changed`,
+  `_Thread_Priority_add/remove/changed`,
   `_Thread_queue_Context_add_priority_update`
 - `scheduleredfschedule.c` — needs contract on entry point referring back to
   `_Scheduler_EDF_Schedule_body`
