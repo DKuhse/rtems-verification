@@ -191,6 +191,16 @@ RTEMS_INLINE_ROUTINE Priority_Control _Scheduler_Node_get_priority(
  * @param new_priority The new priority for @a node.
  * @param prepend_it Indicates whether the new priority should be prepended.
  */
+/*@
+  requires \valid( node );
+
+  assigns node->Priority.value;
+
+  ensures node->Priority.value ==
+    ( new_priority |
+      (Priority_Control) ( prepend_it ? 0 : SCHEDULER_PRIORITY_APPEND_FLAG ) );
+  ensures node->owner == \at( node->owner, Pre );
+*/
 RTEMS_INLINE_ROUTINE void _Scheduler_Node_set_priority(
   Scheduler_Node   *node,
   Priority_Control  new_priority,

@@ -725,6 +725,149 @@ void _Thread_Priority_perform_actions(
  *
  * @see _Thread_Wait_acquire().
  */
+#if !defined(RTEMS_SMP)
+/*@
+  requires \valid_read( &the_thread->Scheduler.nodes );
+  requires \valid( priority_node );
+  requires \valid( queue_context );
+  requires \valid( the_thread->Scheduler.nodes );
+  requires priority_aggregation_well_formed{Pre}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  requires priority_aggregation_cached_minimum{Pre}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  requires !priority_contributor_member{Pre}(
+    &the_thread->Scheduler.nodes->Wait.Priority,
+    priority_node );
+  requires \exists Priority_Node *node;
+    node \in priority_contributors{Pre}(
+      &the_thread->Scheduler.nodes->Wait.Priority );
+
+  assigns the_thread->Scheduler.nodes->Wait.Priority,
+          the_thread->Scheduler.nodes->Priority.value,
+          queue_context->Priority;
+  allocates \nothing;
+  frees \nothing;
+
+  ensures priority_contributors{Post}(
+            &the_thread->Scheduler.nodes->Wait.Priority ) ==
+          priority_contributors_insert(
+            priority_contributors{Pre}(
+              &the_thread->Scheduler.nodes->Wait.Priority ),
+            priority_node );
+  ensures priority_aggregation_well_formed{Post}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  ensures priority_aggregation_cached_minimum{Post}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  ensures priority_node->priority == \at( priority_node->priority, Pre );
+  ensures the_thread->Scheduler.nodes->owner ==
+    \at( the_thread->Scheduler.nodes->owner, Pre );
+  ensures \forall Scheduler_Node *node;
+    \valid_read( &node->owner ) ==>
+      node->owner == \at( node->owner, Pre );
+  ensures \forall Thread_Control *thread;
+    \valid_read( &thread->Scheduler.nodes ) ==>
+      thread->Scheduler.nodes == \at( thread->Scheduler.nodes, Pre );
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) ||
+          queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) + 1;
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) ==>
+          queue_context->Priority.update[ 0 ] ==
+            \at( queue_context->Priority.update[ 0 ], Pre );
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) ==>
+          queue_context->Priority.update[ 0 ]->Scheduler.nodes ==
+            \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes, Pre );
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) + 1 ==>
+          queue_context->Priority.update[
+            \at( queue_context->Priority.update_count, Pre )
+          ] == the_thread;
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) + 1 ==>
+          SCHEDULER_PRIORITY_PURIFY(
+            the_thread->Scheduler.nodes->Priority.value ) ==
+          the_thread->Scheduler.nodes->Wait.Priority.Node.priority;
+  ensures \at( queue_context->Priority.update_count, Pre ) == 0 &&
+          queue_context->Priority.update_count == 1 ==>
+          SCHEDULER_PRIORITY_PURIFY(
+            the_thread->Scheduler.nodes->Priority.value ) ==
+          the_thread->Scheduler.nodes->Wait.Priority.Node.priority;
+  ensures the_thread->Scheduler.nodes->Priority.value !=
+            \at( the_thread->Scheduler.nodes->Priority.value, Pre ) ==>
+          thread_priority_update_pending{Post}( queue_context, the_thread );
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) &&
+          \at(
+            SCHEDULER_PRIORITY_PURIFY(
+              the_thread->Scheduler.nodes->Priority.value ) ==
+            the_thread->Scheduler.nodes->Wait.Priority.Node.priority,
+            Pre
+          ) ==>
+          SCHEDULER_PRIORITY_PURIFY(
+            the_thread->Scheduler.nodes->Priority.value ) ==
+          the_thread->Scheduler.nodes->Wait.Priority.Node.priority;
+
+  behavior add_noop:
+    assumes \valid_read( &the_thread->Wait.operations );
+    assumes \valid( the_thread->Wait.operations );
+    assumes the_thread->Wait.operations->priority_actions ==
+      _Thread_queue_Do_nothing_priority_actions;
+    assumes queue_context->Priority.update_count <= 1;
+    assumes \valid( _Priority_Verify_scheduler_node_of_aggregation(
+      &the_thread->Scheduler.nodes->Wait.Priority ) );
+    assumes &the_thread->Scheduler.nodes->Wait.Priority ==
+      &_Priority_Verify_scheduler_node_of_aggregation(
+        &the_thread->Scheduler.nodes->Wait.Priority )->Wait.Priority;
+    assumes (uintptr_t) &the_thread->Scheduler.nodes->Wait.Priority >=
+      _Priority_Verify_wait_priority_node_offset;
+    assumes (uintptr_t) &the_thread->Scheduler.nodes->Wait.Priority
+      <= UINTPTR_MAX;
+    assumes \separated(
+      &queue_context->Priority.Actions,
+      priority_node + (..),
+      _Priority_Verify_scheduler_node_of_aggregation(
+        &the_thread->Scheduler.nodes->Wait.Priority ) + (..)
+    );
+    assumes \separated(
+      &queue_context->Priority.Actions.actions,
+      &queue_context->Priority.update_count,
+      queue_context->Priority.update + (0 .. 1),
+      &priority_node->priority,
+      &the_thread->Scheduler.nodes->Wait.Priority.Contributors,
+      &the_thread->Scheduler.nodes->Wait.Priority.Node.priority,
+      &_Priority_Verify_scheduler_node_of_aggregation(
+        &the_thread->Scheduler.nodes->Wait.Priority )->Priority.value
+    );
+    assumes \separated(
+      the_thread->Wait.operations + (..),
+      queue_context + (..),
+      the_thread->Scheduler.nodes + (..),
+      priority_node + (..)
+    );
+    assumes \forall Priority_Node *contributor;
+      contributor \in priority_contributors{Pre}(
+        &the_thread->Scheduler.nodes->Wait.Priority ) ==>
+        \separated(
+          contributor + (..),
+          &queue_context->Priority.Actions.actions,
+          &_Priority_Verify_scheduler_node_of_aggregation(
+            &the_thread->Scheduler.nodes->Wait.Priority )->Priority.value
+        );
+    ensures priority_contributors{Post}(
+              &the_thread->Scheduler.nodes->Wait.Priority ) ==
+            priority_contributors_insert(
+              priority_contributors{Pre}(
+                &the_thread->Scheduler.nodes->Wait.Priority ),
+              priority_node );
+    ensures priority_aggregation_well_formed{Post}(
+      &the_thread->Scheduler.nodes->Wait.Priority );
+    ensures priority_aggregation_cached_minimum{Post}(
+      &the_thread->Scheduler.nodes->Wait.Priority );
+    ensures queue_context->Priority.Actions.actions == \null;
+*/
+#endif
 void _Thread_Priority_add(
   Thread_Control       *the_thread,
   Priority_Node        *priority_node,
@@ -746,6 +889,146 @@ void _Thread_Priority_add(
  *
  * @see _Thread_Wait_acquire().
  */
+#if !defined(RTEMS_SMP)
+/*@
+  requires \valid_read( &the_thread->Scheduler.nodes );
+  requires \valid( priority_node );
+  requires \valid( queue_context );
+  requires \valid( the_thread->Scheduler.nodes );
+  requires priority_aggregation_well_formed{Pre}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  requires priority_aggregation_cached_minimum{Pre}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  requires priority_contributor_member{Pre}(
+    &the_thread->Scheduler.nodes->Wait.Priority,
+    priority_node );
+  requires \exists Priority_Node *other;
+    other != priority_node &&
+    other \in priority_contributors{Pre}(
+      &the_thread->Scheduler.nodes->Wait.Priority );
+
+  assigns the_thread->Scheduler.nodes->Wait.Priority,
+          the_thread->Scheduler.nodes->Priority.value,
+          queue_context->Priority;
+  allocates \nothing;
+  frees \nothing;
+
+  ensures priority_contributors{Post}(
+            &the_thread->Scheduler.nodes->Wait.Priority ) ==
+          priority_contributors_extract(
+            priority_contributors{Pre}(
+              &the_thread->Scheduler.nodes->Wait.Priority ),
+            priority_node );
+  ensures priority_aggregation_well_formed{Post}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  ensures priority_aggregation_cached_minimum{Post}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  ensures priority_node->priority == \at( priority_node->priority, Pre );
+  ensures the_thread->Scheduler.nodes->owner ==
+    \at( the_thread->Scheduler.nodes->owner, Pre );
+  ensures \forall Scheduler_Node *node;
+    \valid_read( &node->owner ) ==>
+      node->owner == \at( node->owner, Pre );
+  ensures \forall Thread_Control *thread;
+    \valid_read( &thread->Scheduler.nodes ) ==>
+      thread->Scheduler.nodes == \at( thread->Scheduler.nodes, Pre );
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) ||
+          queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) + 1;
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) ==>
+          queue_context->Priority.update[ 0 ] ==
+            \at( queue_context->Priority.update[ 0 ], Pre );
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) ==>
+          queue_context->Priority.update[ 0 ]->Scheduler.nodes ==
+            \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes, Pre );
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) + 1 ==>
+          queue_context->Priority.update[
+            \at( queue_context->Priority.update_count, Pre )
+          ] == the_thread;
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) + 1 ==>
+          SCHEDULER_PRIORITY_PURIFY(
+            the_thread->Scheduler.nodes->Priority.value ) ==
+          the_thread->Scheduler.nodes->Wait.Priority.Node.priority;
+  ensures \at( queue_context->Priority.update_count, Pre ) == 0 &&
+          queue_context->Priority.update_count == 1 ==>
+          SCHEDULER_PRIORITY_PURIFY(
+            the_thread->Scheduler.nodes->Priority.value ) ==
+          the_thread->Scheduler.nodes->Wait.Priority.Node.priority;
+  ensures the_thread->Scheduler.nodes->Priority.value !=
+            \at( the_thread->Scheduler.nodes->Priority.value, Pre ) ==>
+          thread_priority_update_pending{Post}( queue_context, the_thread );
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) &&
+          \at(
+            SCHEDULER_PRIORITY_PURIFY(
+              the_thread->Scheduler.nodes->Priority.value ) ==
+            the_thread->Scheduler.nodes->Wait.Priority.Node.priority,
+            Pre
+          ) ==>
+          SCHEDULER_PRIORITY_PURIFY(
+            the_thread->Scheduler.nodes->Priority.value ) ==
+          the_thread->Scheduler.nodes->Wait.Priority.Node.priority;
+
+  behavior remove_noop:
+    assumes \valid_read( &the_thread->Wait.operations );
+    assumes \valid( the_thread->Wait.operations );
+    assumes the_thread->Wait.operations->priority_actions ==
+      _Thread_queue_Do_nothing_priority_actions;
+    assumes queue_context->Priority.update_count <= 1;
+    assumes \valid( _Priority_Verify_scheduler_node_of_aggregation(
+      &the_thread->Scheduler.nodes->Wait.Priority ) );
+    assumes &the_thread->Scheduler.nodes->Wait.Priority ==
+      &_Priority_Verify_scheduler_node_of_aggregation(
+        &the_thread->Scheduler.nodes->Wait.Priority )->Wait.Priority;
+    assumes (uintptr_t) &the_thread->Scheduler.nodes->Wait.Priority >=
+      _Priority_Verify_wait_priority_node_offset;
+    assumes (uintptr_t) &the_thread->Scheduler.nodes->Wait.Priority
+      <= UINTPTR_MAX;
+    assumes \separated(
+      &queue_context->Priority.Actions,
+      priority_node + (..),
+      _Priority_Verify_scheduler_node_of_aggregation(
+        &the_thread->Scheduler.nodes->Wait.Priority ) + (..)
+    );
+    assumes \separated(
+      &queue_context->Priority.Actions.actions,
+      &queue_context->Priority.update_count,
+      queue_context->Priority.update + (0 .. 1),
+      &priority_node->priority,
+      &the_thread->Scheduler.nodes->Wait.Priority.Contributors,
+      &the_thread->Scheduler.nodes->Wait.Priority.Node.priority,
+      &_Priority_Verify_scheduler_node_of_aggregation(
+        &the_thread->Scheduler.nodes->Wait.Priority )->Priority.value
+    );
+    assumes \separated(
+      the_thread->Wait.operations + (..),
+      queue_context + (..),
+      the_thread->Scheduler.nodes + (..),
+      priority_node + (..)
+    );
+    assumes \forall Priority_Node *contributor;
+      contributor \in priority_contributors{Pre}(
+        &the_thread->Scheduler.nodes->Wait.Priority ) ==>
+        \separated(
+          contributor + (..),
+          &queue_context->Priority.Actions.actions,
+          &_Priority_Verify_scheduler_node_of_aggregation(
+            &the_thread->Scheduler.nodes->Wait.Priority )->Priority.value
+        );
+    ensures priority_contributors{Post}(
+              &the_thread->Scheduler.nodes->Wait.Priority ) ==
+            priority_contributors_extract(
+              priority_contributors{Pre}(
+                &the_thread->Scheduler.nodes->Wait.Priority ),
+              priority_node );
+    ensures queue_context->Priority.Actions.actions == \null;
+*/
+#endif
 void _Thread_Priority_remove(
   Thread_Control       *the_thread,
   Priority_Node        *priority_node,
@@ -770,6 +1053,140 @@ void _Thread_Priority_remove(
  *
  * @see _Thread_Wait_acquire().
  */
+#if !defined(RTEMS_SMP)
+/*@
+  requires \valid_read( &the_thread->Scheduler.nodes );
+  requires \valid( priority_node );
+  requires \valid( queue_context );
+  requires \valid( the_thread->Scheduler.nodes );
+  requires priority_aggregation_well_formed{Pre}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  requires priority_contributor_member{Pre}(
+    &the_thread->Scheduler.nodes->Wait.Priority,
+    priority_node );
+
+  assigns the_thread->Scheduler.nodes->Wait.Priority,
+          the_thread->Scheduler.nodes->Priority.value,
+          queue_context->Priority;
+  allocates \nothing;
+  frees \nothing;
+
+  ensures priority_contributors{Post}(
+            &the_thread->Scheduler.nodes->Wait.Priority ) ==
+          priority_contributors{Pre}(
+            &the_thread->Scheduler.nodes->Wait.Priority );
+  ensures priority_aggregation_well_formed{Post}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  ensures priority_aggregation_cached_minimum{Post}(
+    &the_thread->Scheduler.nodes->Wait.Priority );
+  ensures priority_node->priority == \at( priority_node->priority, Pre );
+  ensures the_thread->Scheduler.nodes->owner ==
+    \at( the_thread->Scheduler.nodes->owner, Pre );
+  ensures \forall Scheduler_Node *node;
+    \valid_read( &node->owner ) ==>
+      node->owner == \at( node->owner, Pre );
+  ensures \forall Thread_Control *thread;
+    \valid_read( &thread->Scheduler.nodes ) ==>
+      thread->Scheduler.nodes == \at( thread->Scheduler.nodes, Pre );
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) ||
+          queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) + 1;
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) ==>
+          queue_context->Priority.update[ 0 ] ==
+            \at( queue_context->Priority.update[ 0 ], Pre );
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) ==>
+          queue_context->Priority.update[ 0 ]->Scheduler.nodes ==
+            \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes, Pre );
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) + 1 ==>
+          queue_context->Priority.update[
+            \at( queue_context->Priority.update_count, Pre )
+          ] == the_thread;
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) + 1 ==>
+          SCHEDULER_PRIORITY_PURIFY(
+            the_thread->Scheduler.nodes->Priority.value ) ==
+          the_thread->Scheduler.nodes->Wait.Priority.Node.priority;
+  ensures \at( queue_context->Priority.update_count, Pre ) == 0 &&
+          queue_context->Priority.update_count == 1 ==>
+          SCHEDULER_PRIORITY_PURIFY(
+            the_thread->Scheduler.nodes->Priority.value ) ==
+          the_thread->Scheduler.nodes->Wait.Priority.Node.priority;
+  ensures the_thread->Scheduler.nodes->Priority.value !=
+            \at( the_thread->Scheduler.nodes->Priority.value, Pre ) ==>
+          thread_priority_update_pending{Post}( queue_context, the_thread );
+  ensures queue_context->Priority.update_count ==
+            \at( queue_context->Priority.update_count, Pre ) &&
+          \at(
+            SCHEDULER_PRIORITY_PURIFY(
+              the_thread->Scheduler.nodes->Priority.value ) ==
+            the_thread->Scheduler.nodes->Wait.Priority.Node.priority,
+            Pre
+          ) ==>
+          SCHEDULER_PRIORITY_PURIFY(
+            the_thread->Scheduler.nodes->Priority.value ) ==
+          the_thread->Scheduler.nodes->Wait.Priority.Node.priority;
+
+  behavior change_noop:
+    assumes \valid_read( &the_thread->Wait.operations );
+    assumes \valid( the_thread->Wait.operations );
+    assumes the_thread->Wait.operations->priority_actions ==
+      _Thread_queue_Do_nothing_priority_actions;
+    assumes queue_context->Priority.update_count <= 1;
+    assumes \valid( _Priority_Verify_scheduler_node_of_aggregation(
+      &the_thread->Scheduler.nodes->Wait.Priority ) );
+    assumes &the_thread->Scheduler.nodes->Wait.Priority ==
+      &_Priority_Verify_scheduler_node_of_aggregation(
+        &the_thread->Scheduler.nodes->Wait.Priority )->Wait.Priority;
+    assumes (uintptr_t) &the_thread->Scheduler.nodes->Wait.Priority >=
+      _Priority_Verify_wait_priority_node_offset;
+    assumes (uintptr_t) &the_thread->Scheduler.nodes->Wait.Priority
+      <= UINTPTR_MAX;
+    assumes \separated(
+      &queue_context->Priority.Actions,
+      priority_node + (..),
+      _Priority_Verify_scheduler_node_of_aggregation(
+        &the_thread->Scheduler.nodes->Wait.Priority ) + (..)
+    );
+    assumes \separated(
+      &queue_context->Priority.Actions.actions,
+      &queue_context->Priority.update_count,
+      queue_context->Priority.update + (0 .. 1),
+      &priority_node->priority,
+      &the_thread->Scheduler.nodes->Wait.Priority.Contributors,
+      &the_thread->Scheduler.nodes->Wait.Priority.Node.priority,
+      &_Priority_Verify_scheduler_node_of_aggregation(
+        &the_thread->Scheduler.nodes->Wait.Priority )->Priority.value
+    );
+    assumes \separated(
+      the_thread->Wait.operations + (..),
+      queue_context + (..),
+      the_thread->Scheduler.nodes + (..),
+      priority_node + (..)
+    );
+    assumes \forall Priority_Node *contributor;
+      contributor \in priority_contributors{Pre}(
+        &the_thread->Scheduler.nodes->Wait.Priority ) ==>
+        \separated(
+          contributor + (..),
+          &queue_context->Priority.Actions.actions,
+          &_Priority_Verify_scheduler_node_of_aggregation(
+            &the_thread->Scheduler.nodes->Wait.Priority )->Priority.value
+        );
+    ensures priority_contributors{Post}(
+              &the_thread->Scheduler.nodes->Wait.Priority ) ==
+            priority_contributors{Pre}(
+              &the_thread->Scheduler.nodes->Wait.Priority );
+    ensures priority_aggregation_well_formed{Post}(
+      &the_thread->Scheduler.nodes->Wait.Priority );
+    ensures priority_aggregation_cached_minimum{Post}(
+      &the_thread->Scheduler.nodes->Wait.Priority );
+    ensures queue_context->Priority.Actions.actions == \null;
+*/
+#endif
 void _Thread_Priority_changed(
   Thread_Control       *the_thread,
   Priority_Node        *priority_node,
