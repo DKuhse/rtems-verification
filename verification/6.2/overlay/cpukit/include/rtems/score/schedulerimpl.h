@@ -521,10 +521,15 @@ static inline void _Scheduler_Update_priority( Thread_Control *the_thread )
   } while ( node != tail );
 #else
   const Scheduler_Control *scheduler;
-  Scheduler_Node          *scheduler_node;
 
   scheduler = _Thread_Scheduler_get_home( the_thread );
+#ifdef __FRAMAC__
+  // Frama-C breaks when a a function call is inside a @call annotated function pointer call
+  // so we separately get the home node here and pass it as an argument to the function pointer call below.
+  // This is just like the SMP case, so behavior preserving.
+  Scheduler_Node          *scheduler_node;
   scheduler_node = _Thread_Scheduler_get_home_node( the_thread );
+#endif
   /*@ assert scheduler == &_Scheduler_Table[ 0 ]; */
   /*@ assert scheduler_node == the_thread->Scheduler.nodes; */
   /*@ assert (Scheduler_EDF_Context *) scheduler->context ==
@@ -555,7 +560,11 @@ Before_Update:
   ( *scheduler->Operations.update_priority )(
     scheduler,
     the_thread,
+#ifdef __FRAMAC__
     scheduler_node
+#else
+    _Thread_Scheduler_get_home_node( the_thread )
+#endif
   );
   /*@ assert priority_contributors{Here}(
           &((Scheduler_EDF_Node *) scheduler_node)->Base.Wait.Priority ) ==
