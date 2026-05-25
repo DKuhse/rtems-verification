@@ -97,6 +97,9 @@ struct timeval   sbttotv( int64_t );
         );
 */
 
+// Normally not visible in this file - moved here for convenience, since it's
+// a one liner and an additional overlay file seemed overkill.
+
 /*@
   requires \valid( priority_actions );
   terminates \true;
