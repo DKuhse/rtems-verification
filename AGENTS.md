@@ -1,4 +1,4 @@
-This is a verification of UP EDF scheduling in RTEMS 6.2. Focus lies on EDF API functions.
+This is a verification of UP EDF scheduling in RTEMS 6.2/5.1. Focus lies on EDF API functions.
 RBTree operations are out of scope. The wrapper functions for it are given contracts and not verified.
 SMP is out of scope.
 
