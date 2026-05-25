@@ -744,6 +744,18 @@ BaseType_t xTaskResumeAll(void) {
   ensures pxCurrentTCB_ghost->xStateListItem.xItemValue ==
             (TickType_t)(\old(xTickCount_ghost) + xTicksToWait);
 
+  ensures \forall ListItem_t *item;
+    \valid{Pre}(item) && item != &pxCurrentTCB_ghost->xStateListItem ==>
+      (In(item, &xReadyTasksList) <==> In{Pre}(item, &xReadyTasksList));
+  ensures \forall ListItem_t *item;
+    \valid{Pre}(item) && item != &pxCurrentTCB_ghost->xStateListItem ==>
+      (In(item, pxDelayedTaskList_ghost) <==>
+       In{Pre}(item, pxDelayedTaskList_ghost));
+  ensures \forall ListItem_t *item;
+    \valid{Pre}(item) && item != &pxCurrentTCB_ghost->xStateListItem ==>
+      (In(item, pxOverflowDelayedTaskList_ghost) <==>
+       In{Pre}(item, pxOverflowDelayedTaskList_ghost));
+
   behavior wake_time_overflows:
     assumes (TickType_t)(xTickCount_ghost + xTicksToWait) < xTickCount_ghost;
     ensures In(&pxCurrentTCB_ghost->xStateListItem, pxOverflowDelayedTaskList_ghost);
@@ -1223,6 +1235,21 @@ BaseType_t xTaskDelayUntil(TickType_t* const pxPreviousWakeTime,
                                pxDelayedTaskList_ghost,
                                pxOverflowDelayedTaskList_ghost);
   ensures EDFProperty(&xReadyTasksList, pxCurrentTCB_ghost);
+
+  ensures \forall ListItem_t *item;
+    \valid{Pre}(item) &&
+    item != &\old(pxCurrentTCB_ghost)->xStateListItem ==>
+      (In(item, &xReadyTasksList) <==> In{Pre}(item, &xReadyTasksList));
+  ensures \forall ListItem_t *item;
+    \valid{Pre}(item) &&
+    item != &\old(pxCurrentTCB_ghost)->xStateListItem ==>
+      (In(item, pxDelayedTaskList_ghost) <==>
+       In{Pre}(item, pxDelayedTaskList_ghost));
+  ensures \forall ListItem_t *item;
+    \valid{Pre}(item) &&
+    item != &\old(pxCurrentTCB_ghost)->xStateListItem ==>
+      (In(item, pxOverflowDelayedTaskList_ghost) <==>
+       In{Pre}(item, pxOverflowDelayedTaskList_ghost));
 
   behavior tick_count_overflowed_and_wake_is_future:
     assumes xTickCount_ghost < *pxPreviousWakeTime;

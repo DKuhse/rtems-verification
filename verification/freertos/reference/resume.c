@@ -481,6 +481,21 @@ static BaseType_t prvTaskIsTaskSuspended(const TaskHandle_t xTask) {
   ensures xTaskToResume->xStateListItem.xItemValue ==
     xTaskToResume->xDeadline;
 
+  ensures \forall ListItem_t *item;
+    \valid{Pre}(item) && item != &xTaskToResume->xStateListItem ==>
+      (In(item, &xReadyTasksList) <==> In{Pre}(item, &xReadyTasksList));
+  ensures \forall ListItem_t *item;
+    \valid{Pre}(item) && item != &xTaskToResume->xStateListItem ==>
+      (In(item, pxDelayedTaskList_ghost) <==>
+       In{Pre}(item, pxDelayedTaskList_ghost));
+  ensures \forall ListItem_t *item;
+    \valid{Pre}(item) && item != &xTaskToResume->xStateListItem ==>
+      (In(item, pxOverflowDelayedTaskList_ghost) <==>
+       In{Pre}(item, pxOverflowDelayedTaskList_ghost));
+  ensures \forall ListItem_t *item;
+    \valid{Pre}(item) && item != &xTaskToResume->xStateListItem ==>
+      (In(item, &xSuspendedTaskList) <==> In{Pre}(item, &xSuspendedTaskList));
+
   behavior resumed_preempts:
     assumes pxCurrentTCB_ghost->xDeadline > xTaskToResume->xDeadline;
     ensures EDFProperty(&xReadyTasksList, pxCurrentTCB_ghost);

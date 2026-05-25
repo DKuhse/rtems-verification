@@ -4,7 +4,7 @@
 # vTaskDelay and xTaskDelayUntil (verification/freertos/reference/delay.c).
 #
 # Usage:
-#   verify-delay-reference.sh                       # default flags
+#   verify-delay-reference.sh                       # default 30s prover timeout
 #   verify-delay-reference.sh -wp-timeout 60        # 60s prover timeout
 #   RUN_SOUNDNESS_PROBE=0 verify-delay-reference.sh # skip negative probe
 #
@@ -122,6 +122,21 @@ echo " WP Verification (FreeRTOS reference)"
 echo "========================================"
 echo ""
 
+DEFAULT_TIMEOUT=30
+for arg in "$@"; do
+    case "${arg}" in
+        -wp-timeout|-wp-timeout=*)
+            DEFAULT_TIMEOUT=""
+            break
+            ;;
+    esac
+done
+
+DEFAULT_ARGS=()
+if [ -n "${DEFAULT_TIMEOUT}" ]; then
+    DEFAULT_ARGS=(-wp-timeout "${DEFAULT_TIMEOUT}")
+fi
+
 if [ "${RUN_SOUNDNESS_PROBE:-1}" != "0" ]; then
     run_soundness_probe xTaskDelayUntil "$@"
     run_soundness_probe xTaskDelayUntilReadyRefresh "$@"
@@ -136,5 +151,4 @@ frama-c \
     -volatile \
     -then-on Volatile \
     -wp -wp-fct vTaskDelay,xTaskDelayUntil,xTaskDelayUntilReadyRefresh,prvAddCurrentTaskToDelayedList,xTaskResumeAll,vPortYield -wp-model "Typed+Cast" \
-    -wp-timeout 10 \
-    "$@"
+    "${DEFAULT_ARGS[@]}" "$@"

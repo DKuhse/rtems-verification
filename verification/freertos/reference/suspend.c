@@ -524,6 +524,29 @@ void vPortYield(void) {
                 \old(pxCurrentTCB_ghost) : xTaskToSuspend)->xStateListItem,
               pxOverflowDelayedTaskList_ghost);
 
+  ensures \forall ListItem_t *item;
+    \valid{Pre}(item) &&
+    item != &((xTaskToSuspend == \null) ?
+              \old(pxCurrentTCB_ghost) : xTaskToSuspend)->xStateListItem ==>
+      (In(item, &xReadyTasksList) <==> In{Pre}(item, &xReadyTasksList));
+  ensures \forall ListItem_t *item;
+    \valid{Pre}(item) &&
+    item != &((xTaskToSuspend == \null) ?
+              \old(pxCurrentTCB_ghost) : xTaskToSuspend)->xStateListItem ==>
+      (In(item, pxDelayedTaskList_ghost) <==>
+       In{Pre}(item, pxDelayedTaskList_ghost));
+  ensures \forall ListItem_t *item;
+    \valid{Pre}(item) &&
+    item != &((xTaskToSuspend == \null) ?
+              \old(pxCurrentTCB_ghost) : xTaskToSuspend)->xStateListItem ==>
+      (In(item, pxOverflowDelayedTaskList_ghost) <==>
+       In{Pre}(item, pxOverflowDelayedTaskList_ghost));
+  ensures \forall ListItem_t *item;
+    \valid{Pre}(item) &&
+    item != &((xTaskToSuspend == \null) ?
+              \old(pxCurrentTCB_ghost) : xTaskToSuspend)->xStateListItem ==>
+      (In(item, &xSuspendedTaskList) <==> In{Pre}(item, &xSuspendedTaskList));
+
   behavior suspend_current:
     assumes xTaskToSuspend == \null || xTaskToSuspend == pxCurrentTCB_ghost;
 
