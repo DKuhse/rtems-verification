@@ -617,6 +617,12 @@ RTEMS_INLINE_ROUTINE void _Thread_State_acquire_critical(
  * @param the_thread The thread to acquire the lock context.
  * @param lock_context The lock context.
  */
+#if !defined(RTEMS_SMP)
+/*@
+  requires \valid( lock_context );
+  assigns *lock_context;
+*/
+#endif
 RTEMS_INLINE_ROUTINE void _Thread_State_acquire(
   Thread_Control   *the_thread,
   ISR_lock_Context *lock_context
@@ -667,6 +673,12 @@ RTEMS_INLINE_ROUTINE void _Thread_State_release_critical(
  * @param[in, out] the_thread The thread to release the lock context.
  * @param[out] lock_context The lock context.
  */
+#if !defined(RTEMS_SMP)
+/*@
+  requires \valid_read( lock_context );
+  assigns \nothing;
+*/
+#endif
 RTEMS_INLINE_ROUTINE void _Thread_State_release(
   Thread_Control   *the_thread,
   ISR_lock_Context *lock_context
@@ -1260,6 +1272,192 @@ void _Thread_Priority_replace(
  * @see _Thread_Priority_add(), _Thread_Priority_change(),
  *   _Thread_Priority_changed() and _Thread_Priority_remove().
  */
+#if !defined(RTEMS_SMP)
+/*@
+  requires \valid( queue_context );
+  requires queue_context->Priority.update_count <= 1;
+
+  requires \valid_read( _Scheduler_Table + ( 0 .. 0 ) );
+  requires _Scheduler_Table[ 0 ].Operations.update_priority ==
+    _Scheduler_EDF_Update_priority;
+  requires \valid( (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
+  requires edf_ready_context_well_formed{Pre}(
+    (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
+  requires thread_priority_edf_heir_valid{Pre}( _Thread_Heir );
+  requires edf_scheduler_decision{Pre}(
+    (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+    _Per_CPU_Information[ 0 ].per_cpu.executing,
+    _Thread_Heir,
+    _Thread_Heir->is_preemptible,
+    _Thread_Dispatch_necessary_ghost );
+  requires edf_preemptible_heir_is_earliest_ready{Pre}(
+    (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+    _Thread_Heir,
+    _Thread_Heir->is_preemptible );
+
+  requires queue_context->Priority.update_count == 1 ==>
+    thread_priority_edf_node_valid{Pre}(
+      queue_context->Priority.update[ 0 ] );
+  requires queue_context->Priority.update_count == 1 &&
+    queue_context->Priority.update[ 0 ]->current_state == STATES_READY ==>
+      edf_ready_member{Pre}(
+        (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+        (Scheduler_EDF_Node *)
+          queue_context->Priority.update[ 0 ]->Scheduler.nodes );
+  requires queue_context->Priority.update_count == 1 &&
+    queue_context->Priority.update[ 0 ]->current_state == STATES_READY ==>
+      SCHEDULER_PRIORITY_PURIFY(
+        queue_context->Priority.update[ 0 ]->Scheduler.nodes->Priority.value ) ==
+        ((Scheduler_EDF_Node *)
+          queue_context->Priority.update[ 0 ]->Scheduler.nodes)->
+            Base.Wait.Priority.Node.priority;
+  requires queue_context->Priority.update_count == 1 ==>
+    thread_priority_edf_update_separated{Pre}(
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+      queue_context->Priority.update[ 0 ] );
+  requires queue_context->Priority.update_count == 1 ==>
+    \separated(
+      queue_context + (..),
+      queue_context->Priority.update[ 0 ] + (..),
+      queue_context->Priority.update[ 0 ]->Scheduler.nodes + (..),
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context + (..),
+      (Per_CPU_Control_envelope *) _Per_CPU_Information + (..),
+      _Scheduler_Table + ( 0 .. 0 )
+    );
+  requires \separated(
+    queue_context + (..),
+    (Per_CPU_Control_envelope *) _Per_CPU_Information + (..),
+    (Scheduler_Control const *) _Scheduler_Table + (..)
+  );
+  terminates \true;
+  exits \false;
+
+  ensures \forall Priority_Node *node;
+    \valid_read( node ) &&
+    ( queue_context->Priority.update_count == 1 ==>
+      \separated(
+        &node->priority,
+        &((Scheduler_EDF_Node *)
+          \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes,
+               Pre ))->priority
+      ) ) ==>
+      node->priority == \at( node->priority, Pre );
+  ensures queue_context->Priority.update_count ==
+    \at( queue_context->Priority.update_count, Pre );
+  ensures queue_context->Priority.update_count <= 1;
+  ensures queue_context->Priority.update_count == 1 &&
+    \at(
+      priority_aggregation_well_formed(
+        &queue_context->Priority.update[ 0 ]->Scheduler.nodes->Wait.Priority ),
+      Pre
+    ) ==>
+      priority_aggregation_well_formed{Post}(
+        &queue_context->Priority.update[ 0 ]->Scheduler.nodes->Wait.Priority );
+  ensures queue_context->Priority.update_count == 1 &&
+    \at(
+      priority_aggregation_cached_minimum(
+        &queue_context->Priority.update[ 0 ]->Scheduler.nodes->Wait.Priority ),
+      Pre
+    ) ==>
+      priority_aggregation_cached_minimum{Post}(
+        &queue_context->Priority.update[ 0 ]->Scheduler.nodes->Wait.Priority );
+  ensures queue_context->Priority.update_count == 1 ==>
+    priority_contributors{Post}(
+      &queue_context->Priority.update[ 0 ]->Scheduler.nodes->Wait.Priority ) ==
+    priority_contributors{Pre}(
+      &queue_context->Priority.update[ 0 ]->Scheduler.nodes->Wait.Priority );
+  ensures queue_context->Priority.update_count == 0 ==>
+    ( \forall Priority_Aggregation *aggregation;
+        priority_contributors{Post}( aggregation ) ==
+          priority_contributors{Pre}( aggregation ) );
+  ensures queue_context->Priority.update_count == 0 ==>
+    ( \forall Priority_Aggregation *aggregation;
+        \at( priority_aggregation_well_formed( aggregation ), Pre ) ==>
+          priority_aggregation_well_formed{Post}( aggregation ) );
+  ensures queue_context->Priority.update_count == 0 ==>
+    ( \forall Priority_Aggregation *aggregation;
+        \at( priority_aggregation_cached_minimum( aggregation ), Pre ) ==>
+          priority_aggregation_cached_minimum{Post}( aggregation ) );
+  ensures queue_context->Priority.update_count == 0 ==>
+    ( \forall Scheduler_EDF_Node *node;
+        \valid_read( node ) &&
+        \at( edf_ready_node_cache_consistent( node ), Pre ) ==>
+          edf_ready_node_cache_consistent{Post}( node ) );
+
+  behavior empty:
+    assumes queue_context->Priority.update_count == 0;
+    assigns \nothing;
+    ensures edf_scheduler_decision{Post}(
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+      _Per_CPU_Information[ 0 ].per_cpu.executing,
+      _Thread_Heir,
+      _Thread_Heir->is_preemptible,
+      _Thread_Dispatch_necessary_ghost );
+    ensures edf_preemptible_heir_is_earliest_ready{Post}(
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+      _Thread_Heir,
+      _Thread_Heir->is_preemptible );
+    ensures edf_ready_context_well_formed{Post}(
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
+    ensures edf_ready_set{Post}(
+              (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context ) ==
+            edf_ready_set{Pre}(
+              (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
+    ensures queue_context->Priority.update_count ==
+      \at( queue_context->Priority.update_count, Pre );
+
+  behavior one:
+    assumes queue_context->Priority.update_count == 1;
+    assigns ((Scheduler_EDF_Node *)
+              \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes,
+                   Pre ))->priority,
+            ((Scheduler_EDF_Node *)
+              \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes,
+                   Pre ))->
+                Base.Priority,
+            ((Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context)->Ready,
+            _Per_CPU_Information[ 0 ].per_cpu.heir,
+            _Per_CPU_Information[ 0 ].per_cpu.dispatch_necessary,
+            _Thread_Dispatch_necessary_ghost,
+            ((Thread_Control *) \at( _Thread_Heir, Pre ))->cpu_time_used,
+            ((Thread_Control *)
+              \at( _Per_CPU_Information[ 0 ].per_cpu.heir, Pre ))->
+                cpu_time_used,
+            _Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp;
+    ensures edf_scheduler_decision{Post}(
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+      _Per_CPU_Information[ 0 ].per_cpu.executing,
+      _Thread_Heir,
+      _Thread_Heir->is_preemptible,
+      _Thread_Dispatch_necessary_ghost );
+    ensures edf_preemptible_heir_is_earliest_ready{Post}(
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+      _Thread_Heir,
+      _Thread_Heir->is_preemptible );
+    ensures edf_ready_context_well_formed{Post}(
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
+    ensures edf_ready_set{Post}(
+              (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context ) ==
+            edf_ready_set{Pre}(
+              (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
+    ensures edf_priority_cache_consistency_preserved{Pre,Post}(
+      edf_ready_set{Pre}(
+        (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context ) );
+    ensures queue_context->Priority.update[ 0 ]->current_state == STATES_READY ==>
+      edf_ready_node_cache_consistent{Post}(
+        (Scheduler_EDF_Node *)
+          queue_context->Priority.update[ 0 ]->Scheduler.nodes );
+    ensures queue_context->Priority.update_count ==
+      \at( queue_context->Priority.update_count, Pre );
+    ensures queue_context->Priority.update[ 0 ] ==
+      \at( queue_context->Priority.update[ 0 ], Pre );
+    ensures queue_context->Priority.update[ 0 ]->Scheduler.nodes ==
+      \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes, Pre );
+
+  complete behaviors empty, one;
+  disjoint behaviors empty, one;
+*/
+#endif
 void _Thread_Priority_update( Thread_queue_Context *queue_context );
 
 /**

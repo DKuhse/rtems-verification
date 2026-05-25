@@ -1108,13 +1108,191 @@ void _Thread_Priority_update( Thread_queue_Context *queue_context )
    * Update the priority of all threads of the set.  Do not care to clear the
    * set, since the thread queue context will soon get destroyed anyway.
    */
+#ifdef __FRAMAC__
+  if ( n == 0 ) {
+    return;
+  }
+#endif
+
+  /*@ assert n == 1; */
+  /*@ assert queue_context->Priority.update_count == 1; */
+  /*@ assert queue_context->Priority.update_count == 1 &&
+        queue_context->Priority.update[ 0 ]->current_state == STATES_READY ==>
+          SCHEDULER_PRIORITY_PURIFY(
+            queue_context->Priority.update[ 0 ]->Scheduler.nodes->
+              Priority.value ) ==
+          ((Scheduler_EDF_Node *)
+            queue_context->Priority.update[ 0 ]->Scheduler.nodes)->
+              Base.Wait.Priority.Node.priority; */
+  /*@
+    loop invariant 0 <= i <= n;
+    loop invariant n == 1;
+    loop invariant n == queue_context->Priority.update_count;
+    loop invariant n == \at( queue_context->Priority.update_count, Pre );
+    loop invariant queue_context->Priority.update[ 0 ] ==
+      \at( queue_context->Priority.update[ 0 ], Pre );
+    loop invariant queue_context->Priority.update[ 0 ]->Scheduler.nodes ==
+      \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes, Pre );
+    loop invariant \at(
+      priority_aggregation_well_formed(
+        &queue_context->Priority.update[ 0 ]->Scheduler.nodes->Wait.Priority ),
+      Pre
+    ) ==>
+      priority_aggregation_well_formed{Here}(
+        &queue_context->Priority.update[ 0 ]->Scheduler.nodes->Wait.Priority );
+    loop invariant \at(
+      priority_aggregation_cached_minimum(
+        &queue_context->Priority.update[ 0 ]->Scheduler.nodes->Wait.Priority ),
+      Pre
+    ) ==>
+      priority_aggregation_cached_minimum{Here}(
+        &queue_context->Priority.update[ 0 ]->Scheduler.nodes->Wait.Priority );
+    loop invariant priority_contributors{Here}(
+      &queue_context->Priority.update[ 0 ]->Scheduler.nodes->Wait.Priority ) ==
+      priority_contributors{Pre}(
+        &queue_context->Priority.update[ 0 ]->Scheduler.nodes->Wait.Priority );
+    loop invariant i == 0 ==> _Thread_Heir == \at( _Thread_Heir, Pre );
+    loop invariant i == 0 ==>
+      _Per_CPU_Information[ 0 ].per_cpu.heir ==
+        \at( _Per_CPU_Information[ 0 ].per_cpu.heir, Pre );
+    loop invariant \forall Priority_Node *node;
+      \valid_read( node ) &&
+      \separated(
+        &node->priority,
+        &((Scheduler_EDF_Node *)
+          \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes,
+               Pre ))->priority
+      ) ==>
+        node->priority == \at( node->priority, Pre );
+    loop invariant edf_ready_context_well_formed{Here}(
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
+    loop invariant edf_ready_set{Here}(
+              (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context ) ==
+            edf_ready_set{Pre}(
+              (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );
+    loop invariant edf_priority_cache_consistency_preserved{Pre,Here}(
+      edf_ready_set{Pre}(
+        (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context ) );
+    loop invariant edf_scheduler_decision{Here}(
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+      _Per_CPU_Information[ 0 ].per_cpu.executing,
+      _Thread_Heir,
+      _Thread_Heir->is_preemptible,
+      _Thread_Dispatch_necessary_ghost );
+    loop invariant edf_preemptible_heir_is_earliest_ready{Here}(
+      (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+      _Thread_Heir,
+      _Thread_Heir->is_preemptible );
+    loop invariant i == 0 ==>
+      thread_priority_edf_heir_valid{Here}( _Thread_Heir );
+    loop invariant i == 0 &&
+      queue_context->Priority.update[ 0 ]->current_state == STATES_READY ==>
+        edf_ready_member{Here}(
+          (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+          (Scheduler_EDF_Node *)
+            queue_context->Priority.update[ 0 ]->Scheduler.nodes );
+    loop invariant i == 0 &&
+      queue_context->Priority.update[ 0 ]->current_state == STATES_READY ==>
+        SCHEDULER_PRIORITY_PURIFY(
+          queue_context->Priority.update[ 0 ]->Scheduler.nodes->Priority.value ) ==
+          ((Scheduler_EDF_Node *)
+            queue_context->Priority.update[ 0 ]->Scheduler.nodes)->
+              Base.Wait.Priority.Node.priority;
+    loop invariant i == 0 ==>
+      thread_priority_edf_update_separated{Here}(
+        (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+        queue_context->Priority.update[ 0 ] );
+    loop invariant i == 1 &&
+      queue_context->Priority.update[ 0 ]->current_state == STATES_READY ==>
+        edf_ready_node_cache_consistent{Here}(
+          (Scheduler_EDF_Node *)
+            queue_context->Priority.update[ 0 ]->Scheduler.nodes );
+    loop assigns i,
+      ((Scheduler_EDF_Node *)
+        \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes,
+             Pre ))->priority,
+      ((Scheduler_EDF_Node *)
+        \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes,
+             Pre ))->Base.Priority,
+      ((Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context)->Ready,
+      _Per_CPU_Information[ 0 ].per_cpu.heir,
+      _Per_CPU_Information[ 0 ].per_cpu.dispatch_necessary,
+      _Thread_Dispatch_necessary_ghost,
+      ((Thread_Control *) \at( _Thread_Heir, Pre ))->cpu_time_used,
+      ((Thread_Control *)
+        \at( _Per_CPU_Information[ 0 ].per_cpu.heir, Pre ))->cpu_time_used,
+      _Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp;
+    loop variant n - i;
+  */
   for ( i = 0; i < n ; ++i ) {
     Thread_Control   *the_thread;
     ISR_lock_Context  lock_context;
 
     the_thread = queue_context->Priority.update[ i ];
+    /*@ assert i == 0; */
+    /*@ assert the_thread == queue_context->Priority.update[ 0 ]; */
+    /*@ assert the_thread->Scheduler.nodes ==
+          \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes, Pre ); */
     _Thread_State_acquire( the_thread, &lock_context );
+    /*@ assert _Thread_Heir == \at( _Thread_Heir, Pre ); */
+    /*@ assert _Per_CPU_Information[ 0 ].per_cpu.heir ==
+          \at( _Per_CPU_Information[ 0 ].per_cpu.heir, Pre ); */
+    /*@ assert the_thread->Scheduler.nodes ==
+          \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes, Pre ); */
+    /*@ assert &((Scheduler_EDF_Node *) the_thread->Scheduler.nodes)->priority ==
+          &((Scheduler_EDF_Node *)
+            \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes,
+                 Pre ))->priority; */
+    /*@ assert &((Scheduler_EDF_Node *) the_thread->Scheduler.nodes)->
+            Base.Priority ==
+          &((Scheduler_EDF_Node *)
+            \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes,
+                 Pre ))->Base.Priority; */
+    /*@ assert &_Thread_Heir->cpu_time_used ==
+          &((Thread_Control *) \at( _Thread_Heir, Pre ))->cpu_time_used; */
+    /*@ assert &_Per_CPU_Information[ 0 ].per_cpu.heir->cpu_time_used ==
+          &((Thread_Control *)
+            \at( _Per_CPU_Information[ 0 ].per_cpu.heir, Pre ))->
+              cpu_time_used; */
+    /*@ assert thread_priority_edf_heir_valid{Here}( _Thread_Heir ); */
+    /*@ assert edf_scheduler_decision{Here}(
+          (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+          _Per_CPU_Information[ 0 ].per_cpu.executing,
+          _Thread_Heir,
+          _Thread_Heir->is_preemptible,
+          _Thread_Dispatch_necessary_ghost ); */
+    /*@ assert the_thread->current_state == STATES_READY ==>
+          edf_ready_member{Here}(
+            (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+            (Scheduler_EDF_Node *) the_thread->Scheduler.nodes ); */
+    /*@ assert the_thread->current_state == STATES_READY ==>
+          SCHEDULER_PRIORITY_PURIFY(
+            the_thread->Scheduler.nodes->Priority.value ) ==
+            ((Scheduler_EDF_Node *)
+              the_thread->Scheduler.nodes)->Base.Wait.Priority.Node.priority; */
+    /*@ assert thread_priority_edf_update_separated{Here}(
+          (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+          the_thread ); */
     _Scheduler_Update_priority( the_thread );
+    /*@ assert queue_context->Priority.update[ 0 ]->Scheduler.nodes ==
+          \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes, Pre ); */
+    /*@ assert &((Scheduler_EDF_Node *)
+            queue_context->Priority.update[ 0 ]->Scheduler.nodes)->priority ==
+          &((Scheduler_EDF_Node *)
+            \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes,
+                 Pre ))->priority; */
+    /*@ assert &((Scheduler_EDF_Node *)
+            queue_context->Priority.update[ 0 ]->Scheduler.nodes)->
+              Base.Priority ==
+          &((Scheduler_EDF_Node *)
+            \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes,
+                 Pre ))->Base.Priority; */
+    /*@ assert edf_scheduler_decision{Here}(
+          (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
+          _Per_CPU_Information[ 0 ].per_cpu.executing,
+          _Thread_Heir,
+          _Thread_Heir->is_preemptible,
+          _Thread_Dispatch_necessary_ghost ); */
     _Thread_State_release( the_thread, &lock_context );
   }
 }
