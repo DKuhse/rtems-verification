@@ -19,18 +19,10 @@
 #undef configASSERT
 #define configASSERT(x) ((void)(x))
 
-/* Minimal TCB fields dereferenced by vTaskResume's scheduler-running path. */
-struct tskTaskControlBlock {
-    ListItem_t xStateListItem;
-    ListItem_t xEventListItem;
-    TickType_t xDeadline;
-};
-typedef struct tskTaskControlBlock TCB_t;
-typedef TCB_t * TaskHandle_t;
+#include "freertos_volatile_instrumentation.h"
 
 #define FREERTOS_USE_ABSTRACT_LIST_MODEL
 #include "scheduler_model.h"
-#include "freertos_volatile_instrumentation.h"
 
 /* Route direct list calls through the scheduler model. */
 #define uxListRemove(pxItemToRemove) vSchedulerListRemove_abs((pxItemToRemove))
@@ -48,131 +40,7 @@ typedef TCB_t * TaskHandle_t;
         tracePOST_MOVED_TASK_TO_READY_STATE(pxTCB);                         \
     } while (0)
 
-/*@
-  requires xReadyTasksList.uxNumberOfItems > (UBaseType_t)0U;
-  requires ReadyList(&xReadyTasksList);
-
-  terminates \true;
-  allocates \nothing;
-  frees \nothing;
-  exits \false;
-
-  assigns pxCurrentTCB,
-          pxCurrentTCB_ghost,
-          xYieldPendings[0],
-          xYieldPendings0_ghost;
-
-  behavior suspended:
-    assumes uxSchedulerSuspended_ghost != (UBaseType_t)0U;
-    ensures xYieldPendings0_ghost == pdTRUE;
-    ensures pxCurrentTCB_ghost == \old(pxCurrentTCB_ghost);
-
-  behavior running:
-    assumes uxSchedulerSuspended_ghost == (UBaseType_t)0U;
-    ensures xYieldPendings0_ghost == pdFALSE;
-    ensures pxCurrentTCB_ghost == (TCB_t *)Head(&xReadyTasksList)->pvOwner;
-    ensures EDFProperty(&xReadyTasksList, pxCurrentTCB_ghost);
-
-  complete behaviors;
-  disjoint behaviors;
-*/
-void vTaskSwitchContext(void);
-
-/* The MSP430 port's yield wrapper is assembly/context-save code around
- * vTaskSwitchContext.  Keep the call sequence visible and stub the port
- * operations at their contracts.
- */
-
-/*@
-  terminates \true;
-  allocates \nothing;
-  frees \nothing;
-  exits \false;
-  assigns \nothing;
-*/
-void vPortYieldPushStatusRegister(void);
-
-/*@
-  terminates \true;
-  allocates \nothing;
-  frees \nothing;
-  exits \false;
-  assigns \nothing;
-*/
-void vPortYieldDisableInterrupts(void);
-
-/*@
-  terminates \true;
-  allocates \nothing;
-  frees \nothing;
-  exits \false;
-  assigns \nothing;
-*/
-void vPortYieldSaveContext(void);
-
-/*@
-  terminates \true;
-  allocates \nothing;
-  frees \nothing;
-  exits \false;
-  assigns \nothing;
-*/
-void vPortYieldRestoreContext(void);
-
-#undef portDISABLE_INTERRUPTS
-#define portDISABLE_INTERRUPTS() vPortYieldDisableInterrupts()
-
-#undef portSAVE_CONTEXT
-#define portSAVE_CONTEXT() vPortYieldSaveContext()
-
-#undef portRESTORE_CONTEXT
-#define portRESTORE_CONTEXT() vPortYieldRestoreContext()
-
-/*@
-  requires uxSchedulerSuspended_ghost == (UBaseType_t)0U;
-  requires xReadyTasksList.uxNumberOfItems > (UBaseType_t)0U;
-  requires ReadyList(&xReadyTasksList);
-  requires SchedulerSuspendedListContext(&xReadyTasksList,
-                                         pxDelayedTaskList_ghost,
-                                         pxOverflowDelayedTaskList_ghost,
-                                         &xSuspendedTaskList);
-
-  terminates \true;
-  allocates \nothing;
-  frees \nothing;
-  exits \false;
-
-  assigns pxCurrentTCB,
-          pxCurrentTCB_ghost,
-          xYieldPendings[0],
-          xYieldPendings0_ghost;
-
-  ensures EDFProperty(&xReadyTasksList, pxCurrentTCB_ghost);
-  ensures SchedulerSuspendedListContext(&xReadyTasksList,
-                                        pxDelayedTaskList_ghost,
-                                        pxOverflowDelayedTaskList_ghost,
-                                        &xSuspendedTaskList);
-*/
-void vPortYield(void) {
-#ifdef __FRAMAC__
-    vPortYieldPushStatusRegister();
-#else
-    asm volatile("push.w  sr");
-#endif
-
-    portDISABLE_INTERRUPTS();
-    portSAVE_CONTEXT();
-
-    vTaskSwitchContext();
-
-    portRESTORE_CONTEXT();
-}
-
-#undef portYIELD
-#define portYIELD() vPortYield()
-
-#undef portYIELD_WITHIN_API
-#define portYIELD_WITHIN_API() portYIELD()
+#include "freertos_scheduler_stubs.h"
 
 #define taskYIELD_ANY_CORE_IF_USING_PREEMPTION(pxTCB)       \
     do {                                                    \

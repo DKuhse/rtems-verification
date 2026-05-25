@@ -12,17 +12,10 @@
 #include "list.h"
 #undef MPU_WRAPPERS_INCLUDED_FROM_API_FILE
 
-/* Minimal TCB fields dereferenced by the configured xTaskIncrementTick body. */
-struct tskTaskControlBlock {
-    ListItem_t xStateListItem;
-    ListItem_t xEventListItem;
-    TickType_t xDeadline;
-};
-typedef struct tskTaskControlBlock TCB_t;
+#include "freertos_volatile_instrumentation.h"
 
 #define FREERTOS_USE_ABSTRACT_LIST_MODEL
 #include "scheduler_model.h"
-#include "freertos_volatile_instrumentation.h"
 
 /*@
   predicate ReadiedItemBetween{Before,After}(ListItem_t *item,

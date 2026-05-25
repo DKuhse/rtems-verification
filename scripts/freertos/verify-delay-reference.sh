@@ -1,7 +1,8 @@
 #!/bin/bash
 #
 # Headless WP run for the standalone reference extraction of
-# vTaskDelay and xTaskDelayUntil (verification/freertos/reference/delay.c).
+# xTaskDelayUntil and xTaskDelayUntilUnfixed
+# (verification/freertos/reference/delay.c).
 #
 # Usage:
 #   verify-delay-reference.sh                       # default 30s prover timeout
@@ -138,11 +139,11 @@ if [ -n "${DEFAULT_TIMEOUT}" ]; then
 fi
 
 if [ "${RUN_SOUNDNESS_PROBE:-1}" != "0" ]; then
+    run_soundness_probe xTaskDelayUntilUnfixed "$@"
     run_soundness_probe xTaskDelayUntil "$@"
-    run_soundness_probe xTaskDelayUntilReadyRefresh "$@"
 fi
 
-echo "--- vTaskDelay / xTaskDelayUntil (reference) ---"
+echo "--- xTaskDelayUntil / xTaskDelayUntilUnfixed (reference) ---"
 
 frama-c \
     -cpp-command "${CPP_CMD}" \
@@ -150,5 +151,5 @@ frama-c \
     "${DELAY_SOURCE}" \
     -volatile \
     -then-on Volatile \
-    -wp -wp-fct vTaskDelay,xTaskDelayUntil,xTaskDelayUntilReadyRefresh,prvAddCurrentTaskToDelayedList,xTaskResumeAll,vPortYield -wp-model "Typed+Cast" \
+    -wp -wp-fct xTaskDelayUntilUnfixed,xTaskDelayUntil,prvAddCurrentTaskToDelayedList,xTaskResumeAll,vPortYield -wp-model "Typed+Cast" \
     "${DEFAULT_ARGS[@]}" "$@"

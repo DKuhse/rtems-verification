@@ -3,50 +3,15 @@
 #include "list.h"
 #undef MPU_WRAPPERS_INCLUDED_FROM_API_FILE
 
-struct tskTaskControlBlock {
-    ListItem_t xStateListItem;
-    ListItem_t xEventListItem;
-    TickType_t xDeadline;
-};
-typedef struct tskTaskControlBlock TCB_t;
+#include "freertos_volatile_instrumentation.h"
 
 #define FREERTOS_USE_ABSTRACT_LIST_MODEL
 #include "scheduler_model.h"
-#include "freertos_volatile_instrumentation.h"
+#include "freertos_scheduler_stubs.h"
 
 #define taskSELECT_HIGHEST_PRIORITY_TASK() \
     pxCurrentTCB = listGET_OWNER_OF_HEAD_ENTRY( &xReadyTasksList )
 
-/*@
-  requires xReadyTasksList.uxNumberOfItems > 0;
-  requires ReadyList( &xReadyTasksList );
-
-  assigns pxCurrentTCB,
-          pxCurrentTCB_ghost,
-          xYieldPendings[ 0 ],
-          xYieldPendings0_ghost;
-
-  behavior suspended:
-    assumes uxSchedulerSuspended_ghost != (UBaseType_t)0U;
-    assigns xYieldPendings[0],
-            xYieldPendings0_ghost;
-    ensures xYieldPendings0_ghost == pdTRUE;
-    ensures pxCurrentTCB_ghost == \old( pxCurrentTCB_ghost );
-
-  behavior running:
-    assumes uxSchedulerSuspended_ghost == (UBaseType_t)0U;
-    assigns pxCurrentTCB,
-            pxCurrentTCB_ghost,
-            xYieldPendings[ 0 ],
-            xYieldPendings0_ghost;
-    ensures xYieldPendings0_ghost == pdFALSE;
-    ensures pxCurrentTCB_ghost ==
-              (TCB_t *) Head( &xReadyTasksList )->pvOwner;
-    ensures EDFProperty( &xReadyTasksList, pxCurrentTCB_ghost );
-
-  complete behaviors suspended, running;
-  disjoint behaviors suspended, running;
-*/
 #if (configNUMBER_OF_CORES == 1)
 void vTaskSwitchContext(void) {
     traceENTER_vTaskSwitchContext();

@@ -8,9 +8,17 @@
  * suspend / resume / delay / increment-tick / task-switch-context.
  *
  * Prerequisites in the includer (before #include):
- *   - `struct tskTaskControlBlock` complete and `typedef TCB_t` in scope.
  *   - list.h's `List_t` / `ListItem_t` / `TickType_t` /
  *     `UBaseType_t` / `BaseType_t` already available via FreeRTOS.h.
+ *
+ * Provides:
+ *   - `struct tskTaskControlBlock`, `TCB_t`, `TaskHandle_t` (the minimal
+ *     verification-only TCB layout shared by all reference overlays).
+ *   - Non-volatile list storage, volatile mirrors, ghost mirrors,
+ *     read/write contracts, and Volatile-plugin directives.
+ *
+ * Must be included BEFORE scheduler_model.h (which depends on
+ * `struct tskTaskControlBlock`).
  */
 
 #ifndef VERIFICATION_FREERTOS_MODEL_VOLATILE_INSTRUMENTATION_H
@@ -19,6 +27,16 @@
 #ifndef __FRAMAC__
 #  error "freertos_volatile_instrumentation.h is a Frama-C verification-only header."
 #endif
+
+/* --- Minimal verification-only TCB layout -------------------------------- */
+
+struct tskTaskControlBlock {
+    ListItem_t xStateListItem;
+    ListItem_t xEventListItem;
+    TickType_t xDeadline;
+};
+typedef struct tskTaskControlBlock TCB_t;
+typedef TCB_t * TaskHandle_t;
 
 /* --- Non-volatile list storage ------------------------------------------- */
 

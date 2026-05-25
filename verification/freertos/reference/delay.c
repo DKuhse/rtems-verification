@@ -1,5 +1,6 @@
 /*
- * Verification overlay (reference) for vTaskDelay and xTaskDelayUntil.
+ * Verification overlay (reference) for xTaskDelayUntil and
+ * xTaskDelayUntilUnfixed (the legacy non-refresh variant).
  *
  * The public API is source-shaped, but the surrounding scheduler operations are
  * kept as small contracts.  The xTaskResumeAll body is source-shaped for the
@@ -15,13 +16,7 @@
 #include "list.h"
 #undef MPU_WRAPPERS_INCLUDED_FROM_API_FILE
 
-/* Minimal TCB fields dereferenced by the finite-delay paths. */
-struct tskTaskControlBlock {
-    ListItem_t xStateListItem;
-    ListItem_t xEventListItem;
-    TickType_t xDeadline;
-};
-typedef struct tskTaskControlBlock TCB_t;
+#include "freertos_volatile_instrumentation.h"
 
 #define FREERTOS_USE_ABSTRACT_LIST_MODEL
 #include "scheduler_model.h"
@@ -50,37 +45,7 @@ typedef struct tskTaskControlBlock TCB_t;
         vListInsert(&(xReadyTasksList), &((pxTCB)->xStateListItem));        \
     } while (0)
 
-#include "freertos_volatile_instrumentation.h"
-
-/*@
-  requires xReadyTasksList.uxNumberOfItems > (UBaseType_t)0U;
-  requires ReadyList(&xReadyTasksList);
-
-  terminates \true;
-  allocates \nothing;
-  frees \nothing;
-  exits \false;
-
-  assigns pxCurrentTCB,
-          pxCurrentTCB_ghost,
-          xYieldPendings[0],
-          xYieldPendings0_ghost;
-
-  behavior suspended:
-    assumes uxSchedulerSuspended_ghost != (UBaseType_t)0U;
-    ensures xYieldPendings0_ghost == pdTRUE;
-    ensures pxCurrentTCB_ghost == \old(pxCurrentTCB_ghost);
-
-  behavior running:
-    assumes uxSchedulerSuspended_ghost == (UBaseType_t)0U;
-    ensures xYieldPendings0_ghost == pdFALSE;
-    ensures pxCurrentTCB_ghost == (TCB_t *)Head(&xReadyTasksList)->pvOwner;
-    ensures EDFProperty(&xReadyTasksList, pxCurrentTCB_ghost);
-
-  complete behaviors;
-  disjoint behaviors;
-*/
-void vTaskSwitchContext(void);
+#include "freertos_scheduler_stubs.h"
 
 /*@
   requires uxSchedulerSuspended_ghost == (UBaseType_t)0U;
@@ -100,100 +65,6 @@ void vTaskSuspendAll(void) {
     uxSchedulerSuspended = (UBaseType_t)(uxSchedulerSuspended + 1U);
     traceRETURN_vTaskSuspendAll();
 }
-
-/* The MSP430 port's yield wrapper is assembly/context-save code around
- * vTaskSwitchContext.  Keep the call sequence visible and stub the port
- * operations at their contracts.
- */
-
-/*@
-  terminates \true;
-  allocates \nothing;
-  frees \nothing;
-  exits \false;
-  assigns \nothing;
-*/
-void vPortYieldPushStatusRegister(void);
-
-/*@
-  terminates \true;
-  allocates \nothing;
-  frees \nothing;
-  exits \false;
-  assigns \nothing;
-*/
-void vPortYieldDisableInterrupts(void);
-
-/*@
-  terminates \true;
-  allocates \nothing;
-  frees \nothing;
-  exits \false;
-  assigns \nothing;
-*/
-void vPortYieldSaveContext(void);
-
-/*@
-  terminates \true;
-  allocates \nothing;
-  frees \nothing;
-  exits \false;
-  assigns \nothing;
-*/
-void vPortYieldRestoreContext(void);
-
-#undef portDISABLE_INTERRUPTS
-#define portDISABLE_INTERRUPTS() vPortYieldDisableInterrupts()
-
-#undef portSAVE_CONTEXT
-#define portSAVE_CONTEXT() vPortYieldSaveContext()
-
-#undef portRESTORE_CONTEXT
-#define portRESTORE_CONTEXT() vPortYieldRestoreContext()
-
-/*@
-  requires uxSchedulerSuspended_ghost == (UBaseType_t)0U;
-  requires xReadyTasksList.uxNumberOfItems > (UBaseType_t)0U;
-  requires ReadyList(&xReadyTasksList);
-  requires SchedulerListContext(&xReadyTasksList,
-                                pxDelayedTaskList_ghost,
-                                pxOverflowDelayedTaskList_ghost);
-
-  terminates \true;
-  allocates \nothing;
-  frees \nothing;
-  exits \false;
-
-  assigns pxCurrentTCB,
-          pxCurrentTCB_ghost,
-          xYieldPendings[0],
-          xYieldPendings0_ghost;
-
-  ensures EDFProperty(&xReadyTasksList, pxCurrentTCB_ghost);
-  ensures SchedulerListContext(&xReadyTasksList,
-                               pxDelayedTaskList_ghost,
-                               pxOverflowDelayedTaskList_ghost);
-*/
-void vPortYield(void) {
-#ifdef __FRAMAC__
-    vPortYieldPushStatusRegister();
-#else
-    asm volatile("push.w  sr");
-#endif
-
-    portDISABLE_INTERRUPTS();
-    portSAVE_CONTEXT();
-
-    vTaskSwitchContext();
-
-    portRESTORE_CONTEXT();
-}
-
-#undef portYIELD
-#define portYIELD() vPortYield()
-
-#undef portYIELD_WITHIN_API
-#define portYIELD_WITHIN_API() portYIELD()
 
 #define taskYIELD_WITHIN_API() portYIELD_WITHIN_API()
 
@@ -509,8 +380,8 @@ static void prvAddCurrentTaskToDelayedList(TickType_t xTicksToWait,
         mtCOVERAGE_TEST_MARKER();
     }
 
-    /* vTaskDelay always requests a finite delay, so the suspended-list branch
-     * of the general helper is outside this extraction. */
+    /* xTaskDelayUntil[Unfixed] always requests a finite delay, so the
+     * suspended-list branch of the general helper is outside this extraction. */
     xTimeToWake = xConstTickCount + xTicksToWait;
 
     /* The list item will be inserted in wake time order. */
@@ -736,7 +607,7 @@ static void prvAddCurrentTaskToDelayedList(TickType_t xTicksToWait,
   complete behaviors;
   disjoint behaviors;
 */
-BaseType_t xTaskDelayUntil(TickType_t* const pxPreviousWakeTime,
+BaseType_t xTaskDelayUntilUnfixed(TickType_t* const pxPreviousWakeTime,
                            const TickType_t xTimeIncrement) {
     TickType_t xTimeToWake;
     BaseType_t xAlreadyYielded, xShouldDelay = pdFALSE;
@@ -1016,7 +887,7 @@ BaseType_t xTaskDelayUntil(TickType_t* const pxPreviousWakeTime,
   complete behaviors;
   disjoint behaviors;
 */
-BaseType_t xTaskDelayUntilReadyRefresh(TickType_t* const pxPreviousWakeTime,
+BaseType_t xTaskDelayUntil(TickType_t* const pxPreviousWakeTime,
                                        const TickType_t xTimeIncrement) {
     TickType_t xTimeToWake;
     BaseType_t xAlreadyYielded, xShouldDelay = pdFALSE;
@@ -1095,130 +966,3 @@ BaseType_t xTaskDelayUntilReadyRefresh(TickType_t* const pxPreviousWakeTime,
     return xShouldDelay;
 }
 
-/*@
-  requires uxSchedulerSuspended_ghost == (UBaseType_t)0U;
-  requires SchedulerListContext(&xReadyTasksList,
-                                pxDelayedTaskList_ghost,
-                                pxOverflowDelayedTaskList_ghost);
-  requires \valid(pxCurrentTCB_ghost);
-  requires uxCurrentNumberOfTasks_ghost > (UBaseType_t)0U;
-  requires xYieldPendings0_ghost == pdTRUE || xYieldPendings0_ghost == pdFALSE;
-  requires xPendedTicks_ghost == (TickType_t)0U;
-  requires ListInv(&xPendingReadyList);
-  requires xPendingReadyList.uxNumberOfItems == (UBaseType_t)0U;
-  requires &xPendingReadyList != &xReadyTasksList;
-  requires &xPendingReadyList != pxDelayedTaskList_ghost;
-  requires &xPendingReadyList != pxOverflowDelayedTaskList_ghost;
-  requires xReadyTasksList.uxNumberOfItems > (UBaseType_t)0U;
-  requires xTicksToDelay == (TickType_t)0U ||
-           xReadyTasksList.uxNumberOfItems > (UBaseType_t)1U;
-  requires In(&pxCurrentTCB_ghost->xStateListItem, &xReadyTasksList);
-  requires pxCurrentTCB_ghost->xEventListItem.pxContainer == \null;
-  requires \separated(&pxCurrentTCB,
-                      &uxSchedulerSuspended,
-                      &uxCurrentNumberOfTasks,
-                      &xTickCount,
-                      &xPendedTicks,
-                      &xNextTaskUnblockTime,
-                      &pxDelayedTaskList,
-                      &pxOverflowDelayedTaskList,
-                      &xYieldPendings[0],
-                      &xPendingReadyList.uxNumberOfItems,
-                      &xReadyTasksList.uxNumberOfItems,
-                      &pxDelayedTaskList_ghost->uxNumberOfItems,
-                      &pxOverflowDelayedTaskList_ghost->uxNumberOfItems,
-                      &pxCurrentTCB_ghost->xStateListItem.xItemValue,
-                      &pxCurrentTCB_ghost->xStateListItem.pxContainer);
-
-  terminates \true;
-  allocates \nothing;
-  frees \nothing;
-  exits \false;
-
-  assigns uxSchedulerSuspended,
-          uxSchedulerSuspended_ghost,
-          pxCurrentTCB,
-          pxCurrentTCB_ghost,
-          xYieldPendings[0],
-          xYieldPendings0_ghost,
-          xReadyTasksList.uxNumberOfItems,
-          pxDelayedTaskList_ghost->uxNumberOfItems,
-          pxOverflowDelayedTaskList_ghost->uxNumberOfItems,
-          pxCurrentTCB_ghost->xStateListItem.xItemValue,
-          pxCurrentTCB_ghost->xStateListItem.pxContainer,
-          xNextTaskUnblockTime,
-          xNextTaskUnblockTime_ghost;
-
-  ensures uxSchedulerSuspended_ghost == (UBaseType_t)0U;
-  ensures SchedulerListContext(&xReadyTasksList,
-                               pxDelayedTaskList_ghost,
-                               pxOverflowDelayedTaskList_ghost);
-  ensures EDFProperty(&xReadyTasksList, pxCurrentTCB_ghost);
-
-  behavior zero_delay:
-    assumes xTicksToDelay == (TickType_t)0U;
-    ensures In(&pxCurrentTCB_ghost->xStateListItem, &xReadyTasksList);
-    ensures xNextTaskUnblockTime_ghost == \old(xNextTaskUnblockTime_ghost);
-
-  behavior finite_delay_resume_yielded:
-    assumes xTicksToDelay > (TickType_t)0U;
-    assumes xYieldPendings0_ghost != pdFALSE;
-    ensures !In(&\old(pxCurrentTCB_ghost)->xStateListItem, &xReadyTasksList);
-    ensures ((TickType_t)(\old(xTickCount_ghost) + xTicksToDelay) <
-             \old(xTickCount_ghost)) ==>
-              In(&\old(pxCurrentTCB_ghost)->xStateListItem, pxOverflowDelayedTaskList_ghost);
-    ensures ((TickType_t)(\old(xTickCount_ghost) + xTicksToDelay) >=
-             \old(xTickCount_ghost)) ==>
-              In(&\old(pxCurrentTCB_ghost)->xStateListItem, pxDelayedTaskList_ghost);
-
-  behavior finite_delay_needs_yield:
-    assumes xTicksToDelay > (TickType_t)0U;
-    assumes xYieldPendings0_ghost == pdFALSE;
-    ensures !In(&\old(pxCurrentTCB_ghost)->xStateListItem, &xReadyTasksList);
-    ensures ((TickType_t)(\old(xTickCount_ghost) + xTicksToDelay) <
-             \old(xTickCount_ghost)) ==>
-              In(&\old(pxCurrentTCB_ghost)->xStateListItem, pxOverflowDelayedTaskList_ghost);
-    ensures ((TickType_t)(\old(xTickCount_ghost) + xTicksToDelay) >=
-             \old(xTickCount_ghost)) ==>
-              In(&\old(pxCurrentTCB_ghost)->xStateListItem, pxDelayedTaskList_ghost);
-
-  complete behaviors;
-  disjoint behaviors;
-*/
-void vTaskDelay(const TickType_t xTicksToDelay) {
-    BaseType_t xAlreadyYielded = pdFALSE;
-
-    traceENTER_vTaskDelay(xTicksToDelay);
-
-    /* A delay time of zero just forces a reschedule. */
-    if (xTicksToDelay > (TickType_t)0U) {
-        vTaskSuspendAll();
-        {
-            //@ assert uxSchedulerSuspended_ghost == (UBaseType_t)1U;
-
-            traceTASK_DELAY();
-
-            /* A task that is removed from the event list while the
-             * scheduler is suspended will not get placed in the ready
-             * list or removed from the blocked list until the scheduler
-             * is resumed.
-             *
-             * This task cannot be in an event list as it is the currently
-             * executing task. */
-            prvAddCurrentTaskToDelayedList(xTicksToDelay, pdFALSE);
-        }
-        xAlreadyYielded = xTaskResumeAll();
-    } else {
-        mtCOVERAGE_TEST_MARKER();
-    }
-
-    /* Force a reschedule if xTaskResumeAll has not already done so, we may
-     * have put ourselves to sleep. */
-    if (xAlreadyYielded == pdFALSE) {
-        taskYIELD_WITHIN_API();
-    } else {
-        mtCOVERAGE_TEST_MARKER();
-    }
-
-    traceRETURN_vTaskDelay();
-}
