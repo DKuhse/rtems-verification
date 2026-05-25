@@ -559,6 +559,13 @@ void _Scheduler_EDF_Release_job(
             the_thread->Scheduler.nodes->Priority.value ) ==
           ((Scheduler_EDF_Node *) the_thread->Scheduler.nodes)->
             Base.Wait.Priority.Node.priority;
+  ensures \at( queue_context->Priority.update_count, Pre ) == 0 &&
+          queue_context->Priority.update_count == 0 &&
+          the_thread->current_state == STATES_READY &&
+          \at( edf_ready_node_cache_consistent(
+            (Scheduler_EDF_Node *) the_thread->Scheduler.nodes ), Pre ) ==>
+          edf_ready_node_cache_consistent{Post}(
+            (Scheduler_EDF_Node *) the_thread->Scheduler.nodes );
 
   behavior active:
     assumes priority_node_active{Pre}( priority_node );
@@ -651,4 +658,10 @@ void _Scheduler_EDF_Cancel_job(
   }
 
   _Thread_Wait_release_critical( the_thread, queue_context );
+  /*@ assert queue_context->Priority.update_count == 0 &&
+        the_thread->current_state == STATES_READY &&
+        \at( edf_ready_node_cache_consistent(
+          (Scheduler_EDF_Node *) the_thread->Scheduler.nodes ), Pre ) ==>
+        edf_ready_node_cache_consistent{Here}(
+          (Scheduler_EDF_Node *) the_thread->Scheduler.nodes ); */
 }
