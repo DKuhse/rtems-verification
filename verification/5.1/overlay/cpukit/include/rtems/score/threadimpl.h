@@ -885,6 +885,13 @@ RTEMS_INLINE_ROUTINE void _Thread_Set_CPU(
  * @retval true @a the_thread is the currently executing one.
  * @retval false @a the_thread is not the currently executing one.
  */
+/*@
+  assigns \result \from the_thread,
+                         _Per_CPU_Information[ 0 ].per_cpu.executing;
+
+  ensures \result <==>
+    the_thread == _Per_CPU_Information[ 0 ].per_cpu.executing;
+*/
 RTEMS_INLINE_ROUTINE bool _Thread_Is_executing (
   const Thread_Control *the_thread
 )
@@ -924,6 +931,13 @@ RTEMS_INLINE_ROUTINE bool _Thread_Is_executing_on_a_processor(
  * @retval true @a the_thread is the heir.
  * @retval false @a the_thread is not the heir.
  */
+/*@
+  assigns \result \from the_thread,
+                         _Per_CPU_Information[ 0 ].per_cpu.heir;
+
+  ensures \result <==>
+    the_thread == _Per_CPU_Information[ 0 ].per_cpu.heir;
+*/
 RTEMS_INLINE_ROUTINE bool _Thread_Is_heir (
   const Thread_Control *the_thread
 )

@@ -18,11 +18,12 @@ to `-c11` so quick compatibility checks can run on `verify-5.1-active`.
 - `verify-edf-initialize.sh` — runs Frama-C/WP on the active
   `_Scheduler_EDF_Initialize()` slice and checks that initialization produces
   an empty, well-formed EDF ready context.
+- `verify-edf-block.sh` — verifies the active `_Scheduler_EDF_Block()` slice.
 
-Additional scripts (block, schedule, unblock, yield, update_priority,
-release_job, cancel_job, thread-change-priority, scheduler-release-job,
-ratemon-release-job, ratemon-cancel) will be added as the corresponding source
-file contracts are ported from `verification/6.2/` (see
+Additional scripts (update_priority, release_job, cancel_job,
+thread-change-priority, scheduler-release-job, ratemon-release-job,
+ratemon-cancel) will be added as the corresponding source file contracts are
+ported from `verification/6.2/` (see
 `verification/5.1/HEADERS.md` for the per-file porting state).
 
 ## Toolchain Notes

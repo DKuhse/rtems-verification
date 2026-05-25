@@ -40,6 +40,8 @@ place:
 | `verify-edf-map-unmap.sh` | 10 / 10 | new, dedicated to the Map/Unmap helpers |
 | `verify-edf-schedule.sh` (function) | 44 / 44 | EDF entry point + `_Scheduler_EDF_Schedule_body` against its body. The `_RBTree_Minimum` contract (in `models/edf_property.h`) bridges the abstract ready set to the body's `RTEMS_CONTAINER_OF`. |
 | `verify-edf-schedule.sh` (model lemma) | 11 / 11 | parity with 6.2 |
+| `verify-edf-block.sh` (function) | 74 / 74 | 5.1-specific `_Scheduler_Generic_block` path with EDF callback contracts |
+| `verify-edf-block.sh` (model lemma) | 13 / 13 | adds non-empty-after-extract ready-set lemma |
 
 **Verification architecture** (two-tier, mirrors 6.2):
 
@@ -68,18 +70,14 @@ with empty body in non-SMP).
 
 Pending (copied as pristine, contracts not yet ported):
 
-- `schedulerimpl.h` — `_Scheduler_Get_context()` has its contract;
-  still needs `_Scheduler_Generic_block` contract analogous to 6.2's
-  `_Scheduler_uniprocessor_Block` contract
+- `schedulerimpl.h` — `_Scheduler_Get_context()` has its contract; the
+  `_Scheduler_Generic_block` EDF callback call sites are covered for block.
 - `priorityimpl.h`, `schedulernodeimpl.h` — needs `_Priority_Get_priority`,
   `_Scheduler_Node_get_priority`, `_Scheduler_Node_set_priority` contracts.
   `set_priority` uses 5.1's `bool prepend_it` calling convention.
 - `threadimpl.h`, `threadqimpl.h` — needs `_Thread_Get_priority`,
   `_Thread_Scheduler_get_home_node`, `_Thread_Priority_add/remove/changed`,
   `_Thread_queue_Context_add_priority_update`
-- `scheduleredfblock.c` — needs contract on entry point + the
-  `_Scheduler_Generic_block(_Scheduler_EDF_Extract_body, _Scheduler_EDF_Schedule_body)`
-  call site
 - `scheduleredfschedule.c` — needs contract on entry point referring back to
   `_Scheduler_EDF_Schedule_body`
 - `scheduleredfunblock.c` — needs entry-point contract. 5.1 inlines the heir

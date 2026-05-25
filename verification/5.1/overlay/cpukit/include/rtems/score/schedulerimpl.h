@@ -29,6 +29,10 @@
 #include <rtems/score/status.h>
 #include <rtems/score/threadimpl.h>
 
+#ifdef __FRAMAC__
+#include <rtems/score/scheduleredf.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -38,6 +42,22 @@ extern "C" {
  *
  * @{
  */
+
+#ifdef __FRAMAC__
+// Forward-declare EDF callback targets used by _Scheduler_Generic_block()
+// `calls` annotations. Their contracts are supplied by scheduleredfimpl.h.
+RTEMS_INLINE_ROUTINE void _Scheduler_EDF_Extract_body(
+  const Scheduler_Control *scheduler,
+  Thread_Control          *the_thread,
+  Scheduler_Node          *node
+);
+
+RTEMS_INLINE_ROUTINE void _Scheduler_EDF_Schedule_body(
+  const Scheduler_Control *scheduler,
+  Thread_Control          *the_thread,
+  bool                     force_dispatch
+);
+#endif
 
 /**
  * @brief Initializes the scheduler to the policy chosen by the user.
@@ -747,11 +767,40 @@ RTEMS_INLINE_ROUTINE void _Scheduler_Generic_block(
                         )
 )
 {
+#ifdef __FRAMAC__
+Before_extract:
+#endif
+  /*@ calls _Scheduler_EDF_Extract_body; */
   ( *extract )( scheduler, the_thread, node );
 
   /* TODO: flash critical section? */
 
   if ( _Thread_Is_executing( the_thread ) || _Thread_Is_heir( the_thread ) ) {
+    /*@ assert the_thread ==
+          _Per_CPU_Information[ 0 ].per_cpu.executing ||
+        the_thread == _Thread_Heir; */
+    /*@ assert the_thread ==
+          \at( _Per_CPU_Information[ 0 ].per_cpu.executing, Before_extract ) ||
+        the_thread == \at( _Thread_Heir, Before_extract ); */
+    /*@ assert \exists Scheduler_EDF_Node *other;
+        other != (Scheduler_EDF_Node *) node &&
+        other \in edf_ready_set{Before_extract}(
+          (Scheduler_EDF_Context *) scheduler->context ); */
+    /*@ assert edf_ready_set{Here}(
+          (Scheduler_EDF_Context *) scheduler->context ) ==
+        edf_ready_extract(
+          edf_ready_set{Before_extract}(
+            (Scheduler_EDF_Context *) scheduler->context ),
+          (Scheduler_EDF_Node *) node ); */
+    /*@ assert \exists Scheduler_EDF_Node *some;
+        some \in edf_ready_extract(
+          edf_ready_set{Before_extract}(
+            (Scheduler_EDF_Context *) scheduler->context ),
+          (Scheduler_EDF_Node *) node ); */
+    /*@ assert \exists Scheduler_EDF_Node *some;
+        some \in edf_ready_set{Here}(
+          (Scheduler_EDF_Context *) scheduler->context ); */
+    /*@ calls _Scheduler_EDF_Schedule_body; */
     ( *schedule )( scheduler, the_thread, true );
   }
 }

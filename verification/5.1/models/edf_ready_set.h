@@ -134,6 +134,15 @@
           ( n \in edf_ready_extract( nodes, node ) ) <==>
           ( n != node && n \in nodes );
 
+      lemma edf_ready_extract_non_empty_if_other_member{L}:
+        \forall set<Scheduler_EDF_Node *> nodes;
+        \forall Scheduler_EDF_Node *removed;
+        \forall Scheduler_EDF_Node *other;
+          other != removed &&
+          other \in nodes ==>
+            \exists Scheduler_EDF_Node *some;
+              some \in edf_ready_extract( nodes, removed );
+
       // --- Owner-distinct preservation lemmas ----------------------------
       lemma edf_ready_owners_distinct_under_extract{L}:
         \forall set<Scheduler_EDF_Node *> nodes;
