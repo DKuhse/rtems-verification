@@ -114,11 +114,12 @@ to `-c11` so quick compatibility checks can run on `verify-6.2-active`.
   watchdog, dispatch, and locking helpers while verifying the EDF
   release/cancel and `_Thread_Priority_update()` composition. These wrappers
   also run WP on the Volatile plugin project.
-- `verify-scheduler-release-job.sh` — runs Frama-C/WP on the generic
-  `_Scheduler_Release_job()` inline wrapper, pins the indirect scheduler
-  operation to `_Scheduler_EDF_Release_job()` with `@calls`, and verifies the
-  wrapper-level priority-update clearing step before the EDF operation
-  contract is applied.
+- `verify-scheduler-release-job.sh` and `verify-scheduler-cancel-job.sh` — run
+  Frama-C/WP on the generic `_Scheduler_Release_job()` and
+  `_Scheduler_Cancel_job()` inline wrappers, pin the indirect scheduler
+  operations to the EDF operation contracts with `@calls`, and verify the
+  wrapper-level priority-update clearing step before the EDF operation contract
+  is applied.
 - `verify-scheduler-update-priority.sh` — runs Frama-C/WP on the generic
   `_Scheduler_Update_priority()` inline wrapper, pins the indirect scheduler
   operation to `_Scheduler_EDF_Update_priority()` with `@calls`, and checks

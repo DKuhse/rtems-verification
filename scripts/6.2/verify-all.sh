@@ -58,6 +58,7 @@ SCRIPTS=(
     verify-edf-yield.sh
     verify-ratemon-cancel.sh
     verify-ratemon-release-job.sh
+    verify-scheduler-cancel-job.sh
     verify-scheduler-release-job.sh
     verify-scheduler-update-priority.sh
     verify-scheduleruni-unblock.sh
