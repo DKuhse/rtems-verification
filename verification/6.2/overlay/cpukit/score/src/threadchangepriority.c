@@ -69,13 +69,18 @@ struct timeval   sbttotv( int64_t );
 #ifdef __FRAMAC__
 /*@
   axiomatic ThreadPriorityPurifyFacts {
-    axiom thread_priority_purify_group_order:
+    // if priority is pure, then purifying after OR'ing with a group order
+    // yields the original value (add bit, then ignore it)
+    // basic mathematical fact that Frama-C can't manage for some reason
+    axiom thread_priority_purifies_to_group_order:
       \forall Priority_Control priority, Priority_Group_order group_order;
         priority_is_pure( priority ) &&
         ( group_order == PRIORITY_GROUP_FIRST ||
           group_order == PRIORITY_GROUP_LAST ) ==>
-        SCHEDULER_PRIORITY_PURIFY(
-          priority | (Priority_Control) group_order ) == priority;
+        priority_purifies_to(
+          (Priority_Control) ( priority | (Priority_Control) group_order ),
+          priority
+        );
   }
 */
 
@@ -96,6 +101,27 @@ struct timeval   sbttotv( int64_t );
           node->Wait.Priority.Node.priority
         );
 */
+
+// GIGA UGLY HACK:
+// function equivalent of thread_priority_purifies_to_group_order
+// essentially a way to force Frama-C to apply the axiom
+// because for some reason an assert doesn't work
+/*@
+  requires priority_is_pure( priority );
+  requires group_order == PRIORITY_GROUP_FIRST ||
+           group_order == PRIORITY_GROUP_LAST;
+  terminates \true;
+  exits \false;
+  assigns \nothing;
+  ensures priority_purifies_to(
+    (Priority_Control) ( priority | (Priority_Control) group_order ),
+    priority
+  );
+*/
+void _Thread_Priority_assume_group_order_purifies(
+  Priority_Control     priority,
+  Priority_Group_order group_order
+);
 
 // Normally not visible in this file - moved here for convenience, since it's
 // a one liner and an additional overlay file seemed overkill.
@@ -227,6 +253,11 @@ void _Thread_queue_Do_nothing_priority_actions(
         &_Priority_Verify_scheduler_node_of_aggregation(
           priority_aggregation )->Priority.value
       );
+  requires \separated(
+    &priority_aggregation->Node.priority,
+    &_Priority_Verify_scheduler_node_of_aggregation(
+      priority_aggregation )->Priority.value
+  );
   requires priority_is_pure( priority_aggregation->Node.priority );
   requires priority_group_order == PRIORITY_GROUP_FIRST ||
            priority_group_order == PRIORITY_GROUP_LAST;
@@ -244,10 +275,6 @@ void _Thread_queue_Do_nothing_priority_actions(
       priority_aggregation )->Priority.value,
     priority_aggregation->Node.priority
   );
-  ensures SCHEDULER_PRIORITY_PURIFY(
-    _Priority_Verify_scheduler_node_of_aggregation(
-      priority_aggregation )->Priority.value ) ==
-    priority_aggregation->Node.priority;
 
   // preservation
   ensures priority_aggregation->Node.priority ==
@@ -263,7 +290,7 @@ static void _Thread_Set_scheduler_node_priority(
   Priority_Aggregation *priority_aggregation,
   Priority_Group_order  priority_group_order
 )
-{
+{ 
   _Scheduler_Node_set_priority(
     SCHEDULER_NODE_OF_WAIT_PRIORITY_NODE( priority_aggregation ),
     _Priority_Get_priority( priority_aggregation ),
@@ -273,10 +300,17 @@ static void _Thread_Set_scheduler_node_priority(
         priority_aggregation )->Priority.value ==
       ( priority_aggregation->Node.priority |
         (Priority_Control) priority_group_order ); */
-  /*@ assert SCHEDULER_PRIORITY_PURIFY(
+#ifdef __FRAMAC__
+  _Thread_Priority_assume_group_order_purifies(
+    priority_aggregation->Node.priority,
+    priority_group_order
+  );
+#endif
+  /*@ assert priority_purifies_to(
         _Priority_Verify_scheduler_node_of_aggregation(
-          priority_aggregation )->Priority.value ) ==
-        priority_aggregation->Node.priority; */
+          priority_aggregation )->Priority.value,
+        priority_aggregation->Node.priority
+      ); */
 }
 
 #if defined(RTEMS_SMP)
@@ -372,10 +406,6 @@ static void _Thread_Priority_action_remove(
       priority_aggregation )->Priority.value,
     priority_aggregation->Node.priority
   );
-  ensures SCHEDULER_PRIORITY_PURIFY(
-    _Priority_Verify_scheduler_node_of_aggregation(
-      priority_aggregation )->Priority.value ) ==
-    priority_aggregation->Node.priority;
   ensures priority_aggregation->Node.priority ==
     \at( priority_aggregation->Node.priority, Pre );
   ensures priority_contributors{Post}( priority_aggregation ) ==

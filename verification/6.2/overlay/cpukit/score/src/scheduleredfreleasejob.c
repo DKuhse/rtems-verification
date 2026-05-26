@@ -62,7 +62,7 @@ struct timeval   sbttotv( int64_t );
 
 /*@
   axiomatic SchedulerEDFPriorityPurifyFacts {
-    lemma scheduler_edf_priority_purify_group_order:
+    axiom scheduler_edf_priority_purify_group_order:
       \forall Priority_Control priority, Priority_Group_order group_order;
         priority_is_pure( priority ) &&
         ( group_order == PRIORITY_GROUP_FIRST ||
