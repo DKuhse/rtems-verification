@@ -11,7 +11,16 @@
 #   verify-all.sh                  # run all active scripts (WP cache on)
 #   verify-all.sh --include-tmp    # also run tmp-* isolation scripts
 #   verify-all.sh --no-cache       # disable the WP proof cache
+#   verify-all.sh -j 8             # run up to 8 scripts in parallel (default nproc/2)
 #   verify-all.sh -- -wp-timeout 60   # forward extra args to every script
+#
+# Parallelism:
+#   Scripts are launched concurrently up to -j JOBS at a time. Their stdout
+#   is buffered to per-script files and replayed in the original SCRIPTS
+#   order so the report is deterministic. Note that each WP invocation
+#   itself spawns provers in parallel (-wp-par); over-subscribing -j
+#   can thrash the CPU. The default of nproc/2 (min 1) leaves headroom
+#   for WP's own prover parallelism.
 #
 # WP proof cache:
 #   FRAMAC_WP_CACHE / FRAMAC_WP_CACHEDIR control WP's per-goal proof cache.
@@ -25,15 +34,25 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 INCLUDE_TMP=0
 USE_CACHE=1
+JOBS=$(( $(nproc 2>/dev/null || echo 2) / 2 ))
+[ "${JOBS}" -lt 1 ] && JOBS=1
 EXTRA_ARGS=()
 while [ $# -gt 0 ]; do
     case "$1" in
         --include-tmp) INCLUDE_TMP=1; shift ;;
         --no-cache)    USE_CACHE=0; shift ;;
+        -j)            JOBS="$2"; shift 2 ;;
+        -j*)           JOBS="${1#-j}"; shift ;;
+        --jobs=*)      JOBS="${1#--jobs=}"; shift ;;
         --) shift; EXTRA_ARGS=("$@"); break ;;
         *) EXTRA_ARGS+=("$1"); shift ;;
     esac
 done
+
+if ! [[ "${JOBS}" =~ ^[0-9]+$ ]] || [ "${JOBS}" -lt 1 ]; then
+    echo "verify-all.sh: -j must be a positive integer (got '${JOBS}')" >&2
+    exit 2
+fi
 
 if [ "${USE_CACHE}" = "1" ]; then
     : "${FRAMAC_WP_CACHE:=update}"
@@ -76,24 +95,62 @@ SCRIPTS_OK=0
 SCRIPTS_BAD=0
 declare -a REPORT_LINES
 
-for script in "${SCRIPTS[@]}"; do
+# Buffer per-script output to a temp dir so parallel jobs don't interleave.
+TMPDIR_RUN="$(mktemp -d "${TMPDIR:-/tmp}/verify-all.XXXXXX")"
+trap 'rm -rf "${TMPDIR_RUN}"' EXIT
+
+echo "Parallelism: -j ${JOBS} (per-script output buffered, printed in order)"
+
+# Launch jobs with a simple semaphore: keep at most ${JOBS} background
+# children alive at any moment. `wait -n` blocks until one finishes.
+running=0
+for idx in "${!SCRIPTS[@]}"; do
+    script="${SCRIPTS[$idx]}"
     path="${HERE}/${script}"
+    out="${TMPDIR_RUN}/${idx}.out"
+    rcfile="${TMPDIR_RUN}/${idx}.rc"
+
     if [ ! -x "${path}" ]; then
+        : > "${out}"
+        echo "MISSING" > "${rcfile}"
+        continue
+    fi
+
+    while [ "${running}" -ge "${JOBS}" ]; do
+        wait -n
+        running=$((running - 1))
+    done
+
+    (
+        "${path}" "${EXTRA_ARGS[@]}" >"${out}" 2>&1
+        echo "$?" > "${rcfile}"
+    ) &
+    running=$((running + 1))
+done
+
+# Drain remaining children.
+wait
+
+# Now replay output and build the report in the original script order.
+for idx in "${!SCRIPTS[@]}"; do
+    script="${SCRIPTS[$idx]}"
+    out="${TMPDIR_RUN}/${idx}.out"
+    rcfile="${TMPDIR_RUN}/${idx}.rc"
+    rc_raw="$(cat "${rcfile}" 2>/dev/null || echo MISSING)"
+
+    if [ "${rc_raw}" = "MISSING" ]; then
         echo ">>> SKIP ${script} (missing or not executable)"
         REPORT_LINES+=("$(printf '  %-40s  %s' "${script}" 'SKIPPED (not found)')")
         SCRIPTS_BAD=$((SCRIPTS_BAD + 1))
         continue
     fi
+    rc="${rc_raw}"
 
     echo
     echo "============================================================"
     echo ">>> ${script}"
     echo "============================================================"
-
-    # Don't let `set -e` inside the child script abort us; capture output.
-    output=$("${path}" "${EXTRA_ARGS[@]}" 2>&1)
-    rc=$?
-    echo "${output}"
+    cat "${out}"
 
     # Sum every "[wp] Proved goals: X / Y" line (a script may run
     # multiple WP passes — function pass + lemma pass).
@@ -101,15 +158,12 @@ for script in "${SCRIPTS[@]}"; do
     script_goals=0
     pass_count=0
     while IFS= read -r line; do
-        # Expected forms:
-        #   [wp] Proved goals:    12 / 12
-        #   [wp] Proved goals:    11 / 12
         if [[ "${line}" =~ Proved\ goals:[[:space:]]*([0-9]+)[[:space:]]*/[[:space:]]*([0-9]+) ]]; then
             script_proved=$((script_proved + ${BASH_REMATCH[1]}))
             script_goals=$((script_goals + ${BASH_REMATCH[2]}))
             pass_count=$((pass_count + 1))
         fi
-    done < <(printf '%s\n' "${output}" | grep -E '^\[wp\] Proved goals:')
+    done < <(grep -E '^\[wp\] Proved goals:' "${out}")
 
     if [ "${pass_count}" = "0" ]; then
         status="NO WP SUMMARY (exit ${rc})"

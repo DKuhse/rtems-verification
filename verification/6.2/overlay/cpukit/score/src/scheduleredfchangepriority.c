@@ -112,14 +112,12 @@ struct timeval   sbttotv( int64_t );
       );
 
   // If the_thread is ready, the_node is already in the ready set
-  // required so Extract's precondition holds in the extract_enqueue path.
   requires the_thread->current_state == STATES_READY ==>
     edf_ready_member{Pre}(
       (Scheduler_EDF_Context *) scheduler->context,
       (Scheduler_EDF_Node *) node );
 
-  // Update_priority repairs cache consistency for the node it is called on.
-  // Several priority updates can be queued, so others may still be stale.
+  // Update_priority repairs cache consistency
   requires the_thread->current_state == STATES_READY ==>
     priority_purifies_to(
       node->Priority.value,
@@ -127,6 +125,8 @@ struct timeval   sbttotv( int64_t );
   requires the_thread->current_state == STATES_READY ==>
     SCHEDULER_PRIORITY_PURIFY( node->Priority.value ) ==
       node->Wait.Priority.Node.priority;
+
+  // SEPARATION
   requires \separated(
     (Scheduler_EDF_Node *) node + (..),
     (Scheduler_EDF_Context *) scheduler->context + (..)
@@ -165,6 +165,8 @@ struct timeval   sbttotv( int64_t );
           _Thread_Heir->cpu_time_used,
           _Per_CPU_Information[ 0 ].per_cpu.heir->cpu_time_used,
           _Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp;
+
+  // LOGIC
 
   // P3 at exit.
   ensures edf_scheduler_decision{Post}(

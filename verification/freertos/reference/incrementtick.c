@@ -18,6 +18,8 @@
 #include "scheduler_model.h"
 
 /*@
+  
+
   predicate ReadiedItemBetween{Before,After}(ListItem_t *item,
                                              List_t *ready) =
     \valid{Before}(item) &&

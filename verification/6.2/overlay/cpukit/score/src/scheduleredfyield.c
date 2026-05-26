@@ -114,8 +114,7 @@ struct timeval   sbttotv( int64_t );
           _Per_CPU_Information[ 0 ].per_cpu.heir->cpu_time_used,
           _Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp;
 
-  // P3 at exit. As in Schedule, Yield re-establishes it from scratch via
-  // Get_highest_ready; no Pre-property requirement.
+  // P3 at exit
   ensures edf_scheduler_decision{Post}(
     (Scheduler_EDF_Context *) scheduler->context,
     _Per_CPU_Information[ 0 ].per_cpu.executing,
@@ -123,8 +122,7 @@ struct timeval   sbttotv( int64_t );
     _Thread_Heir->is_preemptible,
     _Thread_Dispatch_necessary_ghost );
 
-  // Inductive invariant: the ready context remains well-formed at every
-  // EDF API boundary.
+  // Well formedness
   ensures edf_ready_context_well_formed{Post}(
     (Scheduler_EDF_Context *) scheduler->context );
   ensures edf_ready_context_cache_consistent{Post}(
@@ -147,8 +145,6 @@ void _Scheduler_EDF_Yield(
   _Scheduler_EDF_Extract( context, the_node );
   _Scheduler_EDF_Enqueue( context, the_node, the_node->priority );
 
-  // After Enqueue the ready set is non-empty (the_node is in it). Pin the
-  // witness in the cast form for Get_highest_ready
   /*@ assert
         the_node \in edf_ready_set{Here}(
           (Scheduler_EDF_Context *) scheduler->context ); */
@@ -158,8 +154,6 @@ void _Scheduler_EDF_Yield(
     _Scheduler_EDF_Get_highest_ready
   );
 
-  // After Yield, _Thread_Heir == highest_ready unconditionally
-  // even if the heir is not preemptible
   /*@ assert
         edf_thread_node_is_earliest_ready{Here}(
           (Scheduler_EDF_Context *) scheduler->context,

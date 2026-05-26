@@ -64,6 +64,7 @@ struct timeval   sbttotv( int64_t );
 #include <rtems/score/thread.h>
 
 /*@
+  // LOGIC
   requires \valid_read( scheduler );
   requires \valid( the_thread );
   requires \valid( node );
@@ -83,10 +84,6 @@ struct timeval   sbttotv( int64_t );
   requires SCHEDULER_PRIORITY_PURIFY( node->Priority.value ) ==
     ((Scheduler_EDF_Node *) node)->Base.Wait.Priority.Node.priority;
 
-  // the_thread is not already represented in the ready set: required so
-  // the post-state ready set remains owner-distinct (the well-formedness
-  // invariant). Semantically, Unblock moves a thread from blocked to ready,
-  // so the thread must not already be represented by some other ready node.
   requires \forall Scheduler_EDF_Node *m;
     m \in edf_ready_set{Pre}(
       (Scheduler_EDF_Context *) scheduler->context ) ==>
@@ -103,9 +100,6 @@ struct timeval   sbttotv( int64_t );
   requires \valid(
     &_Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp );
 
-  // P3 assumed at entry: heir is non-preemptible or owns the earliest-ready
-  // scheduler node, and dispatch is set if heir differs from executing.
-  // Proven again at exit (post-call heir).
   requires edf_scheduler_decision{Pre}(
     (Scheduler_EDF_Context *) scheduler->context,
     _Per_CPU_Information[ 0 ].per_cpu.executing,
@@ -113,18 +107,14 @@ struct timeval   sbttotv( int64_t );
     _Thread_Heir->is_preemptible,
     _Thread_Dispatch_necessary_ghost );
 
-  // The new node belongs to the_thread; needed to make the_thread the
-  // owner of the earliest-ready node in the update_heir case.
   requires ((Scheduler_EDF_Node *) node)->Base.owner == the_thread;
 
 
-  // Cache invariant for _Thread_Heir's home node. The context-level cache
-  // invariant covers ready nodes; this explicit assumption also covers the
-  // non-preemptible-heir case where the heir need not be represented in the
-  // ready set.
+  // Cache invariant for _Thread_Heir's home node.
   requires ((Scheduler_EDF_Node *) _Thread_Heir->Scheduler.nodes)->priority ==
     _Thread_Heir->Scheduler.nodes->Wait.Priority.Node.priority;
 
+  // SEPARATION
 
   requires \separated(
     _Thread_Heir->Scheduler.nodes,
@@ -151,10 +141,7 @@ struct timeval   sbttotv( int64_t );
     scheduler + (..),
     (Per_CPU_Control_envelope *) _Per_CPU_Information + (..)
   );
-  // _Thread_Heir points to a Thread_Control that is not inside Per_CPU
-  // and is not the scheduler context. Needed so WP can derive that
-  // _Thread_Heir->Scheduler.nodes is preserved across Enqueue's
-  // `assigns context->Ready`.
+
   requires \separated(
     _Thread_Heir + (..),
     (Per_CPU_Control_envelope *) _Per_CPU_Information + (..),
@@ -172,6 +159,8 @@ struct timeval   sbttotv( int64_t );
           _Per_CPU_Information[ 0 ].per_cpu.heir->cpu_time_used,
           _Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp;
 
+  // LOGIC
+
   ensures ((Scheduler_EDF_Node *) node)->priority ==
     SCHEDULER_PRIORITY_PURIFY( \at( node->Priority.value, Pre ) );
 
@@ -183,15 +172,13 @@ struct timeval   sbttotv( int64_t );
               (Scheduler_EDF_Context *) scheduler->context ),
             (Scheduler_EDF_Node *) node );
 
-  // Inductive invariant: the ready context remains well-formed at every
-  // EDF API boundary.
+  // Well formedness
   ensures edf_ready_context_well_formed{Post}(
     (Scheduler_EDF_Context *) scheduler->context );
   ensures edf_ready_context_cache_consistent{Post}(
     (Scheduler_EDF_Context *) scheduler->context );
 
-  // P3 at exit: new heir is the earliest-ready thread (if preemptible),
-  // dispatch is set if heir differs from executing.
+  // P3 at exit
   ensures edf_scheduler_decision{Post}(
     (Scheduler_EDF_Context *) scheduler->context,
     _Per_CPU_Information[ 0 ].per_cpu.executing,

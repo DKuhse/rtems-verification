@@ -1506,9 +1506,9 @@ void _Thread_Priority_replace(
  */
 #if !defined(RTEMS_SMP)
 /*@
+  // ===== CORE LOGIC =====
   requires \valid( queue_context );
   requires queue_context->Priority.update_count <= 1;
-
   requires \valid_read( _Scheduler_Table + ( 0 .. 0 ) );
   requires _Scheduler_Table[ 0 ].Operations.update_priority ==
     _Scheduler_EDF_Update_priority;
@@ -1526,7 +1526,6 @@ void _Thread_Priority_replace(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
     _Thread_Heir,
     _Thread_Heir->is_preemptible );
-
   requires queue_context->Priority.update_count == 1 ==>
     thread_priority_edf_node_valid{Pre}(
       queue_context->Priority.update[ 0 ] );
@@ -1549,6 +1548,8 @@ void _Thread_Priority_replace(
       ) ==
         queue_context->Priority.update[ 0 ]->Scheduler.nodes->
           Wait.Priority.Node.priority;
+
+  // ===== SEPARATION =====
   requires queue_context->Priority.update_count == 1 ==>
     thread_priority_edf_update_separated{Pre}(
       (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context,
@@ -1567,21 +1568,11 @@ void _Thread_Priority_replace(
     (Per_CPU_Control_envelope *) _Per_CPU_Information + (..),
     (Scheduler_Control const *) _Scheduler_Table + (..)
   );
+
   terminates \true;
   exits \false;
 
-  ensures \forall Priority_Node *node;
-    \valid_read( node ) &&
-    ( queue_context->Priority.update_count == 1 ==>
-      \separated(
-        &node->priority,
-        &((Scheduler_EDF_Node *)
-          \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes,
-               Pre ))->priority
-      ) ) ==>
-      node->priority == \at( node->priority, Pre );
-  ensures queue_context->Priority.update_count ==
-    \at( queue_context->Priority.update_count, Pre );
+  // ===== CORE LOGIC =====
   ensures queue_context->Priority.update_count <= 1;
   ensures queue_context->Priority.update_count == 1 &&
     \at(
@@ -1599,15 +1590,6 @@ void _Thread_Priority_replace(
     ) ==>
       priority_aggregation_cached_minimum{Post}(
         &queue_context->Priority.update[ 0 ]->Scheduler.nodes->Wait.Priority );
-  ensures queue_context->Priority.update_count == 1 ==>
-    priority_contributors{Post}(
-      &queue_context->Priority.update[ 0 ]->Scheduler.nodes->Wait.Priority ) ==
-    priority_contributors{Pre}(
-      &queue_context->Priority.update[ 0 ]->Scheduler.nodes->Wait.Priority );
-  ensures queue_context->Priority.update_count == 0 ==>
-    ( \forall Priority_Aggregation *aggregation;
-        priority_contributors{Post}( aggregation ) ==
-          priority_contributors{Pre}( aggregation ) );
   ensures queue_context->Priority.update_count == 0 ==>
     ( \forall Priority_Aggregation *aggregation;
         \at( priority_aggregation_well_formed( aggregation ), Pre ) ==>
@@ -1621,6 +1603,29 @@ void _Thread_Priority_replace(
         \valid_read( node ) &&
         \at( edf_ready_node_cache_consistent( node ), Pre ) ==>
           edf_ready_node_cache_consistent{Post}( node ) );
+
+  // ===== PRESERVATION =====
+  ensures \forall Priority_Node *node;
+    \valid_read( node ) &&
+    ( queue_context->Priority.update_count == 1 ==>
+      \separated(
+        &node->priority,
+        &((Scheduler_EDF_Node *)
+          \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes,
+               Pre ))->priority
+      ) ) ==>
+      node->priority == \at( node->priority, Pre );
+  ensures queue_context->Priority.update_count ==
+    \at( queue_context->Priority.update_count, Pre );
+  ensures queue_context->Priority.update_count == 1 ==>
+    priority_contributors{Post}(
+      &queue_context->Priority.update[ 0 ]->Scheduler.nodes->Wait.Priority ) ==
+    priority_contributors{Pre}(
+      &queue_context->Priority.update[ 0 ]->Scheduler.nodes->Wait.Priority );
+  ensures queue_context->Priority.update_count == 0 ==>
+    ( \forall Priority_Aggregation *aggregation;
+        priority_contributors{Post}( aggregation ) ==
+          priority_contributors{Pre}( aggregation ) );
 
   behavior empty:
     assumes queue_context->Priority.update_count == 0;

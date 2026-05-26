@@ -28,7 +28,7 @@
         \forall Scheduler_EDF_Node *other;
           other \in nodes ==> edf_ready_node_not_after{L}( node, other );
 
-      // --- EDF Witness-explicit form -------------------------------------
+      // --- EDF Scheduler Witness-explicit form -------------------------------------
       // Used inside the EDF operation proofs (Unblock, Block, ...) where
       // the witness node is locally known. Avoids existential introduction
       // in the noisy contract context.
@@ -60,15 +60,10 @@
         !is_preemptible ||
         edf_thread_node_is_earliest_ready{L}( context, heir, node );
 
-      // --- EDF Existential form ------------------------------------------
+      // --- EDF scheduler Existential form ----------------------------------------
       // The "real" EDF property exposed to callers above the scheduler
       // abstraction: heir is non-preemptible or *some* node represents it
-      // as earliest-ready. `is_preemptible` is passed explicitly rather
-      // than dereferenced inside the predicate body -- Thread_Control has
-      // flexible-array members, which causes WP's typed_cast model to
-      // drop `\valid_read(heir)` hypotheses and encode the predicate
-      // application as an opaque zero-arity atom that interacts badly
-      // with the surrounding context.
+      // as earliest-ready. 
 
       predicate edf_thread_owns_earliest_ready_node{L}(
         set<Scheduler_EDF_Node *> nodes,
@@ -110,17 +105,17 @@
         boolean                is_preemptible,
         boolean                dispatch_necessary
       ) =
-        // (P3.a) scheduler picks argmin from ready queue
+        // scheduler picks argmin from ready queue
         edf_preemptible_heir_is_earliest_ready{L}(
           context, heir, is_preemptible ) &&
-        // (P3.b) heir != executing ==> context switch scheduled
+        // heir != executing ==> context switch scheduled
         edf_dispatch_set_if_heir_differs(
           executing, heir, dispatch_necessary );
 
       // --- Bridge ------------------------------------------------------
       // Existential introduction: a concrete witness satisfying the
       // witness-explicit form discharges the existential form. Proves
-      // cleanly in isolation; can then be automatically applied as a rewrite
+      // cleanly in isolation. Can then be applied as a rewrite
       // when the witness predicate appears alongside the existential.
 
       lemma edf_scheduler_node_earliest_implies_thread_earliest{L}:

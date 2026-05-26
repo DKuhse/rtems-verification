@@ -62,6 +62,7 @@ struct timeval   sbttotv( int64_t );
 
 /*@
   axiomatic SchedulerEDFPriorityPurifyFacts {
+  // very obvious bitwise logic that Frama-C can't discharge
     axiom scheduler_edf_priority_purify_group_order:
       \forall Priority_Control priority, Priority_Group_order group_order;
         priority_is_pure( priority ) &&
@@ -105,9 +106,17 @@ Priority_Control _Scheduler_EDF_Unmap_priority(
 }
 
 /*@
+  // ===== CORE LOGIC =====
   requires \valid_read( scheduler );
   requires deadline < SCHEDULER_EDF_PRIO_MSB;
   requires \valid( (Scheduler_EDF_Context *) scheduler->context );
+  requires \valid_read( &the_thread->Scheduler.nodes );
+  requires \valid( the_thread->Scheduler.nodes );
+  requires \valid( priority_node );
+  requires \valid( queue_context );
+  requires \valid_read(
+    &queue_context->Priority.update[ 0 ]->Scheduler.nodes );
+  requires queue_context->Priority.update_count == 0;
   requires edf_ready_context_well_formed{Pre}(
     (Scheduler_EDF_Context *) scheduler->context );
   requires thread_priority_edf_heir_valid{Pre}( _Thread_Heir );
@@ -115,21 +124,7 @@ Priority_Control _Scheduler_EDF_Unmap_priority(
     (Scheduler_EDF_Context *) scheduler->context,
     _Thread_Heir,
     _Thread_Heir->is_preemptible );
-  requires \valid_read( &the_thread->Scheduler.nodes );
-  requires \valid( priority_node );
-  requires \valid( queue_context );
-  requires \valid( the_thread->Scheduler.nodes );
   requires thread_priority_edf_node_valid{Pre}( the_thread );
-  requires queue_context->Priority.update_count == 0;
-  requires \valid_read(
-    &queue_context->Priority.update[ 0 ]->Scheduler.nodes );
-  requires \separated(
-    &queue_context->Priority.update[ 0 ]->Scheduler.nodes,
-    priority_node + (..),
-    queue_context + (..),
-    &the_thread->Scheduler.nodes->Wait.Priority,
-    &the_thread->Scheduler.nodes->Priority.value
-  );
   requires priority_is_pure(
     (Priority_Control) SCHEDULER_PRIORITY_MAP( deadline ) );
   requires the_thread->current_state == STATES_READY ==>
@@ -164,6 +159,15 @@ Priority_Control _Scheduler_EDF_Unmap_priority(
     the_thread,
     priority_node,
     queue_context );
+
+  // ===== SEPARATION =====
+  requires \separated(
+    &queue_context->Priority.update[ 0 ]->Scheduler.nodes,
+    priority_node + (..),
+    queue_context + (..),
+    &the_thread->Scheduler.nodes->Wait.Priority,
+    &the_thread->Scheduler.nodes->Priority.value
+  );
   requires \separated(
     &_Thread_Heir->is_preemptible,
     &_Thread_Heir->Scheduler.nodes,
@@ -224,17 +228,12 @@ Priority_Control _Scheduler_EDF_Unmap_priority(
           the_thread->Scheduler.nodes->Priority.value,
           queue_context->Priority;
 
+  // ===== CORE LOGIC =====
   ensures priority_node->priority == SCHEDULER_PRIORITY_MAP( deadline );
   ensures priority_aggregation_well_formed{Post}(
     &the_thread->Scheduler.nodes->Wait.Priority );
   ensures priority_aggregation_cached_minimum{Post}(
     &the_thread->Scheduler.nodes->Wait.Priority );
-  ensures ((Scheduler_EDF_Context *) scheduler->context)->Ready.rbh_root ==
-    \at( ((Scheduler_EDF_Context *) scheduler->context)->Ready.rbh_root, Pre );
-  ensures edf_ready_set{Post}(
-            (Scheduler_EDF_Context *) scheduler->context ) ==
-          edf_ready_set{Pre}(
-            (Scheduler_EDF_Context *) scheduler->context );
   ensures edf_ready_context_well_formed{Post}(
     (Scheduler_EDF_Context *) scheduler->context );
   ensures thread_priority_edf_heir_valid{Post}( _Thread_Heir );
@@ -242,22 +241,11 @@ Priority_Control _Scheduler_EDF_Unmap_priority(
     (Scheduler_EDF_Context *) scheduler->context,
     _Thread_Heir,
     _Thread_Heir->is_preemptible );
-  ensures _Thread_Heir == \at( _Thread_Heir, Pre );
-  ensures _Per_CPU_Information[ 0 ].per_cpu.heir ==
-    \at( _Per_CPU_Information[ 0 ].per_cpu.heir, Pre );
   ensures the_thread->Scheduler.nodes->Priority.value !=
             \at( the_thread->Scheduler.nodes->Priority.value, Pre ) ==>
           thread_priority_update_pending{Post}( queue_context, the_thread );
   ensures \at( queue_context->Priority.update_count, Pre ) == 0 ==>
           queue_context->Priority.update_count <= 1;
-  ensures \at( queue_context->Priority.update_count, Pre ) == 0 &&
-          queue_context->Priority.update_count == 0 ==>
-          queue_context->Priority.update[ 0 ] ==
-            \at( queue_context->Priority.update[ 0 ], Pre );
-  ensures \at( queue_context->Priority.update_count, Pre ) == 0 &&
-          queue_context->Priority.update_count == 0 ==>
-          queue_context->Priority.update[ 0 ]->Scheduler.nodes ==
-            \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes, Pre );
   ensures \at( queue_context->Priority.update_count, Pre ) == 0 &&
           queue_context->Priority.update_count == 1 ==>
           queue_context->Priority.update[ 0 ] == the_thread;
@@ -285,6 +273,25 @@ Priority_Control _Scheduler_EDF_Unmap_priority(
             (Scheduler_EDF_Node *) the_thread->Scheduler.nodes ), Pre ) ==>
           edf_ready_node_cache_consistent{Post}(
             (Scheduler_EDF_Node *) the_thread->Scheduler.nodes );
+
+  // ===== PRESERVATION =====
+  ensures ((Scheduler_EDF_Context *) scheduler->context)->Ready.rbh_root ==
+    \at( ((Scheduler_EDF_Context *) scheduler->context)->Ready.rbh_root, Pre );
+  ensures edf_ready_set{Post}(
+            (Scheduler_EDF_Context *) scheduler->context ) ==
+          edf_ready_set{Pre}(
+            (Scheduler_EDF_Context *) scheduler->context );
+  ensures _Thread_Heir == \at( _Thread_Heir, Pre );
+  ensures _Per_CPU_Information[ 0 ].per_cpu.heir ==
+    \at( _Per_CPU_Information[ 0 ].per_cpu.heir, Pre );
+  ensures \at( queue_context->Priority.update_count, Pre ) == 0 &&
+          queue_context->Priority.update_count == 0 ==>
+          queue_context->Priority.update[ 0 ] ==
+            \at( queue_context->Priority.update[ 0 ], Pre );
+  ensures \at( queue_context->Priority.update_count, Pre ) == 0 &&
+          queue_context->Priority.update_count == 0 ==>
+          queue_context->Priority.update[ 0 ]->Scheduler.nodes ==
+            \at( queue_context->Priority.update[ 0 ]->Scheduler.nodes, Pre );
 
   behavior active:
     assumes priority_node_active{Pre}( priority_node );
