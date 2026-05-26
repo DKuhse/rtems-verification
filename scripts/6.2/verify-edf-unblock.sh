@@ -23,7 +23,7 @@ set -e
 # internals (_Scheduler_EDF_Enqueue / _Extract / _Get_highest_ready) and
 # the uniprocessor helpers (verified by verify-scheduleruni-unblock.sh)
 # are intentionally absent.
-WP_FCTS="${WP_FCTS:-_Scheduler_EDF_Unblock,_Scheduler_EDF_Get_context,_Scheduler_EDF_Node_downcast,_Thread_Is_ready}"
+WP_FCTS="${WP_FCTS:-_Scheduler_EDF_Unblock,_Scheduler_EDF_Get_context,_Scheduler_EDF_Node_downcast,_Scheduler_Node_get_priority,_Thread_Get_priority,_Thread_Scheduler_get_home_node,_Priority_Get_priority,_Thread_Is_ready}"
 
 WP_FCT_DEFAULTS="${WP_FCT_DEFAULTS:--wp -wp-fct ${WP_FCTS} -wp-model Typed+Cast -wp-timeout 30}"
 WP_LEMMA_DEFAULTS="${WP_LEMMA_DEFAULTS:--wp -wp-prop=@lemma -wp-model Typed+Cast -wp-timeout 30}"

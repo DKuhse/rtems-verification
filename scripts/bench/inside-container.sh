@@ -301,6 +301,7 @@ run_one "h_edf_get_context"           /opt/scripts/6.2/verify-edf-block.sh      
 run_one "h_edf_node_downcast"         /opt/scripts/6.2/verify-edf-block.sh           "_Scheduler_EDF_Node_downcast"
 run_one "h_edf_map_priority"          /opt/scripts/6.2/verify-edf-release-cancel.sh  "_Scheduler_EDF_Map_priority"
 run_one "h_edf_unmap_priority"        /opt/scripts/6.2/verify-edf-release-cancel.sh  "_Scheduler_EDF_Unmap_priority"
+run_one "h_thread_get_priority"       /opt/scripts/6.2/verify-edf-unblock.sh         "_Thread_Get_priority"
 run_one "h_scheduler_get_context"     /opt/scripts/6.2/verify-edf-initialize.sh      "_Scheduler_Get_context"
 run_one "h_rbtree_init_empty"         /opt/scripts/6.2/verify-edf-initialize.sh      "_RBTree_Initialize_empty"
 run_one "h_node_do_initialize"        /opt/scripts/6.2/verify-edf-node-initialize.sh "_Scheduler_Node_do_initialize"

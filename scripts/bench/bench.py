@@ -104,6 +104,7 @@ TARGETS: List[Target] = [
     _62("h_edf_node_downcast",       "verify-edf-block.sh",              "_Scheduler_EDF_Node_downcast"),
     _62("h_edf_map_priority",        "verify-edf-release-cancel.sh",     "_Scheduler_EDF_Map_priority"),
     _62("h_edf_unmap_priority",      "verify-edf-release-cancel.sh",     "_Scheduler_EDF_Unmap_priority"),
+    _62("h_thread_get_priority",     "verify-edf-unblock.sh",            "_Thread_Get_priority"),
     _62("h_scheduler_get_context",   "verify-edf-initialize.sh",         "_Scheduler_Get_context"),
     _62("h_rbtree_init_empty",       "verify-edf-initialize.sh",         "_RBTree_Initialize_empty"),
     _62("h_node_do_initialize",      "verify-edf-node-initialize.sh",    "_Scheduler_Node_do_initialize"),
@@ -209,7 +210,7 @@ EDF_HELPERS_62 = [
     "h_edf_map_priority", "h_edf_unmap_priority",
     "h_scheduler_get_context", "h_rbtree_init_empty",
     "h_node_do_initialize", "h_rbtree_init_node",
-    "h_thread_is_ready",
+    "h_thread_is_ready", "h_thread_get_priority",
     "h_uni_update_heir", "h_uni_update_heir_if_necessary",
     "h_uni_update_heir_if_preemptible",
 ]
@@ -233,13 +234,13 @@ RTEMS_62_GROUPS = [
     (r"Unblock",                 ["edf_unblock", "scheduleruni_unblock"]),
     (r"Update\_priority",        ["edf_update_priority", "scheduler_update_priority"]),
     (r"Release\_job",            ["edf_release_job", "scheduler_release_job"]),
-    (r"Cancel\_job",             ["edf_cancel_job"]),
+    (r"Cancel\_job",             ["edf_cancel_job", "scheduler_cancel_job"]),
     (r"Thread\_Priority\_\{*\}", ["thread_priority_add",
                                   "thread_priority_changed",
                                   "thread_priority_remove"]),
     (r"RM\_Release\_job",        ["ratemon_release_job"]),
     (r"RM\_Cancel",              ["ratemon_cancel"]),
-    (r"Scheduler helpers",       EDF_HELPERS_62),
+    (r"Schedule helpers",       EDF_HELPERS_62),
     (r"Priority helpers",        PRIORITY_HELPERS_62),
 ]
 
@@ -279,9 +280,22 @@ RTEMS_51_GROUPS = [
                                   "51_thread_priority_remove"]),
     (r"RM\_Release\_job",        ["51_ratemon_release_job"]),
     (r"RM\_Cancel",              ["51_ratemon_cancel"]),
-    (r"Scheduler helpers",       EDF_HELPERS_51),
+    (r"Schedule helpers",       EDF_HELPERS_51),
     (r"Priority helpers",        PRIORITY_HELPERS_51),
 ]
+
+
+def _zip_groups(groups_a, groups_b):
+    """Pair RTEMS_51_GROUPS with RTEMS_62_GROUPS by display label, in
+    `groups_b`'s order. Result: [(display, labels_a, labels_b), ...]."""
+    by_disp_a = {disp: labels for disp, labels in groups_a}
+    return [(disp, by_disp_a.get(disp, []), labels_b)
+            for disp, labels_b in groups_b]
+
+
+# Combined RTEMS 5 + 6 view; each cell renders as "5/6".
+RTEMS_DUAL_GROUPS = _zip_groups(RTEMS_51_GROUPS, RTEMS_62_GROUPS)
+
 
 # `xTaskDelayUntilUnfixed` is measured (it stays in TARGETS for auditability
 # of the negative reference) but intentionally not surfaced in the table.
@@ -779,27 +793,89 @@ def render_one(caption: str, label: str, groups, data: dict) -> str:
     return "\n".join(lines)
 
 
+def render_dual(caption: str, label: str, dual_groups, data: dict) -> str:
+    """Combined-system table: each numeric cell shows 'a/b' (e.g. 5.1/6.2).
+    `dual_groups` is a list of (display, labels_a, labels_b) tuples.
+    """
+    missing: set = set()
+    lines: List[str] = []
+    lines.append(r"\begin{table}[tp]")
+    lines.append(r"    \small")
+    lines.append(r"    \centering")
+    lines.append(f"    \\caption{{{caption}}}")
+    lines.append(f"    \\label{{{label}}}")
+    lines.append(TABULAR_PREAMBLE)
+    lines.append(r"    & \multicolumn{2}{c}{\textbf{Proof Goals}} & \multirow{2}{*}{\textbf{Time}}\\ \cmidrule{2-3}")
+    lines.append(r"    & Qed & Alt-Ergo & \\ \hline \hline")
+    tqa = tqb = taa = tab = 0
+    tta = ttb = 0.0
+    for display, labels_a, labels_b in dual_groups:
+        qa, aa, _, ea = fold(labels_a, data, missing_sink=missing)
+        qb, ab, _, eb = fold(labels_b, data, missing_sink=missing)
+        tqa += qa; tqb += qb
+        taa += aa; tab += ab
+        tta += ea; ttb += eb
+        lines.append(
+            f"    \\texttt{{{display}}} & {qa}/{qb} & {aa}/{ab} & "
+            f"{{$\\approx {ea:.1f}/{eb:.1f}\\,s$}} \\\\")
+    lines.append(r"    \midrule")
+    lines.append(
+        f"    \\textbf{{Total}} & \\textbf{{{tqa}/{tqb}}} & "
+        f"\\textbf{{{taa}/{tab}}} & "
+        f"{{$\\approx {tta:.1f}/{ttb:.1f}\\,s$}} \\\\")
+    lines.append(r"\end{tabular}")
+    lines.append(r"\end{table}")
+    if missing:
+        lines.insert(0, f"% WARNING: missing RESULT labels in source CSV: {sorted(missing)}")
+    return "\n".join(lines)
+
+
+def _render(caption: str, label: str, groups, data: dict) -> str:
+    """Dispatch to render_one (2-tuples) or render_dual (3-tuples) based
+    on the shape of `groups`."""
+    if groups and len(groups[0]) == 3:
+        return render_dual(caption, label, groups, data)
+    return render_one(caption, label, groups, data)
+
+
 def cmd_render(args) -> int:
-    par = load_results(pathlib.Path(args.parallel))
-    ser = load_results(pathlib.Path(args.serial))
+    # Path resolution:
+    #   neither flag given → default to BOTH canonical files (convenience)
+    #   only --parallel given → load parallel only (skip serial entirely)
+    #   only --serial   given → load serial only (skip parallel entirely)
+    #   both given → load both
+    # This stops `render --parallel X` from picking up a stale canonical
+    # results-serial.txt left over from an earlier run.
+    bench_dir = pathlib.Path(__file__).resolve().parent
+    canon_par = bench_dir / "results" / "results-parallel.txt"
+    canon_ser = bench_dir / "results" / "results-serial.txt"
+    if args.parallel is None and args.serial is None:
+        par_path, ser_path = canon_par, canon_ser
+    else:
+        par_path = pathlib.Path(args.parallel) if args.parallel else None
+        ser_path = pathlib.Path(args.serial)   if args.serial   else None
+
+    par = load_results(par_path) if par_path is not None else {}
+    ser = load_results(ser_path) if ser_path is not None else {}
     sections = [
-        ("Derived proof goals and required time of RTEMS 6 verification.",
-            "tab:rtems6-stats", RTEMS_62_GROUPS, par),
-        ("Derived proof goals and required time of RTEMS 6 verification (sequential).",
-            "tab:rtems6-stats-seq", RTEMS_62_GROUPS, ser),
-        ("Derived proof goals and required time of RTEMS 5 verification.",
-            "tab:rtems5-stats", RTEMS_51_GROUPS, par),
-        ("Derived proof goals and required time of RTEMS 5 verification (sequential).",
-            "tab:rtems5-stats-seq", RTEMS_51_GROUPS, ser),
+        ("Derived proof goals and required time of RTEMS verification "
+         "(each cell: \\emph{RTEMS 5 / RTEMS 6}).",
+            "tab:rtems-stats", RTEMS_DUAL_GROUPS, par),
+        ("Derived proof goals and required time of RTEMS verification "
+         "(each cell: \\emph{RTEMS 5 / RTEMS 6}, sequential).",
+            "tab:rtems-stats-seq", RTEMS_DUAL_GROUPS, ser),
         ("Derived proof goals and required time of FreeRTOS verification.",
             "tab:freertos-stats", FREERTOS_GROUPS, par),
-        ("Derived proof goals and required time of FreeRTOS verification (sequential).",
+        ("Derived proof goals and required time of FreeRTOS verification "
+         "(sequential).",
             "tab:freertos-stats-seq", FREERTOS_GROUPS, ser),
     ]
+    # Only render tables for passes that have data.
+    sections = [s for s in sections if s[3]]
     for i, (caption, label, groups, data) in enumerate(sections):
         if i:
             print()
-        print(render_one(caption, label, groups, data))
+        print(_render(caption, label, groups, data))
     return 0
 
 
@@ -909,10 +985,22 @@ def cmd_run(args) -> int:
             return 2
 
     print("[bench] === LaTeX ===", file=sys.stderr, flush=True)
-    return cmd_render(argparse.Namespace(
-        parallel=str(results_dir / "results-parallel.txt"),
-        serial=str(results_dir / "results-serial.txt"),
-    ))
+    # Only feed render the file(s) for the pass(es) we actually ran (or
+    # both, for --render-only). cmd_render's "only what you ask for"
+    # semantics means we don't pick up stale data from the other side.
+    if render_only or pass_choice == "both":
+        render_args = argparse.Namespace(
+            parallel=str(results_dir / "results-parallel.txt"),
+            serial=str(results_dir / "results-serial.txt"))
+    elif pass_choice == "parallel":
+        render_args = argparse.Namespace(
+            parallel=str(results_dir / "results-parallel.txt"),
+            serial=None)
+    else:  # "serial"
+        render_args = argparse.Namespace(
+            parallel=None,
+            serial=str(results_dir / "results-serial.txt"))
+    return cmd_render(render_args)
 
 
 # ─── CLI ────────────────────────────────────────────────────────────────────────
@@ -960,13 +1048,20 @@ def main() -> int:
                       help="skip targets already in $LOG_DIR/results.txt")
     p_in.set_defaults(func=cmd_inside_run)
 
-    p_r = sub.add_parser("render",
-                         help="re-render previously gathered results")
-    bench_dir = pathlib.Path(__file__).resolve().parent
-    p_r.add_argument("--parallel",
-                     default=str(bench_dir / "results" / "results-parallel.txt"))
-    p_r.add_argument("--serial",
-                     default=str(bench_dir / "results" / "results-serial.txt"))
+    p_r = sub.add_parser(
+        "render",
+        help="re-render previously gathered results",
+        description=("With no path flags, loads both canonical files "
+                     "(results-{parallel,serial}.txt) and skips tables for "
+                     "passes whose file is empty. Passing one flag only "
+                     "loads that pass — useful for re-rendering after a "
+                     "single-pass run without picking up stale data."))
+    p_r.add_argument("--parallel", default=None, metavar="FILE",
+                     help="parallel-pass results file (default: canonical "
+                          "path; pass to render only the parallel side)")
+    p_r.add_argument("--serial", default=None, metavar="FILE",
+                     help="serial-pass results file (default: canonical "
+                          "path; pass to render only the serial side)")
     p_r.set_defaults(func=cmd_render)
 
     args = ap.parse_args()
