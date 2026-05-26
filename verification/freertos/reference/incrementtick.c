@@ -121,8 +121,7 @@ static void prvResetNextTaskUnblockTime(void);
                                 pxDelayedTaskList_ghost,
                                 pxOverflowDelayedTaskList_ghost);
 
-  // Termination of the delayed-list drain depends on list-count semantics.
-  // This reset proves tick arithmetic only; termination is a later ADT proof.
+  // Termination of the delayed-list drain is out of scope
   terminates \false;
 
   ensures SchedulerListContext(&xReadyTasksList,

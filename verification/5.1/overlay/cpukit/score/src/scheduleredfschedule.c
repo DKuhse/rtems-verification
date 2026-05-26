@@ -39,6 +39,7 @@ struct timeval   sbttotv( int64_t );
 #include <rtems/score/scheduleredfimpl.h>
 
 /*@
+  // LOGIC
   requires \valid_read( scheduler );
   requires \valid( (Scheduler_EDF_Context *) scheduler->context );
   requires edf_ready_context_well_formed{Pre}(
@@ -66,13 +67,13 @@ struct timeval   sbttotv( int64_t );
           _Per_CPU_Information[ 0 ].per_cpu.heir->cpu_time_used,
           _Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp;
 
-  ensures \at( _Thread_Heir, Pre ) == _Thread_Heir ||
-          ( \exists Scheduler_EDF_Node *node;
-              edf_ready_earliest_node{Pre}(
-                edf_ready_set{Pre}(
-                  (Scheduler_EDF_Context *) scheduler->context ),
-                node ) &&
-              _Thread_Heir == node->Base.owner );
+  ensures edf_scheduler_decision{Post}(
+    (Scheduler_EDF_Context *) scheduler->context,
+    _Per_CPU_Information[ 0 ].per_cpu.executing,
+    _Thread_Heir,
+    _Thread_Heir->is_preemptible,
+    _Thread_Dispatch_necessary_ghost );
+
   ensures edf_ready_context_well_formed{Post}(
     (Scheduler_EDF_Context *) scheduler->context );
 */

@@ -1,25 +1,5 @@
-/*
- * Shared FreeRTOS reference-overlay scaffolding.
- *
- * Storage declarations, ghost mirrors, and Frama-C Volatile-plugin
- * read/write contracts for the kernel globals consumed by the
- * `verification/freertos/reference/*.c` extractions.  Lifted out of the
- * per-file boilerplate so the wrappers stay in lockstep across
- * suspend / resume / delay / increment-tick / task-switch-context.
- *
- * Prerequisites in the includer (before #include):
- *   - list.h's `List_t` / `ListItem_t` / `TickType_t` /
- *     `UBaseType_t` / `BaseType_t` already available via FreeRTOS.h.
- *
- * Provides:
- *   - `struct tskTaskControlBlock`, `TCB_t`, `TaskHandle_t` (the minimal
- *     verification-only TCB layout shared by all reference overlays).
- *   - Non-volatile list storage, volatile mirrors, ghost mirrors,
- *     read/write contracts, and Volatile-plugin directives.
- *
- * Must be included BEFORE scheduler_model.h (which depends on
- * `struct tskTaskControlBlock`).
- */
+// Instrumentation for volatile variables
+
 
 #ifndef VERIFICATION_FREERTOS_MODEL_VOLATILE_INSTRUMENTATION_H
 #define VERIFICATION_FREERTOS_MODEL_VOLATILE_INSTRUMENTATION_H

@@ -16,6 +16,8 @@
 #endif
 
 /*@
+  // predicates specifying what a well formed task/ready/delay queue looks like
+
   predicate TaskItem{L}(ListItem_t *item) =
     \valid(item) &&
     item->pvOwner != \null &&
@@ -33,6 +35,7 @@
     \forall ListItem_t *item;
       \valid(item) && In(item, list) ==> TaskItem(item);
 
+  // Deadline priorities (P1)
   predicate ReadyItemDeadlineMatches{L}(ListItem_t *item) =
     TaskItem(item) &&
     item->xItemValue ==
@@ -63,6 +66,7 @@
   predicate SuspendedList{L}(List_t *suspended) =
     UnorderedTaskList(suspended);
 
+  // event list items shouldn't point to task lists
   predicate TaskEventListLinkValid{L}(struct tskTaskControlBlock *task,
                                       List_t *readyList,
                                       List_t *delayedList,
@@ -103,6 +107,8 @@
     DelayedTasksHaveValidEventListLinks(delayed, ready, overflowDelayed) &&
     DelayedTasksHaveValidEventListLinks(overflowDelayed, ready, delayed);
 
+  // All items have their deadline priority, except for one
+  // (used in delay, where P1 is temporarily violated)
   predicate SchedulerListContextIgnoringReadyItemDeadline{L}(
                                     List_t *ready,
                                     List_t *delayed,
@@ -148,15 +154,16 @@
       \valid(item) && In(item, list) ==>
         bound <= item->xItemValue;
 
-  // EDFProperty is intentionally stated over ready-list item values.
-  // ReadyListDeadlineMatches is the separate invariant that ties those
-  // values back to each task owner's xDeadline.
+  // EDF selection (P3)
   predicate EDFProperty{L}(List_t *ready,
                            struct tskTaskControlBlock *running) =
     \valid(running) &&
     In(&running->xStateListItem, ready) &&
     ListValueLowerBound(ready, running->xDeadline);
 
+  // Preservation related stuff
+
+  // list insert doesn't touch item values
   predicate ListValueFrame{Before,After}(List_t *list) =
     (\forall ListItem_t *item;
       \valid{After}(item) ==> \valid{Before}(item)) &&
@@ -228,6 +235,8 @@
             ((struct tskTaskControlBlock *)pxListItem->pvOwner)->xDeadline ==>
             ReadyItemDeadlineMatches(pxListItem);
 
+  // EXPLICIT PRESERVATION PROPERTIES
+
   // pxListItem is detached, so no list's membership, count, or contents
   // change — every list-level fact is uniformly framed.
   ensures ListPredicatesPreserved{Pre,Here};
@@ -281,6 +290,9 @@ void vSchedulerListItemSetValue_abs(ListItem_t * const pxListItem,
     (UBaseType_t)(\old(pxList->uxNumberOfItems) + 1U);
   ensures pxNewListItem->xItemValue == \old(pxNewListItem->xItemValue);
   ensures pxNewListItem->pvOwner == \old(pxNewListItem->pvOwner);
+
+
+  // PRESERVATION PROPERTIES
 
   ensures \forall ListItem_t *item;
     \valid{Pre}(item) && item != pxNewListItem ==>
@@ -388,6 +400,8 @@ void vSchedulerListInsert_abs(List_t * const pxList,
   ensures pxNewListItem->xItemValue == \old(pxNewListItem->xItemValue);
   ensures pxNewListItem->pvOwner == \old(pxNewListItem->pvOwner);
 
+  // PRESERVATION PROPERTIES
+
   ensures \forall ListItem_t *item;
     \valid{Pre}(item) && item != pxNewListItem ==>
       (In(item, pxList) <==> In{Pre}(item, pxList));
@@ -477,11 +491,7 @@ void vSchedulerListInsertEnd_abs(List_t * const pxList,
     ListValueLowerBound{Pre}(list, bound) ==>
       ListValueLowerBound(list, bound);
 
-  // Item-removal is monotone: the modified list only shrinks and the
-  // removed item becomes Detached, so every list-level predicate that
-  // held before still holds. No conflation here — the universals over
-  // arbitrary lists in ListPredicatesPreserved are stating uniform
-  // preservation, not a modified-list obligation in disguise.
+  // Item removal doesn't destroy any properties
   ensures ListPredicatesPreserved{Pre,Here};
   ensures \forall List_t *delayed, *overflowDelayed;
     SchedulerListContextIgnoringReadyItemDeadline{Pre}(
@@ -492,6 +502,8 @@ void vSchedulerListInsertEnd_abs(List_t * const pxList,
         SchedulerListContext(\at(pxItemToRemove->pxContainer, Pre),
                              delayed,
                              overflowDelayed);
+  
+  // PRESERVATION PROPERTIES
 
   ensures \forall List_t *list;
     ReadyList{Pre}(list) &&

@@ -42,6 +42,7 @@ struct timeval   sbttotv( int64_t );
 #include <rtems/score/thread.h>
 
 /*@
+  // LOGIC
   requires \valid_read( scheduler );
   requires \valid( the_thread );
   requires \valid( node );
@@ -61,16 +62,8 @@ struct timeval   sbttotv( int64_t );
   requires SCHEDULER_PRIORITY_PURIFY( node->Priority.value ) ==
     ((Scheduler_EDF_Node *) node)->Base.Wait.Priority.Node.priority;
 
-  // Carve-out vs 6.2: 5.1's body has a pseudo-ISR force-dispatch escape
-  // hatch (`_Scheduler_Update_heir(the_thread, priority == PSEUDO_ISR)`)
-  // that 6.2 does not. When a non-preemptible heir is force-dispatched to a
-  // pseudo-ISR-priority the_thread, the_thread is not generally earliest in
-  // the ready set (deadline threads with smaller priority values may be
-  // present), so P3.a cannot hold for a preemptible pseudo-ISR new heir.
-  // We exclude this branch via precondition; the contract then matches 6.2.
-  // RTEMS callers (MPCI receive server, timer server, ratemon) honor this
-  // naturally: ratemon tasks have deadline priorities; system pseudo-ISR
-  // tasks are configured non-preemptible by convention.
+  // pseudo-ISR nodes break EDF, so we exclude them
+  // (RM release/cancel never use these)
   requires SCHEDULER_PRIORITY_PURIFY( node->Priority.value ) !=
     ( SCHEDULER_EDF_PRIO_MSB | PRIORITY_PSEUDO_ISR );
 
@@ -94,9 +87,7 @@ struct timeval   sbttotv( int64_t );
   requires \valid(
     &_Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp );
 
-  // P3 assumed at entry: heir is non-preemptible or owns the earliest-ready
-  // scheduler node, and dispatch is set if heir differs from executing.
-  // Proven again at exit (post-call heir).
+  // P3 assumed at entry
   requires edf_scheduler_decision{Pre}(
     (Scheduler_EDF_Context *) scheduler->context,
     _Per_CPU_Information[ 0 ].per_cpu.executing,
@@ -116,6 +107,7 @@ struct timeval   sbttotv( int64_t );
   requires ((Scheduler_EDF_Node *) _Thread_Heir->Scheduler.nodes)->priority ==
     _Thread_Heir->Scheduler.nodes->Wait.Priority.Node.priority;
 
+  // SEPARATION
 
   requires \separated(
     _Thread_Heir->Scheduler.nodes,
@@ -142,10 +134,6 @@ struct timeval   sbttotv( int64_t );
     scheduler + (..),
     (Per_CPU_Control_envelope *) _Per_CPU_Information + (..)
   );
-  // _Thread_Heir points to a Thread_Control that is not inside Per_CPU
-  // and is not the scheduler context. Needed so WP can derive that
-  // _Thread_Heir->Scheduler.nodes is preserved across Enqueue's
-  // `assigns context->Ready`.
   requires \separated(
     _Thread_Heir + (..),
     (Per_CPU_Control_envelope *) _Per_CPU_Information + (..),
@@ -163,6 +151,8 @@ struct timeval   sbttotv( int64_t );
           _Per_CPU_Information[ 0 ].per_cpu.heir->cpu_time_used,
           _Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp;
 
+  // LOGIC
+
   ensures ((Scheduler_EDF_Node *) node)->priority ==
     SCHEDULER_PRIORITY_PURIFY( \at( node->Priority.value, Pre ) );
 
@@ -174,15 +164,13 @@ struct timeval   sbttotv( int64_t );
               (Scheduler_EDF_Context *) scheduler->context ),
             (Scheduler_EDF_Node *) node );
 
-  // Inductive invariant: the ready context remains well-formed at every
-  // EDF API boundary.
+  // context remains well formed
   ensures edf_ready_context_well_formed{Post}(
     (Scheduler_EDF_Context *) scheduler->context );
   ensures edf_ready_context_cache_consistent{Post}(
     (Scheduler_EDF_Context *) scheduler->context );
 
-  // P3 at exit: new heir is the earliest-ready thread (if preemptible),
-  // dispatch is set if heir differs from executing.
+  // edf
   ensures edf_scheduler_decision{Post}(
     (Scheduler_EDF_Context *) scheduler->context,
     _Per_CPU_Information[ 0 ].per_cpu.executing,
@@ -261,19 +249,6 @@ void _Scheduler_EDF_Unblock(
       the_node
     ); */
 
-  /*
-   *  If the thread that was unblocked is more important than the heir,
-   *  then we have a new heir.  This may or may not result in a
-   *  context switch.
-   *
-   *  Normal case:
-   *    If the current thread is preemptible, then we need to do
-   *    a context switch.
-   *  Pseudo-ISR case:
-   *    Even if the thread isn't preemptible, if the new heir is
-   *    a pseudo-ISR system task, we need to do a context switch.
-   *    (Carved out by precondition; see contract.)
-   */
   if ( priority < _Thread_Get_priority( _Thread_Heir ) ) {
     _Scheduler_Update_heir(
       the_thread,
@@ -281,9 +256,6 @@ void _Scheduler_EDF_Unblock(
     );
   }
 
-  // P3.b: the if-true branch inherits it from _Scheduler_Update_heir's
-  // top-level ensures; the if-false branch carries it from P3.b{Pre}
-  // unchanged. Inline assertion so Alt-Ergo handles the case-split.
   /*@ assert
     _Per_CPU_Information[ 0 ].per_cpu.executing == _Thread_Heir ||
     _Thread_Dispatch_necessary_ghost; */

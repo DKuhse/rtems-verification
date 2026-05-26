@@ -19,6 +19,13 @@
 
 /*@
   axiomatic Scheduler_List_Model {
+    // we use a traversal based list membership for FreeRTOS.
+    // axiomatic logic functions like in RTEMS mapping to a set are nicer
+    // however the manual set accesses break them, because Frama-C
+    // for some reason doesn't generate frame conditions, i.e.
+    // even if lists don't overlap, properties are not preserverd
+    // across them
+
     inductive TraversesFrom{L}(ListItem_t *item,
                                ListItem_t *cursor,
                                List_t *list) {
@@ -44,8 +51,12 @@
       list->uxNumberOfItems > (UBaseType_t)0 &&
       TraversesFrom(item, list->xListEnd.pxNext, list);
 
+    // Reasoning directly over pxContainer is easier,
+    // so we use that as a membership predicate and tie it to the traversal predicate with an invariant.
     predicate In{L}(ListItem_t *item, List_t *list) =
       \valid{L}(item) && item->pxContainer == list;
+
+    // Stuff about lists being well formed
 
     predicate ListMembershipConsistent{L}(List_t *list) =
       \valid(list) &&
@@ -120,6 +131,8 @@
       ListStorageSeparated(list) &&
       ListMembershipCountPositive(list);
 
+    // Useful properties about lists
+
     predicate Detached{L}(ListItem_t *item) =
       \valid(item) && item->pxContainer == \null;
 
@@ -143,7 +156,9 @@
 
 /* Mutating list wrappers are intentionally specified in scheduler_model.h.
  * They preserve scheduler-level predicates directly instead of forcing the
- * tick proof to rebuild those predicates from item-field frame facts. */
+ * tick proof to rebuild those predicates from item-field frame facts. 
+ * Here we only specify the non-mutating list queries which are generic.
+ */
 
 /*@
   requires ListInv(pxList);
