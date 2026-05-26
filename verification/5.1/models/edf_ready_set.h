@@ -11,10 +11,8 @@
       // edf_ready_set is opaque w.r.t. RBTree node-field internals.  The root
       // pointer selects the abstract set, and the root node is the explicit
       // read frame of the root-level model.  The set "changes" only through
-      // the ensures of operations (Enqueue/Extract); full RBTree traversal
+      // the ensures of operations (Enqueue/Extract). Full RBTree traversal
       // and node-link bookkeeping stay below the abstraction boundary.
-      // This is a 'soft' lie - a true assigns would need an traversal model
-      // but we don't touch the RBTree internals, so this is not an issue.
 
       logic set<Scheduler_EDF_Node *> edf_ready_set_from_root(
         RBTree_Node *root
@@ -50,9 +48,7 @@
           m1 \in nodes && m2 \in nodes &&
             m1->Base.owner == m2->Base.owner ==> m1 == m2;
 
-      // Owner-canonical ready node: the owner points back to this node as
-      // its home scheduler node. This is the node-side ownership bijection
-      // invariant used by the EDF proof.
+      // Ready node with a correct backlink
       predicate edf_ready_node_has_canonical_owner{L}(
         Scheduler_EDF_Node *node
       ) =
