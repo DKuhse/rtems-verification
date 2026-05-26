@@ -32,6 +32,10 @@ run_pass() {
 
     echo "[bench] === ${pass_name} pass (${wp_par_env:-default WP_PAR}) ===" >&2
 
+    # stdout (RESULT lines + verbose Frama-C log) → out_file
+    # stderr (progress bar lines)                  → err_file AND user terminal
+    # The process substitution keeps stderr live for the user while still
+    # capturing it on disk for postmortem.
     docker run --rm \
         -v "${REPO_ROOT}/rtems":/workspace/rtems \
         -v "${REPO_ROOT}/scripts":/opt/scripts \
@@ -40,9 +44,10 @@ run_pass() {
         -v "${BENCH_DIR}":/opt/bench \
         -v "${logs_subdir}":/tmp/wp-logs \
         -e "${wp_par_env}" \
+        -e "WP_TIMEOUT=${WP_TIMEOUT:-120}" \
         "${IMAGE}" \
         bash /opt/bench/inside-container.sh \
-        >"${out_file}" 2>"${err_file}"
+        >"${out_file}" 2> >(tee "${err_file}" >&2)
 
     grep '^RESULT' "${out_file}" > "${RESULTS_DIR}/results-${pass_name}.txt"
     echo "[bench] -> ${RESULTS_DIR}/results-${pass_name}.txt ($(wc -l < "${RESULTS_DIR}/results-${pass_name}.txt") rows)" >&2
