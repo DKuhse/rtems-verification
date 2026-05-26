@@ -114,6 +114,7 @@ static Thread_queue_Context _Rate_monotonic_Cancel_queue_context;
 #endif
 
 /*@
+  // LOGIC
   requires \valid( the_period );
   requires \valid( owner );
   requires \valid( lock_context );
@@ -222,6 +223,7 @@ static Thread_queue_Context _Rate_monotonic_Cancel_queue_context;
     &owner->Scheduler.nodes->Priority.value
   );
 
+  // SEPARATION
   requires \separated(
     (Scheduler_Control const *) _Scheduler_Table + (..),
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context + (..),
@@ -339,6 +341,8 @@ static Thread_queue_Context _Rate_monotonic_Cancel_queue_context;
               cpu_time_used,
           _Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp;
 
+  // LOGIC
+  
   ensures the_period->postponed_jobs == 0;
   ensures the_period->state == RATE_MONOTONIC_INACTIVE;
   ensures the_period->Priority.priority ==

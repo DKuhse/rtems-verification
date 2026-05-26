@@ -73,11 +73,9 @@ struct timeval   sbttotv( int64_t );
   requires edf_ready_context_cache_consistent{Pre}(
     (Scheduler_EDF_Context *) scheduler->context );
 
-  // the_thread's node is in the ready set: required for Extract.
   requires edf_ready_member{Pre}(
     (Scheduler_EDF_Context *) scheduler->context,
     (Scheduler_EDF_Node *) node );
-  // The node belongs to the_thread.
   requires ((Scheduler_EDF_Node *) node)->Base.owner == the_thread;
 
   requires \valid( _Thread_Heir );
@@ -98,8 +96,6 @@ struct timeval   sbttotv( int64_t );
     _Thread_Heir->is_preemptible,
     _Thread_Dispatch_necessary_ghost );
 
-  // In the heir branch, after extracting the_thread's node the ready set
-  // must still be non-empty so Get_highest_ready can pick a new heir.
   requires the_thread == _Thread_Heir ==>
     \exists Scheduler_EDF_Node *other;
       other != (Scheduler_EDF_Node *) node &&
@@ -110,8 +106,6 @@ struct timeval   sbttotv( int64_t );
     (Scheduler_EDF_Node *) node + (..),
     (Scheduler_EDF_Context *) scheduler->context + (..)
   );
-  // Heir's home node must be separate from the tree root so its
-  // `Base.owner` survives Extract's `assigns context->Ready` framing.
   requires \separated(
     (Scheduler_EDF_Node *) _Thread_Heir->Scheduler.nodes + (..),
     (Scheduler_EDF_Node *) node + (..),
@@ -160,8 +154,7 @@ struct timeval   sbttotv( int64_t );
     _Thread_Heir->is_preemptible,
     _Thread_Dispatch_necessary_ghost );
 
-  // Inductive invariant: the ready context remains well-formed at every
-  // EDF API boundary.
+  // the ready context remains well-formed
   ensures edf_ready_context_well_formed{Post}(
     (Scheduler_EDF_Context *) scheduler->context );
   ensures edf_ready_context_cache_consistent{Post}(
@@ -173,9 +166,6 @@ struct timeval   sbttotv( int64_t );
 
   behavior is_heir:
     assumes the_thread == \at( _Thread_Heir, Pre );
-    // _Thread_Heir is replaced with the owner of the post-state earliest
-    // ready node. The exact identity is captured by the global EDF-property
-    // post-condition above (witness-explicit form pinned in the body).
 
   complete behaviors;
   disjoint behaviors;
@@ -186,8 +176,6 @@ void _Scheduler_EDF_Block(
   Scheduler_Node          *node
 )
 {
-  // Recover the concrete home-node witness from the existential EDF
-  // property and the ready-set canonical-owner invariant.
   /*@ assert _Thread_Heir->is_preemptible ==>
         edf_thread_node_is_earliest_ready{Here}(
           (Scheduler_EDF_Context *) scheduler->context,
@@ -208,8 +196,6 @@ void _Scheduler_EDF_Block(
         _Thread_Heir,
         _Thread_Dispatch_necessary_ghost ); */
 
-  // Case A: not_heir, preemptible. Recover from canonical-owner invariant. 
-  // The extract preservation lemma gives that the heir's home node is still earliest in the post-state.
   /*@ assert the_thread != \at( _Thread_Heir, Pre ) &&
         _Thread_Heir->is_preemptible ==>
         edf_thread_node_is_earliest_ready{Here}(
@@ -218,9 +204,6 @@ void _Scheduler_EDF_Block(
           (Scheduler_EDF_Node *) _Thread_Heir->Scheduler.nodes
         ); */
 
-  // Case B: is_heir. _Thread_Heir is now highest_ready, the owner of the
-  // post-state earliest ready node. Get_highest_ready's contract gives the
-  // witness directly.
   /*@ assert the_thread == \at( _Thread_Heir, Pre ) ==>
         edf_thread_node_is_earliest_ready{Here}(
           (Scheduler_EDF_Context *) scheduler->context,

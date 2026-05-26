@@ -169,6 +169,7 @@ static void _Rate_monotonic_Release_postponed_job(
 }
 
 /*@
+  // LOGIC
   requires \valid( the_period );
   requires \valid( owner );
   requires \valid_read( lock_context );
@@ -266,6 +267,9 @@ static void _Rate_monotonic_Release_postponed_job(
   requires \valid_read(
     &_Rate_monotonic_Release_job_queue_context.Priority.update[ 0 ]->
       Scheduler.nodes );
+
+  // SEPARATION
+
   requires \separated(
     &_Rate_monotonic_Release_job_queue_context.Priority.update[ 0 ]->
       Scheduler.nodes,
@@ -388,6 +392,8 @@ static void _Rate_monotonic_Release_postponed_job(
             \at( _Per_CPU_Information[ 0 ].per_cpu.heir, Pre ))->
               cpu_time_used,
           _Per_CPU_Information[ 0 ].per_cpu.cpu_usage_timestamp;
+
+  // LOGIC
 
   ensures edf_ready_context_well_formed{Post}(
     (Scheduler_EDF_Context *) _Scheduler_Table[ 0 ].context );

@@ -1,29 +1,4 @@
 #!/usr/bin/env python3
-"""Per-function WP benchmark — Python port.
-
-This is the data-driven Python equivalent of the bash trio:
-    inside-container.sh + run-and-render.sh + render-table.py
-
-The bash version remains the documented reference and is functionally
-identical. Pick whichever you prefer; both write the same RESULT lines and
-the same LaTeX tables.
-
-Subcommands:
-    run         host-side: spin up docker per pass, parse, render
-    inside-run  container-side: iterate targets, drive frama-c
-    render      re-render previously gathered results files
-
-Compat:
-    PASS=parallel|serial|both         (same as the bash flag)
-    RENDER_ONLY=1                     (same as the bash flag)
-    IMAGE=<docker image>              (default rtems-edf-toolchain-fc32)
-    WP_PAR=<n>                        (set by `run`; honoured by `inside-run`)
-    WP_TIMEOUT=<s>                    per-goal prover timeout (default 120s,
-                                      generous on purpose for slow artifact
-                                      reviewer hardware; verify scripts use
-                                      30s for the dev workflow)
-    LOG_DIR=<dir>                     (override /tmp/wp-logs inside container)
-"""
 from __future__ import annotations
 
 import argparse
@@ -40,22 +15,13 @@ from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
 
-# ─── Target list ────────────────────────────────────────────────────────────────
-# Each target picks ONE function to attribute goals to. Drivers:
-#   "script"        – run WP_FCTS=<fct> <script> -wp-cache none. Scripts honour
-#                     WP_FCTS; per-script flags like -wp-split ride along in
-#                     the script's own WP_FCT_DEFAULTS untouched.
-#   "uni_helper"    – direct frama-c against the 6.2 scheduleruni-unblock
-#                     harness (verify-script hard-codes -wp-fct).
-#   "heir51_helper" – same idea for the 5.1 scheduler-update-heir harness.
-#   "freertos"      – direct frama-c against a freertos reference slice.
-
+# Target list
 @dataclass(frozen=True)
 class Target:
-    driver: str
+    driver: str # 'script', 'uni_helper', 'heir51_helper', 'freertos'
     label: str
     script: Optional[str] = None   # for driver="script"
-    fct: Optional[str] = None      # always — single WP function name
+    fct: Optional[str] = None      # single WP function name
     source: Optional[str] = None   # for driver="freertos" (path under verification/freertos/)
 
 
@@ -78,7 +44,7 @@ def _fr(label, source_rel, fct):
 
 
 TARGETS: List[Target] = [
-    # ─── RTEMS 6.2 top-level entry points ──────────────────────────────────────
+    # RTEMS 6.2 top-level entry points
     _62("edf_initialize",            "verify-edf-initialize.sh",          "_Scheduler_EDF_Initialize"),
     _62("edf_node_initialize",       "verify-edf-node-initialize.sh",     "_Scheduler_EDF_Node_initialize"),
     _62("edf_block",                 "verify-edf-block.sh",               "_Scheduler_EDF_Block"),
@@ -99,7 +65,7 @@ TARGETS: List[Target] = [
     _62("ratemon_release_job",       "verify-ratemon-release-job.sh",     "_Rate_monotonic_Release_job"),
     _62("ratemon_cancel",            "verify-ratemon-cancel.sh",          "_Rate_monotonic_Cancel"),
 
-    # ─── RTEMS 6.2 EDF scheduler helpers ───────────────────────────────────────
+    # RTEMS 6.2 EDF scheduler helpers
     _62("h_edf_get_context",         "verify-edf-block.sh",              "_Scheduler_EDF_Get_context"),
     _62("h_edf_node_downcast",       "verify-edf-block.sh",              "_Scheduler_EDF_Node_downcast"),
     _62("h_edf_map_priority",        "verify-edf-release-cancel.sh",     "_Scheduler_EDF_Map_priority"),
@@ -114,7 +80,7 @@ TARGETS: List[Target] = [
     _uni("h_uni_update_heir_if_necessary",   "_Scheduler_uniprocessor_Update_heir_if_necessary"),
     _uni("h_uni_update_heir_if_preemptible", "_Scheduler_uniprocessor_Update_heir_if_preemptible"),
 
-    # ─── RTEMS 6.2 priority helpers ────────────────────────────────────────────
+    # RTEMS 6.2 priority helpers
     _62("h_priority_actions_add",          "verify-thread-change-priority.sh", "_Priority_Actions_add"),
     _62("h_priority_non_empty_insert",     "verify-thread-change-priority.sh", "_Priority_Non_empty_insert"),
     _62("h_priority_extract_non_empty",    "verify-thread-change-priority.sh", "_Priority_Extract_non_empty"),
@@ -126,7 +92,7 @@ TARGETS: List[Target] = [
     _62("h_thread_priority_apply",         "verify-thread-change-priority.sh", "_Thread_Priority_apply"),
     _62("h_scheduler_node_set_priority",   "verify-thread-change-priority.sh", "_Scheduler_Node_set_priority"),
 
-    # ─── RTEMS 5.1 top-level entry points ──────────────────────────────────────
+    # RTEMS 5.1 top-level entry points
     _51("51_edf_initialize",            "verify-edf-initialize.sh",          "_Scheduler_EDF_Initialize"),
     _51("51_edf_node_initialize",       "verify-edf-node-initialize.sh",     "_Scheduler_EDF_Node_initialize"),
     _51("51_edf_block",                 "verify-edf-block.sh",               "_Scheduler_EDF_Block"),
@@ -147,7 +113,7 @@ TARGETS: List[Target] = [
     _51("51_ratemon_release_job",       "verify-ratemon-release-job.sh",       "_Rate_monotonic_Release_job"),
     _51("51_ratemon_cancel",            "verify-ratemon-cancel.sh",            "_Rate_monotonic_Cancel"),
 
-    # ─── RTEMS 5.1 EDF scheduler helpers ───────────────────────────────────────
+    # RTEMS 5.1 EDF scheduler helpers
     _51("51_h_edf_get_context",          "verify-edf-block.sh",            "_Scheduler_EDF_Get_context"),
     _51("51_h_edf_node_downcast",        "verify-edf-block.sh",            "_Scheduler_EDF_Node_downcast"),
     _51("51_h_edf_map_priority",         "verify-edf-map-unmap.sh",        "_Scheduler_EDF_Map_priority"),
@@ -165,7 +131,7 @@ TARGETS: List[Target] = [
     _51("51_h_priority_get_priority",    "verify-edf-unblock.sh",          "_Priority_Get_priority"),
     _heir51("51_h_thread_get_cpu",       "_Thread_Get_CPU"),
 
-    # ─── RTEMS 5.1 priority helpers ────────────────────────────────────────────
+    # RTEMS 5.1 priority helpers
     _51("51_h_priority_actions_add",          "verify-thread-change-priority.sh", "_Priority_Actions_add"),
     _51("51_h_priority_non_empty_insert",     "verify-thread-change-priority.sh", "_Priority_Non_empty_insert"),
     _51("51_h_priority_extract_non_empty",    "verify-thread-change-priority.sh", "_Priority_Extract_non_empty"),
@@ -177,7 +143,7 @@ TARGETS: List[Target] = [
     _51("51_h_thread_priority_apply",         "verify-thread-change-priority.sh", "_Thread_Priority_apply"),
     _51("51_h_scheduler_node_set_priority",   "verify-thread-change-priority.sh", "_Scheduler_Node_set_priority"),
 
-    # ─── FreeRTOS reference top-level entry points ────────────────────────────
+    # FreeRTOS reference top-level entry points
     _fr("vTaskSwitchContext",     "reference/taskswitchcontext.c", "vTaskSwitchContext"),
     _fr("vTaskSuspend",           "reference/suspend.c",           "vTaskSuspend"),
     _fr("vTaskResume",            "reference/resume.c",            "vTaskResume"),
@@ -185,7 +151,7 @@ TARGETS: List[Target] = [
     _fr("xTaskDelayUntilUnfixed", "reference/delay.c",             "xTaskDelayUntilUnfixed"),
     _fr("xTaskIncrementTick",     "reference/incrementtick.c",     "xTaskIncrementTick"),
 
-    # ─── FreeRTOS task helpers ────────────────────────────────────────────────
+    # FreeRTOS task helpers
     _fr("h_vPortYield",                     "reference/suspend.c", "vPortYield"),
     _fr("h_prvTaskIsTaskSuspended",         "reference/resume.c",  "prvTaskIsTaskSuspended"),
     _fr("h_prvAddCurrentTaskToDelayedList", "reference/delay.c",   "prvAddCurrentTaskToDelayedList"),
@@ -193,17 +159,8 @@ TARGETS: List[Target] = [
 ]
 
 
-# ─── Render groups ──────────────────────────────────────────────────────────────
-# Identical to scripts/bench/render-table.py — keep in sync. The bash version
-# is the canonical source; this is a mirror.
-#
-# Row labels and folding match the paper's old table format. New entries
-# (`_Scheduler_Update_priority`, `_Thread_Priority_update`, the four new
-# priority helpers I backfilled in 6.2, and every 5.1 row) are folded into
-# the corresponding `Update_priority` / `Release_job` / `Cancel_job` /
-# `Thread_Priority_{*}` / `Priority helpers` rows rather than spawning
-# new dedicated rows. `xTaskDelayUntilUnfixed` is measured but not surfaced
-# (kept as a negative reference in the results file only).
+# Render groups
+# How should targets be grouped together for the table?
 
 EDF_HELPERS_62 = [
     "h_edf_get_context", "h_edf_node_downcast",
@@ -221,7 +178,6 @@ PRIORITY_HELPERS_62 = [
     "h_thread_set_sched_node_prio", "h_thread_priority_action_change",
     "h_thread_queue_do_nothing_pa", "h_thread_priority_do_perform",
     "h_thread_priority_apply", "h_scheduler_node_set_priority",
-    # Composition step — no dedicated row in the old format.
     "thread_priority_update",
 ]
 
@@ -286,8 +242,7 @@ RTEMS_51_GROUPS = [
 
 
 def _zip_groups(groups_a, groups_b):
-    """Pair RTEMS_51_GROUPS with RTEMS_62_GROUPS by display label, in
-    `groups_b`'s order. Result: [(display, labels_a, labels_b), ...]."""
+    # pair rtems 5.1 and 6.2 groups by display label, in `groups_b`'s order
     by_disp_a = {disp: labels for disp, labels in groups_a}
     return [(disp, by_disp_a.get(disp, []), labels_b)
             for disp, labels_b in groups_b]
@@ -297,8 +252,8 @@ def _zip_groups(groups_a, groups_b):
 RTEMS_DUAL_GROUPS = _zip_groups(RTEMS_51_GROUPS, RTEMS_62_GROUPS)
 
 
-# `xTaskDelayUntilUnfixed` is measured (it stays in TARGETS for auditability
-# of the negative reference) but intentionally not surfaced in the table.
+# `xTaskDelayUntilUnfixed` is measured 
+# but intentionally not surfaced in the table.
 FREERTOS_GROUPS = [
     (r"vTaskSwitchContext",  ["vTaskSwitchContext"]),
     (r"vTaskSuspend",        ["vTaskSuspend"]),
@@ -328,21 +283,12 @@ RTEMS_BUILD_BSP = _env("RTEMS_BUILD_BSP",
 FREERTOS_SRC      = "/workspace/source/freertos-edf-msp430"
 FREERTOS_OVERLAY  = "/workspace/verification/freertos"
 
-# WP_TIMEOUT (default 120s) — per-goal prover timeout.
-# The verify scripts hard-code 30s for the dev workflow; this artifact
-# runner uses a generous default so the bench doesn't misfire on slower
-# reviewer hardware. We always append a fresh -wp-timeout to every
-# invocation, and Frama-C uses the last value it sees on the command line.
+# WP_TIMEOUT (default 120s), per-goal prover timeout.
 WP_TIMEOUT = _env("WP_TIMEOUT", "120")
 
 
 def _wp_extra() -> List[str]:
-    """Build the per-invocation flags appended to every frama-c call.
-
-    -wp-par defaults to `nproc` (frama-c's own default is 4, which leaves a
-    lot of cores on the table for the parallel pass). The serial pass
-    explicitly sets WP_PAR=1; users can pass any other value to override.
-    """
+    # build flags
     par = os.environ.get("WP_PAR") or str(os.cpu_count() or 4)
     return ["-wp-timeout", WP_TIMEOUT, "-wp-par", par]
 
@@ -391,7 +337,7 @@ def _drive_script(t: Target, log_path: pathlib.Path) -> int:
     env = os.environ.copy()
     env["WP_FCTS"] = t.fct  # type: ignore[assignment]
     # _wp_extra() appends -wp-timeout / -wp-par; the verify script's own
-    # defaults are overridden via Frama-C's last-wins.
+    # defaults are overridden via Frama-C's
     cmd = [t.script, "-wp-cache", "none", *_wp_extra()]
     return _run(cmd, log_path, env=env)
 
@@ -437,19 +383,12 @@ def run_target(t: Target, log_dir: pathlib.Path) -> Tuple[int, float]:
     return rc, time.time() - t0
 
 
-# ─── Log parser ─────────────────────────────────────────────────────────────────
+# --- Log parser ----------------------------------------------------------------
 
 _RE_PROVED = re.compile(r"^\[wp\] Proved goals:\s*(\d+)\s*/\s*(\d+)", re.M)
 
 
 def _first_int_token(line: str) -> int:
-    """Return the first whitespace-separated pure-integer token, or 0.
-
-    Mirrors the bash parser's awk:
-        for(i=1;i<=NF;i++) if($i ~ /^[0-9]+$/){print $i; exit}
-    This skips version-style tokens like "2.6.2:" while picking up the
-    real count that follows.
-    """
     for tok in line.split():
         if tok.isdigit():
             return int(tok)
@@ -457,21 +396,8 @@ def _first_int_token(line: str) -> int:
 
 
 def parse_log(log_path: pathlib.Path) -> Tuple[int, int, int, int]:
-    """Return (qed, alt_ergo, proved, total) from the function-pass section.
+    # Return (qed, alt_ergo, proved, total) from the function-pass section.
 
-    `proved` and `total` come from Frama-C's `[wp] Proved goals: X / Y`
-    summary line: X is the number of goals proved by **any** prover, Y is
-    the total. Qed and Alt-Ergo numbers are individual prover counts
-    (typically proved == qed + alt). The bench checks `proved == total`
-    to decide whether a target passed, rather than relying on the shell
-    exit code — Frama-C doesn't return non-zero just because a goal timed
-    out under Alt-Ergo, so on slow hardware `rc==0` is insufficient.
-
-    When the script emits `=== ... function ===` / `=== ... model lemma ===`
-    markers (the EDF scripts do, for the lemma pass that's shared across rows
-    and shouldn't be double-counted), only the function section is parsed.
-    Otherwise the whole log is parsed.
-    """
     try:
         text = log_path.read_text(errors="replace")
     except FileNotFoundError:
@@ -508,15 +434,10 @@ def parse_log(log_path: pathlib.Path) -> Tuple[int, int, int, int]:
     return qed, alt, proved, total
 
 
-# ─── Progress bar ───────────────────────────────────────────────────────────────
+# Progress bar
 
 def _target_system(t: Target) -> str:
-    """Short tag identifying which system a target belongs to.
-
-    Used purely for the live progress bar — RESULT lines and rendered
-    tables are unchanged. Derived from the driver + script path so we
-    don't have to annotate every TARGETS entry.
-    """
+    # visible tag for system
     if t.driver == "uni_helper":
         return "6.2"
     if t.driver == "heir51_helper":
@@ -551,17 +472,9 @@ def _emit_progress(current: int, total: int, system: str, label: str, rc: int,
           file=sys.stderr, flush=True)
 
 
-# ─── Inside-container subcommand ────────────────────────────────────────────────
+# --- Inside-container subcommand ---------------------------------------------------------------
 
 def _load_opam_env() -> None:
-    """Mirror the bash `eval $(opam env)` so `frama-c` lands on PATH.
-
-    The verify-*.sh scripts and `inside-container.sh` do this at the top
-    because `frama-c` lives in the opam switch's bin dir, not in
-    /usr/bin. Without it, subprocess.run("frama-c", ...) raises
-    FileNotFoundError. We shell out to sh so it handles opam's quoting
-    rules itself, then mirror the resulting env into os.environ.
-    """
     if not shutil.which("opam"):
         return
     try:
@@ -582,8 +495,8 @@ def _load_opam_env() -> None:
 
 
 def _expand_patterns(raw: List[str]) -> List[str]:
-    """Flatten comma-separated `--target` args. `--target a,b --target c`
-    becomes `["a", "b", "c"]`."""
+    # Flatten comma-separated `--target` args. `--target a,b --target c`
+    # becomes `["a", "b", "c"]`
     out: List[str] = []
     for entry in raw:
         out.extend(p.strip() for p in entry.split(",") if p.strip())
@@ -591,12 +504,7 @@ def _expand_patterns(raw: List[str]) -> List[str]:
 
 
 def _filter_targets(patterns: List[str]) -> List[Target]:
-    """Return TARGETS filtered by fnmatch against `patterns`.
-
-    Multiple patterns are OR'd. Order matches the TARGETS list (so the
-    progress bar walks them in their original order, not pattern order).
-    A pattern that matches nothing prints a warning but doesn't abort.
-    """
+    # return all targets filtered by patterns
     if not patterns:
         return list(TARGETS)
     matched_for = {pat: [t for t in TARGETS if fnmatch.fnmatch(t.label, pat)]
@@ -621,11 +529,6 @@ def _resolve_target_patterns(args) -> List[str]:
 
 
 def _load_sidecar(path: pathlib.Path) -> dict:
-    """Read previously-completed RESULT lines into {label: raw_line}.
-
-    The sidecar lives inside LOG_DIR (which is mounted from the host) so
-    it persists across docker invocations and Ctrl-C kills.
-    """
     out: dict = {}
     if not path.exists():
         return out
@@ -653,11 +556,7 @@ def cmd_inside_run(args) -> int:
     sidecar_path = log_dir / "results.txt"
     cached: dict = _load_sidecar(sidecar_path) if resume else {}
 
-    # When resuming, truncate-rewrite the sidecar to only contain entries we
-    # still consider valid (i.e. labels currently being filtered AND already
-    # cached). Anything else gets re-run and re-appended below. Without this
-    # the sidecar would grow stale entries across re-runs with different
-    # --target filters.
+    # When resuming, kill targets outside of filter
     mode = "w"  # always start with a known-good file
     sidecar_f = open(sidecar_path, mode, buffering=1)  # line-buffered
     try:
@@ -677,9 +576,7 @@ def cmd_inside_run(args) -> int:
 
         for i, t in enumerate(targets, 1):
             if t.label in cached:
-                # Re-emit the cached RESULT verbatim so the host's grep still
-                # sees it on this pass. Re-parse the log for proved/total
-                # since the RESULT line only stores qed/alt/total.
+                # Re-emit the cached result
                 line = cached[t.label]
                 print(line, flush=True)
                 _, _, qed_s, alt_s, total_s, elapsed_s, rc_s = line.split("|", 6)
@@ -707,14 +604,9 @@ def cmd_inside_run(args) -> int:
     return 0
 
 
-# ─── Render subcommand ──────────────────────────────────────────────────────────
+# Render subcommand
 
 def _prefer_sidecar(path: pathlib.Path) -> pathlib.Path:
-    """If `results-<pass>.txt` is missing or empty, fall back to the
-    per-pass sidecar `logs-<pass>/results.txt`, which is line-flushed and
-    always reflects the latest completed targets — including from a run
-    that was Ctrl-C'd before the canonical file got promoted.
-    """
     if path.exists() and path.stat().st_size > 0:
         return path
     name = path.stem  # e.g. "results-parallel"
@@ -754,7 +646,9 @@ def fold(labels, data, missing_sink=None):
                 missing_sink.add(label)
             continue
         d = data[label]
-        qed += d["qed"]; alt += d["alt"]; total += d["total"]
+        qed += d["qed"]
+        alt += d["alt"]
+        total += d["total"]
         elapsed += d["elapsed"]
     return qed, alt, total, elapsed
 
@@ -794,9 +688,8 @@ def render_one(caption: str, label: str, groups, data: dict) -> str:
 
 
 def render_dual(caption: str, label: str, dual_groups, data: dict) -> str:
-    """Combined-system table: each numeric cell shows 'a/b' (e.g. 5.1/6.2).
-    `dual_groups` is a list of (display, labels_a, labels_b) tuples.
-    """
+    # Combined-system table: each numeric cell shows 'a/b' (e.g. 5.1/6.2).
+    # `dual_groups` is a list of (display, labels_a, labels_b) tuples.
     missing: set = set()
     lines: List[str] = []
     lines.append(r"\begin{table}[tp]")
@@ -840,12 +733,10 @@ def _render(caption: str, label: str, groups, data: dict) -> str:
 
 def cmd_render(args) -> int:
     # Path resolution:
-    #   neither flag given → default to BOTH canonical files (convenience)
-    #   only --parallel given → load parallel only (skip serial entirely)
-    #   only --serial   given → load serial only (skip parallel entirely)
-    #   both given → load both
-    # This stops `render --parallel X` from picking up a stale canonical
-    # results-serial.txt left over from an earlier run.
+    #   neither flag given -> default to both
+    #   only --parallel given -> load parallel only (skip serial entirely)
+    #   only --serial   given -> load serial only (skip parallel entirely)
+    #   both given -> load both
     bench_dir = pathlib.Path(__file__).resolve().parent
     canon_par = bench_dir / "results" / "results-parallel.txt"
     canon_ser = bench_dir / "results" / "results-serial.txt"
@@ -879,7 +770,7 @@ def cmd_render(args) -> int:
     return 0
 
 
-# ─── Host-side run subcommand ───────────────────────────────────────────────────
+# Host-side run subcommand
 
 def _run_pass(repo_root: pathlib.Path, bench_dir: pathlib.Path,
               results_dir: pathlib.Path, image: str,
@@ -929,8 +820,7 @@ def _run_pass(repo_root: pathlib.Path, bench_dir: pathlib.Path,
                     errf.write(line)
                 proc.wait()
             except KeyboardInterrupt:
-                # Let docker tear down the container, then fall through to
-                # promote whatever the sidecar captured before SIGINT.
+                # Let docker tear down the container
                 proc.terminate()
                 proc.wait()
                 raise
@@ -985,9 +875,7 @@ def cmd_run(args) -> int:
             return 2
 
     print("[bench] === LaTeX ===", file=sys.stderr, flush=True)
-    # Only feed render the file(s) for the pass(es) we actually ran (or
-    # both, for --render-only). cmd_render's "only what you ask for"
-    # semantics means we don't pick up stale data from the other side.
+    # Only feed render the file for the pass we ran
     if render_only or pass_choice == "both":
         render_args = argparse.Namespace(
             parallel=str(results_dir / "results-parallel.txt"),
@@ -1003,7 +891,7 @@ def cmd_run(args) -> int:
     return cmd_render(render_args)
 
 
-# ─── CLI ────────────────────────────────────────────────────────────────────────
+# CLI
 
 def main() -> int:
     ap = argparse.ArgumentParser(

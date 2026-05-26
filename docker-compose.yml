@@ -8,7 +8,6 @@ services:
     volumes:
       - ./rtems:/workspace/rtems
 
-  # Headless verification (RTEMS 5.1)
   verify:
     build:
       context: .
@@ -21,29 +20,6 @@ services:
       - ./verification:/workspace/verification
     command: ["verify-all.sh"]
 
-  # Legacy headless verification (RTEMS 6.2 hand-port). This is retained
-  # as reference material while the active 6.2 effort moves to an abstract
-  # RBTree model under verification/6.2/.
-  # Override the command to target a single legacy function, e.g.:
-  #   docker compose run --rm verify-6.2 \
-  #     /opt/scripts/6.2/verify-edf-update-priority.sh \
-  #     -wp -wp-fct _Scheduler_EDF_Update_priority -wp-model 'Typed+Cast'
-  verify-6.2:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: rtems-edf-toolchain
-    working_dir: /workspace/rtems/src/rtems-6.2/cpukit
-    volumes:
-      - ./rtems:/workspace/rtems
-      - ./legacy/rtems-6.2-hand-port/scripts:/opt/scripts
-      - ./legacy/rtems-6.2-hand-port/verification:/workspace/verification
-    command: ["/opt/scripts/6.2/verify-wp-all.sh", "-wp-model", "Typed+Cast", "-wp-timeout", "30"]
-
-  # Active headless verification (RTEMS 6.2 abstract RBTree port) on the
-  # legacy Frama-C 25 stack. KEPT FOR REFERENCE ONLY: the active scripts
-  # have moved to `-std c11` (FC 32 syntax), so this service no longer
-  # parses the .c file. Use `verify-6.2-active-fc32` for active work.
   verify-6.2-active:
     build:
       context: .
@@ -56,15 +32,6 @@ services:
       - ./verification:/workspace/verification
     command: ["/opt/scripts/6.2/verify-edf-unblock.sh"]
 
-  # Active headless verification on the modern Frama-C 32 stack. Same
-  # source tree as verify-6.2-active but a separate toolchain image, so
-  # the legacy FC 25 results remain byte-reproducible while active-port
-  # work moves forward on a healthy toolchain.
-  #
-  # Override the command to pass WP flags, e.g.:
-  #   docker compose run --rm verify-6.2-active-fc32 \
-  #     /opt/scripts/6.2/verify-edf-unblock.sh \
-  #     -wp -wp-fct _Scheduler_EDF_Unblock -wp-model 'Typed+Cast'
   verify-6.2-active-fc32:
     build:
       context: .
@@ -80,14 +47,6 @@ services:
       - ./verification:/workspace/verification
     command: ["/opt/scripts/6.2/verify-edf-unblock.sh"]
 
-  # Headless verification (RTEMS 5.1 abstract RBTree port) on the
-  # modern Frama-C 32 stack. Overlays verification/5.1/ on top of the
-  # pristine 5.1 sources, mirroring the verify-6.2-active-fc32 layout.
-  #
-  # Override the command to pass WP flags, e.g.:
-  #   docker compose run --rm verify-5.1-fc32 \
-  #     /opt/scripts/5.1/verify-edf-initialize.sh \
-  #     -wp -wp-fct _Scheduler_EDF_Initialize -wp-model 'Typed+Cast'
   verify-5.1-fc32:
     build:
       context: .
@@ -102,9 +61,6 @@ services:
       - ./verification:/workspace/verification
     command: ["/opt/scripts/5.1/verify-edf-initialize.sh"]
 
-  # 5.1 port on the legacy Frama-C 25 stack (kept-for-reference; the
-  # 5.1 scripts default to FC32's -std c11 flag and will fall back to
-  # -c11 when they detect FC25 at runtime).
   verify-5.1:
     build:
       context: .
@@ -117,9 +73,6 @@ services:
       - ./verification:/workspace/verification
     command: ["/opt/scripts/5.1/verify-edf-initialize.sh"]
 
-  # Headless verification (FreeRTOS EDF). Currently a smoke test that
-  # only exercises the toolchain wiring against list.c — annotated targets
-  # get added incrementally.
   verify-freertos:
     build:
       context: .
@@ -134,48 +87,3 @@ services:
       - ./scripts:/opt/scripts
       - ./verification:/workspace/verification
     command: ["/opt/scripts/freertos/verify-wp-all.sh", "-wp-timeout", "30"]
-
-  # frama-c-gui on the FreeRTOS EDF port (X11 forwarded).
-  # Usage:
-  #   xhost +local:docker
-  #   docker compose run --rm gui-freertos              # default: overlay/tasks.c
-  #   docker compose run --rm gui-freertos -wp-fct foo /workspace/.../x.c
-  gui-freertos:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        FRAMA_C_VERSION: "32.0"
-        INSTALL_COQ: "true"
-    image: rtems-edf-toolchain-fc32
-    working_dir: /workspace/source/freertos-edf-msp430
-    environment:
-      - DISPLAY=${DISPLAY}
-    volumes:
-      - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      - ./source:/workspace/source
-      - ./scripts:/opt/scripts
-      - ./verification:/workspace/verification
-    stdin_open: true
-    tty: true
-    entrypoint: ["/opt/scripts/freertos/gui-wp.sh"]
-
-  # Interactive shell with X11 forwarding for frama-c-gui
-  # Usage: xhost +local:docker && docker compose run gui
-  gui:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: rtems-edf-toolchain
-    working_dir: /workspace/rtems/src/rtems-5.1/cpukit
-    environment:
-      - DISPLAY=${DISPLAY}
-    volumes:
-      - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      - ./rtems:/workspace/rtems
-      - ./source:/workspace/source
-      - ./scripts:/opt/scripts
-      - ./verification:/workspace/verification
-    stdin_open: true
-    tty: true
-    command: ["/bin/bash"]
