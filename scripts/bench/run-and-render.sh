@@ -9,9 +9,9 @@
 # verification/, source/). Requires the rtems-edf-toolchain-fc32 image.
 #
 # Usage:
-#   scripts/bench/run-and-render.sh             # runs both passes
-#   PASS=parallel scripts/bench/run-and-render.sh   # only the parallel pass
-#   PASS=serial   scripts/bench/run-and-render.sh   # only the serial pass
+#   scripts/bench/run-and-render.sh             # default: parallel pass only
+#   PASS=serial   scripts/bench/run-and-render.sh   # serial pass only
+#   PASS=both     scripts/bench/run-and-render.sh   # both passes sequentially
 #   RENDER_ONLY=1 scripts/bench/run-and-render.sh   # skip docker, just render
 #
 set -euo pipefail
@@ -22,7 +22,7 @@ RESULTS_DIR="${BENCH_DIR}/results"
 mkdir -p "${RESULTS_DIR}" "${RESULTS_DIR}/logs-parallel" "${RESULTS_DIR}/logs-serial"
 
 IMAGE="${IMAGE:-rtems-edf-toolchain-fc32}"
-PASS="${PASS:-both}"
+PASS="${PASS:-parallel}"
 
 run_pass() {
     local pass_name="$1" wp_par_env="$2"

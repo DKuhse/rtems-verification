@@ -14,7 +14,8 @@
 # Per-target Frama-C logs land in /tmp/wp-logs/.
 #
 # Env vars:
-#   WP_PAR        when set, appends "-wp-par $WP_PAR" to every invocation
+#   WP_PAR        per-invocation `-wp-par N` (default: nproc; the serial
+#                 pass sets WP_PAR=1)
 #   LOG_DIR       override /tmp/wp-logs
 #
 # Drivers — separate helpers because the underlying verify-*.sh scripts
@@ -45,11 +46,12 @@ LOG_DIR="${LOG_DIR:-/tmp/wp-logs}"
 mkdir -p "${LOG_DIR}"
 
 WP_TIMEOUT="${WP_TIMEOUT:-120}"
+# -wp-par defaults to nproc (frama-c's own default is 4, which leaves a lot
+# of cores idle on the parallel pass). The serial pass passes WP_PAR=1
+# explicitly; any other value of WP_PAR overrides the default.
+: "${WP_PAR:=$(nproc 2>/dev/null || echo 4)}"
 
-EXTRA_ARGS=(-wp-timeout "${WP_TIMEOUT}")
-if [ -n "${WP_PAR:-}" ]; then
-    EXTRA_ARGS+=(-wp-par "${WP_PAR}")
-fi
+EXTRA_ARGS=(-wp-timeout "${WP_TIMEOUT}" -wp-par "${WP_PAR}")
 
 if command -v opam >/dev/null 2>&1; then
     eval "$(opam env)"
@@ -87,7 +89,7 @@ _format_bar() {
 }
 
 _print_progress() {
-    local label="$1" rc="$2" proved="$3" total="$4" elapsed="$5"
+    local label="$1" system="$2" rc="$3" proved="$4" total="$5" elapsed="$6"
     local pct=0
     if [ "${TOTAL_TARGETS}" -gt 0 ]; then
         pct=$((CURRENT_TARGET * 100 / TOTAL_TARGETS))
@@ -101,17 +103,24 @@ _print_progress() {
     if [ "${rc}" != "0" ] || [ "${proved}" != "${total}" ]; then
         tag="FAIL"
     fi
+    local sys_tag
+    case "${system}" in
+        5.1) sys_tag="[5.1]" ;;
+        6.2) sys_tag="[6.2]" ;;
+        FR)  sys_tag="[FR]"  ;;
+        *)   sys_tag="[???]" ;;
+    esac
     local now=$(date +%s)
     local since=$((now - BENCH_T0))
-    printf '[bench %3d/%3d] [%s] %3d%%  %-44s  %-4s  %s/%s goals  %5ss  (run %dm%02ds)\n' \
+    printf '[bench %3d/%3d] [%s] %3d%%  %-5s %-40s  %-4s  %s/%s goals  %5ss  (run %dm%02ds)\n' \
         "${CURRENT_TARGET}" "${TOTAL_TARGETS}" "${bar}" "${pct}" \
-        "${label}" "${tag}" "${proved}" "${total}" "${elapsed}" \
+        "${sys_tag}" "${label}" "${tag}" "${proved}" "${total}" "${elapsed}" \
         "$((since/60))" "$((since%60))" >&2
 }
 
 # Parses /tmp/wp-logs/${label}.log and emits the RESULT line + progress line.
 emit_result() {
-    local label="$1" elapsed="$2" rc="$3"
+    local label="$1" system="$2" elapsed="$3" rc="$4"
     local log="${LOG_DIR}/${label}.log"
 
     awk '
@@ -131,24 +140,31 @@ emit_result() {
     echo "RESULT|${label}|${qed}|${alt}|${total}|${elapsed}|rc=${rc}"
 
     CURRENT_TARGET=$((CURRENT_TARGET + 1))
-    _print_progress "${label}" "${rc}" "${proved}" "${total}" "${elapsed}"
+    _print_progress "${label}" "${system}" "${rc}" "${proved}" "${total}" "${elapsed}"
 }
 
 run_one() {
     local label="$1" script="$2" fcts="$3"
+    # Derive the RTEMS major version from the script's directory.
+    local system="???"
+    case "${script}" in
+        */scripts/6.2/*) system="6.2" ;;
+        */scripts/5.1/*) system="5.1" ;;
+    esac
     local log="${LOG_DIR}/${label}.log"
     local t0 t1
     t0=$(date +%s.%N)
     env WP_FCTS="${fcts}" "${script}" -wp-cache none "${EXTRA_ARGS[@]}" >"${log}" 2>&1
     local rc=$?
     t1=$(date +%s.%N)
-    emit_result "${label}" "$(awk -v a="$t0" -v b="$t1" 'BEGIN{printf "%.2f", b-a}')" "${rc}"
+    emit_result "${label}" "${system}" "$(awk -v a="$t0" -v b="$t1" 'BEGIN{printf "%.2f", b-a}')" "${rc}"
 }
 
 # Direct invocation against the 6.2 scheduleruni-unblock harness (verify-script
 # hard-codes -wp-fct, so we can't ride WP_FCTS).
 run_uni_helper() {
     local label="$1" fct="$2"
+    local system="6.2"
     local log="${LOG_DIR}/${label}.log"
     local SRC="${OVERLAY_62}/harnesses/scheduleruni-unblock-harness.c"
 
@@ -179,13 +195,14 @@ run_uni_helper() {
         >"${log}" 2>&1
     local rc=$?
     t1=$(date +%s.%N)
-    emit_result "${label}" "$(awk -v a="$t0" -v b="$t1" 'BEGIN{printf "%.2f", b-a}')" "${rc}"
+    emit_result "${label}" "${system}" "$(awk -v a="$t0" -v b="$t1" 'BEGIN{printf "%.2f", b-a}')" "${rc}"
 }
 
 # Direct invocation against the 5.1 scheduler-update-heir harness (its
 # verify-script hard-codes -wp-fct against this harness translation unit).
 run_51_heir_helper() {
     local label="$1" fct="$2"
+    local system="5.1"
     local log="${LOG_DIR}/${label}.log"
     local SRC="${OVERLAY_51}/harnesses/scheduler-update-heir-harness.c"
 
@@ -216,12 +233,13 @@ run_51_heir_helper() {
         >"${log}" 2>&1
     local rc=$?
     t1=$(date +%s.%N)
-    emit_result "${label}" "$(awk -v a="$t0" -v b="$t1" 'BEGIN{printf "%.2f", b-a}')" "${rc}"
+    emit_result "${label}" "${system}" "$(awk -v a="$t0" -v b="$t1" 'BEGIN{printf "%.2f", b-a}')" "${rc}"
 }
 
 # Direct invocation against the FreeRTOS reference slices.
 run_freertos_one() {
     local label="$1" source_rel="$2" fct="$3"
+    local system="FR"
     local log="${LOG_DIR}/${label}.log"
     local OVERLAY=/workspace/verification/freertos
     local FREERTOS_SRC=/workspace/source/freertos-edf-msp430
@@ -250,7 +268,7 @@ run_freertos_one() {
         >"${log}" 2>&1
     local rc=$?
     t1=$(date +%s.%N)
-    emit_result "${label}" "$(awk -v a="$t0" -v b="$t1" 'BEGIN{printf "%.2f", b-a}')" "${rc}"
+    emit_result "${label}" "${system}" "$(awk -v a="$t0" -v b="$t1" 'BEGIN{printf "%.2f", b-a}')" "${rc}"
 }
 
 printf '[bench] %d targets queued (WP_PAR=%s)\n' "${TOTAL_TARGETS}" "${WP_PAR:-default}" >&2
@@ -268,6 +286,7 @@ run_one "edf_cancel_job"             /opt/scripts/6.2/verify-edf-release-cancel.
 # Uniprocessor Unblock — verify-scheduleruni-unblock.sh hard-codes 4 fcts,
 # so we drive it directly to isolate just _Scheduler_uniprocessor_Unblock.
 run_uni_helper "scheduleruni_unblock"  "_Scheduler_uniprocessor_Unblock"
+run_one "scheduler_cancel_job"       /opt/scripts/6.2/verify-scheduler-cancel-job.sh   "_Scheduler_Cancel_job"
 run_one "scheduler_release_job"      /opt/scripts/6.2/verify-scheduler-release-job.sh    "_Scheduler_Release_job"
 run_one "scheduler_update_priority"  /opt/scripts/6.2/verify-scheduler-update-priority.sh "_Scheduler_Update_priority"
 run_one "thread_priority_add"        /opt/scripts/6.2/verify-thread-change-priority.sh "_Thread_Priority_add"

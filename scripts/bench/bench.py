@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import fnmatch
 import os
 import pathlib
 import re
@@ -88,6 +89,7 @@ TARGETS: List[Target] = [
     _62("edf_release_job",           "verify-edf-release-cancel.sh",      "_Scheduler_EDF_Release_job"),
     _62("edf_cancel_job",            "verify-edf-release-cancel.sh",      "_Scheduler_EDF_Cancel_job"),
     _uni("scheduleruni_unblock",     "_Scheduler_uniprocessor_Unblock"),
+    _62("scheduler_cancel_job",      "verify-scheduler-cancel-job.sh",    "_Scheduler_Cancel_job"),
     _62("scheduler_release_job",     "verify-scheduler-release-job.sh",   "_Scheduler_Release_job"),
     _62("scheduler_update_priority", "verify-scheduler-update-priority.sh","_Scheduler_Update_priority"),
     _62("thread_priority_add",       "verify-thread-change-priority.sh",  "_Thread_Priority_add"),
@@ -321,11 +323,14 @@ WP_TIMEOUT = _env("WP_TIMEOUT", "120")
 
 
 def _wp_extra() -> List[str]:
-    extra = ["-wp-timeout", WP_TIMEOUT]
-    par = os.environ.get("WP_PAR")
-    if par:
-        extra += ["-wp-par", par]
-    return extra
+    """Build the per-invocation flags appended to every frama-c call.
+
+    -wp-par defaults to `nproc` (frama-c's own default is 4, which leaves a
+    lot of cores on the table for the parallel pass). The serial pass
+    explicitly sets WP_PAR=1; users can pass any other value to override.
+    """
+    par = os.environ.get("WP_PAR") or str(os.cpu_count() or 4)
+    return ["-wp-timeout", WP_TIMEOUT, "-wp-par", par]
 
 
 def _rtems_cpp_cmd(overlay: str, rtems_src: str) -> str:
@@ -371,8 +376,8 @@ def _run(cmd: List[str], log_path: pathlib.Path, env=None) -> int:
 def _drive_script(t: Target, log_path: pathlib.Path) -> int:
     env = os.environ.copy()
     env["WP_FCTS"] = t.fct  # type: ignore[assignment]
-    # _wp_extra() appends -wp-timeout (and -wp-par if set); the verify
-    # script's built-in -wp-timeout 30 is overridden by Frama-C's last-wins.
+    # _wp_extra() appends -wp-timeout / -wp-par; the verify script's own
+    # defaults are overridden via Frama-C's last-wins.
     cmd = [t.script, "-wp-cache", "none", *_wp_extra()]
     return _run(cmd, log_path, env=env)
 
@@ -491,7 +496,28 @@ def parse_log(log_path: pathlib.Path) -> Tuple[int, int, int, int]:
 
 # ─── Progress bar ───────────────────────────────────────────────────────────────
 
-def _emit_progress(current: int, total: int, label: str, rc: int,
+def _target_system(t: Target) -> str:
+    """Short tag identifying which system a target belongs to.
+
+    Used purely for the live progress bar — RESULT lines and rendered
+    tables are unchanged. Derived from the driver + script path so we
+    don't have to annotate every TARGETS entry.
+    """
+    if t.driver == "uni_helper":
+        return "6.2"
+    if t.driver == "heir51_helper":
+        return "5.1"
+    if t.driver == "freertos":
+        return "FR"
+    if t.driver == "script" and t.script:
+        if "/scripts/6.2/" in t.script:
+            return "6.2"
+        if "/scripts/5.1/" in t.script:
+            return "5.1"
+    return "???"
+
+
+def _emit_progress(current: int, total: int, system: str, label: str, rc: int,
                    proved: int, total_goals: int, elapsed: float,
                    bench_t0: float) -> None:
     width = 24
@@ -502,9 +528,11 @@ def _emit_progress(current: int, total: int, label: str, rc: int,
     # "ok" requires both clean exit AND every goal proved by some prover —
     # frama-c won't fail on its own when individual goals time out.
     tag = "ok" if (rc == 0 and proved == total_goals) else "FAIL"
+    sys_tag = f"[{system}]"
     since = int(time.time() - bench_t0)
     print(f"[bench {current:3d}/{total:3d}] [{bar}] {pct:3d}%  "
-          f"{label:<44s}  {tag:<4s}  {proved}/{total_goals} goals  "
+          f"{sys_tag:<5s} {label:<40s}  {tag:<4s}  "
+          f"{proved}/{total_goals} goals  "
           f"{elapsed:5.2f}s  (run {since//60}m{since%60:02d}s)",
           file=sys.stderr, flush=True)
 
@@ -539,24 +567,125 @@ def _load_opam_env() -> None:
             continue
 
 
+def _expand_patterns(raw: List[str]) -> List[str]:
+    """Flatten comma-separated `--target` args. `--target a,b --target c`
+    becomes `["a", "b", "c"]`."""
+    out: List[str] = []
+    for entry in raw:
+        out.extend(p.strip() for p in entry.split(",") if p.strip())
+    return out
+
+
+def _filter_targets(patterns: List[str]) -> List[Target]:
+    """Return TARGETS filtered by fnmatch against `patterns`.
+
+    Multiple patterns are OR'd. Order matches the TARGETS list (so the
+    progress bar walks them in their original order, not pattern order).
+    A pattern that matches nothing prints a warning but doesn't abort.
+    """
+    if not patterns:
+        return list(TARGETS)
+    matched_for = {pat: [t for t in TARGETS if fnmatch.fnmatch(t.label, pat)]
+                   for pat in patterns}
+    for pat, hits in matched_for.items():
+        if not hits:
+            print(f"[bench] warning: pattern {pat!r} matched no targets",
+                  file=sys.stderr)
+    keep_labels: set = set()
+    for hits in matched_for.values():
+        for t in hits:
+            keep_labels.add(t.label)
+    return [t for t in TARGETS if t.label in keep_labels]
+
+
+def _resolve_target_patterns(args) -> List[str]:
+    """Patterns from --target (cli) win, else BENCH_TARGETS (env), else []."""
+    raw = list(getattr(args, "target", None) or [])
+    if not raw and os.environ.get("BENCH_TARGETS"):
+        raw = [os.environ["BENCH_TARGETS"]]
+    return _expand_patterns(raw)
+
+
+def _load_sidecar(path: pathlib.Path) -> dict:
+    """Read previously-completed RESULT lines into {label: raw_line}.
+
+    The sidecar lives inside LOG_DIR (which is mounted from the host) so
+    it persists across docker invocations and Ctrl-C kills.
+    """
+    out: dict = {}
+    if not path.exists():
+        return out
+    for line in path.read_text().splitlines():
+        if not line.startswith("RESULT|"):
+            continue
+        try:
+            label = line.split("|", 2)[1]
+        except IndexError:
+            continue
+        out[label] = line
+    return out
+
+
 def cmd_inside_run(args) -> int:
     _load_opam_env()
     log_dir = pathlib.Path(os.environ.get("LOG_DIR", "/tmp/wp-logs"))
     log_dir.mkdir(parents=True, exist_ok=True)
-    total = len(TARGETS)
+    patterns = _resolve_target_patterns(args)
+    targets = _filter_targets(patterns)
+    total = len(targets)
     bench_t0 = time.time()
-    par = os.environ.get("WP_PAR")
-    print(f"[bench] {total} targets queued "
-          f"(WP_PAR={par if par is not None else 'default'})",
-          file=sys.stderr, flush=True)
-    for i, t in enumerate(TARGETS, 1):
-        rc, elapsed = run_target(t, log_dir)
-        qed, alt, proved, total_goals = parse_log(log_dir / f"{t.label}.log")
-        print(f"RESULT|{t.label}|{qed}|{alt}|{total_goals}|"
-              f"{elapsed:.2f}|rc={rc}",
-              flush=True)
-        _emit_progress(i, total, t.label, rc, proved, total_goals, elapsed,
-                       bench_t0)
+
+    resume = bool(getattr(args, "resume", False)) or bool(os.environ.get("RESUME"))
+    sidecar_path = log_dir / "results.txt"
+    cached: dict = _load_sidecar(sidecar_path) if resume else {}
+
+    # When resuming, truncate-rewrite the sidecar to only contain entries we
+    # still consider valid (i.e. labels currently being filtered AND already
+    # cached). Anything else gets re-run and re-appended below. Without this
+    # the sidecar would grow stale entries across re-runs with different
+    # --target filters.
+    mode = "w"  # always start with a known-good file
+    sidecar_f = open(sidecar_path, mode, buffering=1)  # line-buffered
+    try:
+        for t in targets:
+            if t.label in cached:
+                sidecar_f.write(cached[t.label] + "\n")
+
+        sel_note = f", filter={patterns}" if patterns else ""
+        skip_count = sum(1 for t in targets if t.label in cached)
+        resume_note = f", resume=skipping {skip_count}" if resume and skip_count else ""
+        print(f"[bench] {total}/{len(TARGETS)} targets queued "
+              f"({' '.join(_wp_extra())}{sel_note}{resume_note})",
+              file=sys.stderr, flush=True)
+        if not targets:
+            print("[bench] nothing to run", file=sys.stderr, flush=True)
+            return 0
+
+        for i, t in enumerate(targets, 1):
+            if t.label in cached:
+                # Re-emit the cached RESULT verbatim so the host's grep still
+                # sees it on this pass. Re-parse the log for proved/total
+                # since the RESULT line only stores qed/alt/total.
+                line = cached[t.label]
+                print(line, flush=True)
+                _, _, qed_s, alt_s, total_s, elapsed_s, rc_s = line.split("|", 6)
+                rc_val = int(rc_s.removeprefix("rc=").strip())
+                _, _, proved, _ = parse_log(log_dir / f"{t.label}.log")
+                _emit_progress(i, total, _target_system(t), t.label, rc_val,
+                               proved, int(total_s), float(elapsed_s),
+                               bench_t0)
+                continue
+            rc, elapsed = run_target(t, log_dir)
+            qed, alt, proved, total_goals = parse_log(log_dir / f"{t.label}.log")
+            line = (f"RESULT|{t.label}|{qed}|{alt}|{total_goals}|"
+                    f"{elapsed:.2f}|rc={rc}")
+            print(line, flush=True)
+            sidecar_f.write(line + "\n")
+            _emit_progress(i, total, _target_system(t), t.label, rc, proved,
+                           total_goals, elapsed, bench_t0)
+    finally:
+        sidecar_f.close()
+
     secs = int(time.time() - bench_t0)
     print(f"[bench] done — {total}/{total} targets, "
           f"total {secs//60}m{secs%60:02d}s",
@@ -566,8 +695,28 @@ def cmd_inside_run(args) -> int:
 
 # ─── Render subcommand ──────────────────────────────────────────────────────────
 
+def _prefer_sidecar(path: pathlib.Path) -> pathlib.Path:
+    """If `results-<pass>.txt` is missing or empty, fall back to the
+    per-pass sidecar `logs-<pass>/results.txt`, which is line-flushed and
+    always reflects the latest completed targets — including from a run
+    that was Ctrl-C'd before the canonical file got promoted.
+    """
+    if path.exists() and path.stat().st_size > 0:
+        return path
+    name = path.stem  # e.g. "results-parallel"
+    if name.startswith("results-"):
+        pass_name = name[len("results-"):]
+        sidecar = path.parent / f"logs-{pass_name}" / "results.txt"
+        if sidecar.exists() and sidecar.stat().st_size > 0:
+            print(f"[bench] (reading {sidecar} — canonical file missing/empty)",
+                  file=sys.stderr)
+            return sidecar
+    return path
+
+
 def load_results(path: pathlib.Path) -> dict:
     data: dict = {}
+    path = _prefer_sidecar(path)
     if not path.exists():
         return data
     for line in path.read_text().splitlines():
@@ -658,12 +807,20 @@ def cmd_render(args) -> int:
 
 def _run_pass(repo_root: pathlib.Path, bench_dir: pathlib.Path,
               results_dir: pathlib.Path, image: str,
-              name: str, wp_par_env: str) -> None:
+              name: str, wp_par_env: str,
+              target_patterns: List[str],
+              resume: bool) -> None:
     out_file = results_dir / f"run-{name}.out"
     err_file = results_dir / f"run-{name}.err"
     logs_subdir = results_dir / f"logs-{name}"
     logs_subdir.mkdir(exist_ok=True)
-    print(f"[bench] === {name} pass ({wp_par_env or 'default WP_PAR'}) ===",
+    parts = []
+    if target_patterns:
+        parts.append(f"targets={target_patterns}")
+    if resume:
+        parts.append("resume=on")
+    note = (", " + ", ".join(parts)) if parts else ""
+    print(f"[bench] === {name} pass ({wp_par_env or 'nproc'}{note}) ===",
           file=sys.stderr, flush=True)
     cmd = [
         "docker", "run", "--rm",
@@ -675,25 +832,51 @@ def _run_pass(repo_root: pathlib.Path, bench_dir: pathlib.Path,
         "-v", f"{logs_subdir}:/tmp/wp-logs",
         "-e", wp_par_env,
         "-e", f"WP_TIMEOUT={os.environ.get('WP_TIMEOUT', '120')}",
+    ]
+    if target_patterns:
+        cmd += ["-e", f"BENCH_TARGETS={','.join(target_patterns)}"]
+    if resume:
+        cmd += ["-e", "RESUME=1"]
+    cmd += [
         image,
         "python3", "/opt/bench/bench.py", "inside-run",
     ]
-    with out_file.open("wb") as outf, err_file.open("wb") as errf:
-        proc = subprocess.Popen(cmd, stdout=outf, stderr=subprocess.PIPE,
-                                bufsize=0)
-        assert proc.stderr is not None
-        for line in proc.stderr:
-            sys.stderr.buffer.write(line)
-            sys.stderr.buffer.flush()
-            errf.write(line)
-        proc.wait()
-    # Pull RESULT lines into the results-<pass>.txt file.
-    results = [ln for ln in out_file.read_text(errors="replace").splitlines()
-               if ln.startswith("RESULT")]
-    txt_path = results_dir / f"results-{name}.txt"
-    txt_path.write_text("\n".join(results) + ("\n" if results else ""))
-    print(f"[bench] -> {txt_path} ({len(results)} rows)",
-          file=sys.stderr, flush=True)
+    try:
+        with out_file.open("wb") as outf, err_file.open("wb") as errf:
+            proc = subprocess.Popen(cmd, stdout=outf, stderr=subprocess.PIPE,
+                                    bufsize=0)
+            assert proc.stderr is not None
+            try:
+                for line in proc.stderr:
+                    sys.stderr.buffer.write(line)
+                    sys.stderr.buffer.flush()
+                    errf.write(line)
+                proc.wait()
+            except KeyboardInterrupt:
+                # Let docker tear down the container, then fall through to
+                # promote whatever the sidecar captured before SIGINT.
+                proc.terminate()
+                proc.wait()
+                raise
+    finally:
+        # Promote the line-flushed sidecar to the canonical results file so
+        # interrupted runs still leave a usable file. If the sidecar is
+        # missing (docker died before any target completed), fall back to
+        # grepping docker stdout.
+        sidecar = logs_subdir / "results.txt"
+        txt_path = results_dir / f"results-{name}.txt"
+        if sidecar.exists() and sidecar.stat().st_size > 0:
+            txt_path.write_bytes(sidecar.read_bytes())
+            n = sum(1 for ln in txt_path.read_text(errors="replace").splitlines()
+                    if ln.startswith("RESULT"))
+            print(f"[bench] -> {txt_path} ({n} rows, from sidecar)",
+                  file=sys.stderr, flush=True)
+        elif out_file.exists():
+            results = [ln for ln in out_file.read_text(errors="replace").splitlines()
+                       if ln.startswith("RESULT")]
+            txt_path.write_text("\n".join(results) + ("\n" if results else ""))
+            print(f"[bench] -> {txt_path} ({len(results)} rows, from stdout)",
+                  file=sys.stderr, flush=True)
 
 
 def cmd_run(args) -> int:
@@ -704,21 +887,23 @@ def cmd_run(args) -> int:
 
     image = os.environ.get("IMAGE", "rtems-edf-toolchain-fc32")
 
-    pass_choice = args.pass_choice or os.environ.get("PASS", "both")
+    pass_choice = args.pass_choice or os.environ.get("PASS", "parallel")
     render_only = args.render_only or bool(os.environ.get("RENDER_ONLY"))
+    target_patterns = _resolve_target_patterns(args)
+    resume = bool(getattr(args, "resume", False)) or bool(os.environ.get("RESUME"))
 
     if not render_only:
         if pass_choice == "parallel":
             _run_pass(repo_root, bench_dir, results_dir, image,
-                      "parallel", "WP_PAR=")
+                      "parallel", "WP_PAR=", target_patterns, resume)
         elif pass_choice == "serial":
             _run_pass(repo_root, bench_dir, results_dir, image,
-                      "serial", "WP_PAR=1")
+                      "serial", "WP_PAR=1", target_patterns, resume)
         elif pass_choice == "both":
             _run_pass(repo_root, bench_dir, results_dir, image,
-                      "parallel", "WP_PAR=")
+                      "parallel", "WP_PAR=", target_patterns, resume)
             _run_pass(repo_root, bench_dir, results_dir, image,
-                      "serial", "WP_PAR=1")
+                      "serial", "WP_PAR=1", target_patterns, resume)
         else:
             print(f"unknown PASS={pass_choice}", file=sys.stderr)
             return 2
@@ -737,22 +922,42 @@ def main() -> int:
         description="Per-function WP benchmark (Python port).",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=("Examples:\n"
-                "  python3 bench.py run                  # both passes + LaTeX\n"
+                "  python3 bench.py run                  # parallel pass + LaTeX\n"
+                "  python3 bench.py run --pass both      # parallel + serial + LaTeX\n"
                 "  PASS=parallel python3 bench.py run    # parallel pass only\n"
                 "  RENDER_ONLY=1 python3 bench.py run    # skip docker, just render\n"
                 "  python3 bench.py inside-run           # container worker\n"))
     sub = ap.add_subparsers(dest="cmd", required=True)
 
+    target_help = (
+        "label or fnmatch glob to run (default: all). "
+        "Repeat the flag, or pass comma-separated values, to add patterns. "
+        "Also reads $BENCH_TARGETS as a comma-separated fallback. "
+        "Examples: --target edf_block / --target '51_edf_*' / "
+        "--target edf_block,edf_unblock")
+
     p_run = sub.add_parser("run", help="host-side: docker + render")
     p_run.add_argument("--pass", dest="pass_choice", default=None,
                        choices=["parallel", "serial", "both"],
-                       help="which pass to run (default: $PASS or 'both')")
+                       help="which pass to run (default: $PASS or 'parallel'). "
+                            "'parallel' sets -wp-par to nproc; 'serial' sets "
+                            "-wp-par 1; 'both' runs them sequentially. "
+                            "Override with WP_PAR=N if needed.")
+    p_run.add_argument("--target", action="append", default=[],
+                       metavar="GLOB", help=target_help)
+    p_run.add_argument("--resume", action="store_true",
+                       help="skip targets already in $LOG_DIR/results.txt "
+                            "(useful after Ctrl-C). Also reads $RESUME=1.")
     p_run.add_argument("--render-only", action="store_true",
                        help="skip docker, just render existing results")
     p_run.set_defaults(func=cmd_run)
 
     p_in = sub.add_parser("inside-run",
                           help="container-side worker (iterates TARGETS)")
+    p_in.add_argument("--target", action="append", default=[],
+                      metavar="GLOB", help=target_help)
+    p_in.add_argument("--resume", action="store_true",
+                      help="skip targets already in $LOG_DIR/results.txt")
     p_in.set_defaults(func=cmd_inside_run)
 
     p_r = sub.add_parser("render",
