@@ -31,6 +31,7 @@ import dataclasses
 import os
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -436,8 +437,16 @@ def _first_int_token(line: str) -> int:
     return 0
 
 
-def parse_log(log_path: pathlib.Path) -> Tuple[int, int, int]:
-    """Return (qed, alt_ergo, total) parsed from the function-pass section.
+def parse_log(log_path: pathlib.Path) -> Tuple[int, int, int, int]:
+    """Return (qed, alt_ergo, proved, total) from the function-pass section.
+
+    `proved` and `total` come from Frama-C's `[wp] Proved goals: X / Y`
+    summary line: X is the number of goals proved by **any** prover, Y is
+    the total. Qed and Alt-Ergo numbers are individual prover counts
+    (typically proved == qed + alt). The bench checks `proved == total`
+    to decide whether a target passed, rather than relying on the shell
+    exit code — Frama-C doesn't return non-zero just because a goal timed
+    out under Alt-Ergo, so on slow hardware `rc==0` is insufficient.
 
     When the script emits `=== ... function ===` / `=== ... model lemma ===`
     markers (the EDF scripts do, for the lemma pass that's shared across rows
@@ -447,7 +456,7 @@ def parse_log(log_path: pathlib.Path) -> Tuple[int, int, int]:
     try:
         text = log_path.read_text(errors="replace")
     except FileNotFoundError:
-        return (0, 0, 0)
+        return (0, 0, 0, 0)
     fn_lines: List[str] = []
     in_fn = False
     saw_markers = False
@@ -464,10 +473,11 @@ def parse_log(log_path: pathlib.Path) -> Tuple[int, int, int]:
             fn_lines.append(line)
     fnpass_lines = fn_lines if saw_markers else text.splitlines()
 
-    total = qed = alt = 0
+    proved = total = qed = alt = 0
     fnpass = "\n".join(fnpass_lines)
     if (m := _RE_PROVED.search(fnpass)):
-        total = int(m.group(2))
+        proved = int(m.group(1))
+        total  = int(m.group(2))
     for line in fnpass_lines:
         stripped = line.lstrip()
         if qed == 0 and stripped.startswith("Qed:"):
@@ -476,30 +486,61 @@ def parse_log(log_path: pathlib.Path) -> Tuple[int, int, int]:
             alt = _first_int_token(line)
         if qed and alt:
             break
-    return qed, alt, total
+    return qed, alt, proved, total
 
 
 # ─── Progress bar ───────────────────────────────────────────────────────────────
 
 def _emit_progress(current: int, total: int, label: str, rc: int,
-                   qed: int, total_goals: int, elapsed: float,
+                   proved: int, total_goals: int, elapsed: float,
                    bench_t0: float) -> None:
     width = 24
     filled = (current * width // total) if total > 0 else 0
     filled = min(filled, width)
     bar = "#" * filled + "." * (width - filled)
     pct = (current * 100 // total) if total > 0 else 0
-    tag = "ok" if rc == 0 else "FAIL"
+    # "ok" requires both clean exit AND every goal proved by some prover —
+    # frama-c won't fail on its own when individual goals time out.
+    tag = "ok" if (rc == 0 and proved == total_goals) else "FAIL"
     since = int(time.time() - bench_t0)
     print(f"[bench {current:3d}/{total:3d}] [{bar}] {pct:3d}%  "
-          f"{label:<44s}  {tag:<4s}  {qed}/{total_goals} goals  "
+          f"{label:<44s}  {tag:<4s}  {proved}/{total_goals} goals  "
           f"{elapsed:5.2f}s  (run {since//60}m{since%60:02d}s)",
           file=sys.stderr, flush=True)
 
 
 # ─── Inside-container subcommand ────────────────────────────────────────────────
 
+def _load_opam_env() -> None:
+    """Mirror the bash `eval $(opam env)` so `frama-c` lands on PATH.
+
+    The verify-*.sh scripts and `inside-container.sh` do this at the top
+    because `frama-c` lives in the opam switch's bin dir, not in
+    /usr/bin. Without it, subprocess.run("frama-c", ...) raises
+    FileNotFoundError. We shell out to sh so it handles opam's quoting
+    rules itself, then mirror the resulting env into os.environ.
+    """
+    if not shutil.which("opam"):
+        return
+    try:
+        out = subprocess.check_output(
+            ["sh", "-c", "eval $(opam env) && env -0"],
+            stderr=subprocess.DEVNULL,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return
+    for entry in out.split(b"\0"):
+        if not entry:
+            continue
+        name, _, value = entry.partition(b"=")
+        try:
+            os.environ[name.decode("utf-8")] = value.decode("utf-8")
+        except UnicodeDecodeError:
+            continue
+
+
 def cmd_inside_run(args) -> int:
+    _load_opam_env()
     log_dir = pathlib.Path(os.environ.get("LOG_DIR", "/tmp/wp-logs"))
     log_dir.mkdir(parents=True, exist_ok=True)
     total = len(TARGETS)
@@ -510,11 +551,11 @@ def cmd_inside_run(args) -> int:
           file=sys.stderr, flush=True)
     for i, t in enumerate(TARGETS, 1):
         rc, elapsed = run_target(t, log_dir)
-        qed, alt, total_goals = parse_log(log_dir / f"{t.label}.log")
+        qed, alt, proved, total_goals = parse_log(log_dir / f"{t.label}.log")
         print(f"RESULT|{t.label}|{qed}|{alt}|{total_goals}|"
               f"{elapsed:.2f}|rc={rc}",
               flush=True)
-        _emit_progress(i, total, t.label, rc, qed, total_goals, elapsed,
+        _emit_progress(i, total, t.label, rc, proved, total_goals, elapsed,
                        bench_t0)
     secs = int(time.time() - bench_t0)
     print(f"[bench] done — {total}/{total} targets, "

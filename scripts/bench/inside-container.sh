@@ -87,20 +87,25 @@ _format_bar() {
 }
 
 _print_progress() {
-    local label="$1" rc="$2" qed="$3" total="$4" elapsed="$5"
+    local label="$1" rc="$2" proved="$3" total="$4" elapsed="$5"
     local pct=0
     if [ "${TOTAL_TARGETS}" -gt 0 ]; then
         pct=$((CURRENT_TARGET * 100 / TOTAL_TARGETS))
     fi
     local bar
     bar=$(_format_bar "${CURRENT_TARGET}" "${TOTAL_TARGETS}" 24)
+    # "ok" means rc==0 AND every goal proved (by any prover, not just Qed).
+    # frama-c doesn't fail the shell just because a goal didn't prove, so
+    # checking rc alone would miss timeout/unknown verdicts on slow hardware.
     local tag="ok"
-    [ "${rc}" != "0" ] && tag="FAIL"
+    if [ "${rc}" != "0" ] || [ "${proved}" != "${total}" ]; then
+        tag="FAIL"
+    fi
     local now=$(date +%s)
     local since=$((now - BENCH_T0))
     printf '[bench %3d/%3d] [%s] %3d%%  %-44s  %-4s  %s/%s goals  %5ss  (run %dm%02ds)\n' \
         "${CURRENT_TARGET}" "${TOTAL_TARGETS}" "${bar}" "${pct}" \
-        "${label}" "${tag}" "${qed}" "${total}" "${elapsed}" \
+        "${label}" "${tag}" "${proved}" "${total}" "${elapsed}" \
         "$((since/60))" "$((since%60))" >&2
 }
 
@@ -118,14 +123,15 @@ emit_result() {
         cp "${log}" "${log}.fnpass"
     fi
 
-    total=$(awk '/^\[wp\] Proved goals:/{ gsub(/[^0-9]/," ",$0); print $2; exit }' "${log}.fnpass")
+    # `Proved goals: X / Y` — X = #goals proved by any prover, Y = total.
+    read proved total <<< "$(awk '/^\[wp\] Proved goals:/{ gsub(/[^0-9]/," ",$0); print $1, $2; exit }' "${log}.fnpass")"
     qed=$(awk '/^  Qed:/{ for(i=1;i<=NF;i++) if($i ~ /^[0-9]+$/){print $i; exit} }' "${log}.fnpass")
     alt=$(awk '/^  Alt-Ergo/{ for(i=1;i<=NF;i++) if($i ~ /^[0-9]+$/){print $i; exit} }' "${log}.fnpass")
-    : "${total:=0}" "${qed:=0}" "${alt:=0}" "${elapsed:=0}"
+    : "${proved:=0}" "${total:=0}" "${qed:=0}" "${alt:=0}" "${elapsed:=0}"
     echo "RESULT|${label}|${qed}|${alt}|${total}|${elapsed}|rc=${rc}"
 
     CURRENT_TARGET=$((CURRENT_TARGET + 1))
-    _print_progress "${label}" "${rc}" "${qed}" "${total}" "${elapsed}"
+    _print_progress "${label}" "${rc}" "${proved}" "${total}" "${elapsed}"
 }
 
 run_one() {
