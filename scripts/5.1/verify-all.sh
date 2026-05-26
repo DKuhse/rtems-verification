@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Composite runner for the active RTEMS 5.1 verification scripts.
+# Composite runner for the RTEMS 5.1 verification scripts.
 #
 # Runs every documented verify-*.sh in this directory in turn, parses each WP
 # pass's "Proved goals: X / Y" summary, and prints a per-script table
@@ -8,7 +8,7 @@
 # unproved (or failed to emit a WP summary at all).
 #
 # Usage:
-#   verify-all.sh                  # run all active scripts (WP cache on)
+#   verify-all.sh                  # run all 5.1 scripts (WP cache on)
 #   verify-all.sh --no-cache       # disable the WP proof cache
 #   verify-all.sh -- -wp-timeout 60   # forward extra args to every script
 #
@@ -43,7 +43,7 @@ else
     echo "WP cache: disabled"
 fi
 
-# Documented active scripts. Keep this list explicit so temporary or
+# Documented 5.1 scripts. Keep this list explicit so temporary or
 # exploratory scripts are not pulled into the checkpoint runner by accident.
 SCRIPTS=(
     verify-scheduler-update-heir.sh

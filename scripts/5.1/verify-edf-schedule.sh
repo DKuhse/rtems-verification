@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Verify _Scheduler_EDF_Schedule on the active RTEMS 5.1 port.
+# Verify _Scheduler_EDF_Schedule on the RTEMS 5.1 port.
 #
 # Two WP passes:
 #   1. function goals for _Scheduler_EDF_Schedule + immediate helpers
@@ -73,8 +73,8 @@ run_fc() {
 if [ "${GUI}" = "1" ]; then
     run_fc "${WP_FCT_DEFAULTS}" "$@"
 else
-    echo "=== EDF Schedule (RTEMS 5.1 active port): function ==="
+    echo "=== EDF Schedule (RTEMS 5.1): function ==="
     run_fc "${WP_FCT_DEFAULTS}" "$@"
-    echo "=== EDF Schedule (RTEMS 5.1 active port): model lemma ==="
+    echo "=== EDF Schedule (RTEMS 5.1): model lemma ==="
     run_fc "${WP_LEMMA_DEFAULTS}" "$@"
 fi

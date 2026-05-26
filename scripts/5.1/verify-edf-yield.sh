@@ -1,20 +1,21 @@
 #!/bin/bash
 #
-# Verify _Scheduler_EDF_Unblock on the active RTEMS 5.1 port.
+# Verify _Scheduler_EDF_Yield on the RTEMS 5.1 port.
 #
-# _Scheduler_Update_heir is verified separately by verify-scheduler-update-heir.sh.
-# Here we run the EDF entry point + its EDF inline helpers against their bodies,
-# using verified primitive contracts for the heir-update layer.
+# Two WP passes:
+#   1. function goals for _Scheduler_EDF_Yield + immediate helpers
+#   2. the EDF property lemma in the model
 #
 set -e
 
-WP_FCTS="${WP_FCTS:-_Scheduler_EDF_Unblock,_Scheduler_EDF_Get_context,_Scheduler_EDF_Node_downcast,_Scheduler_Node_get_priority,_Thread_Get_priority,_Thread_Scheduler_get_home_node,_Priority_Get_priority}"
-# _Scheduler_EDF_Enqueue is verified against its body in the Schedule/Map-Unmap
-# slices; here it is used through its contract. Including it in -wp-fct would
-# trigger redundant body checks that time out on the _RBTree_Insert_inline
-# call (no assigns specification by design).
+WP_FCTS="${WP_FCTS:-_Scheduler_EDF_Yield,_Scheduler_EDF_Get_context,_Scheduler_EDF_Node_downcast}"
+# _Scheduler_EDF_Schedule_body is verified separately by verify-edf-schedule.sh
+# against its body and the EDF-specialized `_RBTree_Minimum` contract. Here
+# the strengthened force_dispatch=true ensures of that function discharge the
+# Yield postcondition.
 
 WP_FCT_DEFAULTS="${WP_FCT_DEFAULTS:--wp -wp-fct ${WP_FCTS} -wp-model Typed+Cast -wp-timeout 30}"
+WP_LEMMA_DEFAULTS="${WP_LEMMA_DEFAULTS:--wp -wp-prop=@lemma -wp-model Typed+Cast -wp-timeout 30}"
 
 if command -v opam >/dev/null 2>&1; then
     eval $(opam env)
@@ -38,7 +39,7 @@ RTEMS_PREFIX="${RTEMS_PREFIX:-/opt/rtems5}"
 OVERLAY="${OVERLAY:-/workspace/verification/5.1}"
 RTEMS_BUILD_BSP="${RTEMS_BUILD_BSP:-/workspace/rtems/build/amd64/x86_64-rtems5/c/amd64/include}"
 
-SRC="${OVERLAY}/overlay/cpukit/score/src/scheduleredfunblock.c"
+SRC="${OVERLAY}/overlay/cpukit/score/src/scheduleredfyield.c"
 MODEL="${OVERLAY}/models/edf_ready_set.h"
 
 [ -f "${SRC}" ] || { echo "missing overlay source: ${SRC}" >&2; exit 1; }
@@ -72,6 +73,8 @@ run_fc() {
 if [ "${GUI}" = "1" ]; then
     run_fc "${WP_FCT_DEFAULTS}" "$@"
 else
-    echo "=== EDF Unblock (RTEMS 5.1 active port): function ==="
+    echo "=== EDF Yield (RTEMS 5.1): function ==="
     run_fc "${WP_FCT_DEFAULTS}" "$@"
+    echo "=== EDF Yield (RTEMS 5.1): model lemma ==="
+    run_fc "${WP_LEMMA_DEFAULTS}" "$@"
 fi

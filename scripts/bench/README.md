@@ -1,6 +1,6 @@
 # Per-function WP benchmark
 
-Drives the verification scripts under `scripts/6.2/`, `scripts/5.1-active/`,
+Drives the verification scripts under `scripts/6.2/`, `scripts/5.1/`,
 and `scripts/freertos/` once per top-level function (and once per helper),
 parses Frama-C/WP's `Proved goals:` / `Qed:` / `Alt-Ergo:` summary, and
 renders LaTeX tables matching the paper's existing layout.
@@ -52,7 +52,7 @@ batch of related functions.
   helpers are driven via a direct frama-c call against
   `verification/6.2/harnesses/scheduleruni-unblock-harness.c` because their
   verify-script hard-codes `-wp-fct`.
-- **RTEMS 5.1** — all of `scripts/5.1-active/verify-*.sh`. The
+- **RTEMS 5.1** — all of `scripts/5.1/verify-*.sh`. The
   `_Scheduler_Update_heir` helper (5.1's analog of 6.2's split
   `_Scheduler_uniprocessor_Update_heir*` family) is driven via a direct
   frama-c call against

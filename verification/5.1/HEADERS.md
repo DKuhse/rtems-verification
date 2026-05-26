@@ -1,17 +1,17 @@
-# Active RTEMS 5.1 Verification Header Inventory
+# RTEMS 5.1 Verification Header Inventory
 
-This file tracks active RTEMS 5.1 verification overlays and stubs.
+This file tracks RTEMS 5.1 verification overlays and stubs.
 
 The legacy in-tree 5.1 verification (which patches `rtems/src/rtems-5.1/`
 directly via `setup.sh`) is still functional and lives at
 `Formally-Verifying-Implementations-of-EDF-Scheduler-in-RTEMS/`. The new
 overlay-style verification documented here does NOT patch the pristine 5.1
 source tree; instead the overlay is preferred via `-I` ordering when running
-Frama-C through `scripts/5.1-active/`.
+Frama-C through `scripts/5.1/`.
 
 ## Current State
 
-The active 5.1 tree contains a starting overlay derived from the active 6.2
+The 5.1 tree contains a starting overlay derived from the reference 6.2
 verification effort (`../6.2/`). Most files are currently pristine 5.1 imports
 with the contracts ported file-by-file as they reach a clean state. Already in
 place:
@@ -115,7 +115,7 @@ Pending (copied as pristine, contracts not yet ported):
 
 ## Rule
 
-Every active overlay or stub added here must document:
+Every overlay or stub added here must document:
 
 - which pristine RTEMS file or function it replaces or abstracts
 - what behavior is preserved verbatim
@@ -128,7 +128,7 @@ Every active overlay or stub added here must document:
 
 **Source**: `cpukit/include/rtems/score/scheduler.h` (5.1)
 
-**Status**: active compatibility patch.
+**Status**: compatibility patch.
 
 **Modified**:
 
@@ -144,7 +144,7 @@ Every active overlay or stub added here must document:
 
 **Source**: `cpukit/include/rtems/score/schedulerimpl.h` (5.1)
 
-**Status**: active compatibility patch (partial).
+**Status**: compatibility patch (partial).
 
 **Modified**:
 
@@ -155,14 +155,14 @@ Every active overlay or stub added here must document:
 
 **Pending**: contracts for `_Scheduler_Generic_block`, `_Scheduler_Update_heir`,
 `_Scheduler_Release_job`, `_Scheduler_Cancel_job`, and the SMP-only helpers
-once their EDF entry-point callers are ported. The active 6.2 overlay
+once their EDF entry-point callers are ported. The 6.2 overlay
 `schedulerimpl.h` is the reference.
 
 ### scheduleredf.h
 
 **Source**: `cpukit/include/rtems/score/scheduleredf.h` (5.1)
 
-**Status**: active compatibility patch.
+**Status**: compatibility patch.
 
 **Modified**:
 
@@ -175,14 +175,14 @@ once their EDF entry-point callers are ported. The active 6.2 overlay
 
 **Source**: `cpukit/include/rtems/score/scheduleredfimpl.h` (5.1)
 
-**Status**: active compatibility patch.
+**Status**: compatibility patch.
 
 **Modified**:
 
 - Added ACSL contracts for `_Scheduler_EDF_Get_context()`,
   `_Scheduler_EDF_Node_downcast()`, `_Scheduler_EDF_Enqueue()`,
   `_Scheduler_EDF_Extract()`, `_Scheduler_EDF_Extract_body()` — these are
-  the same shape as the active 6.2 contracts because 5.1's helper bodies and
+  the same shape as the 6.2 contracts because 5.1's helper bodies and
   signatures match.
 - Added a new ACSL contract for `_Scheduler_EDF_Schedule_body()`. This is
   the 5.1 analogue of 6.2's `_Scheduler_EDF_Get_highest_ready` +
@@ -195,13 +195,13 @@ once their EDF entry-point callers are ported. The active 6.2 overlay
 
 **Source**: `cpukit/include/rtems/score/percpu.h` (5.1)
 
-**Status**: active compatibility patch.
+**Status**: compatibility patch.
 
 **Modified**:
 
 - Under `__FRAMAC__`, changed `_Per_CPU_Information` from an unsized extern
   array to a one-element extern array (`_Per_CPU_Information[1U]`). This
-  mirrors the active 6.2 workaround and lets WP reason about
+  mirrors the 6.2 workaround and lets WP reason about
   `_Per_CPU_Information[0]` in the non-SMP proof.
 - Added a Frama-C volatile binding for
   `_Per_CPU_Information[0].per_cpu.dispatch_necessary`. The binding writes
@@ -212,7 +212,7 @@ once their EDF entry-point callers are ported. The active 6.2 overlay
 
 **Source**: `cpukit/include/rtems/score/thread.h` (5.1)
 
-**Status**: active compatibility patch.
+**Status**: compatibility patch.
 
 **Modified**:
 
@@ -224,7 +224,7 @@ once their EDF entry-point callers are ported. The active 6.2 overlay
 
 **Source**: `cpukit/score/src/scheduleredf.c` (5.1)
 
-**Status**: active contract slice.
+**Status**: contract slice.
 
 **Modified**:
 
@@ -237,7 +237,7 @@ once their EDF entry-point callers are ported. The active 6.2 overlay
 
 **Source**: `cpukit/score/src/scheduleredfnodeinit.c` (5.1)
 
-**Status**: active contract slice.
+**Status**: contract slice.
 
 **Modified**:
 

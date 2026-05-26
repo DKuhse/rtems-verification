@@ -1,18 +1,21 @@
 #!/bin/bash
 #
-# Verify _Scheduler_EDF_Yield on the active RTEMS 5.1 port.
+# Verify the UP thread-priority aggregation operations used by EDF
+# release/cancel job on the RTEMS 5.1 port.
 #
-# Two WP passes:
-#   1. function goals for _Scheduler_EDF_Yield + immediate helpers
-#   2. the EDF property lemma in the model
+# The priority RBTree/plain operations remain an intentional abstraction
+# boundary for this project. This script targets the priority combinators plus
+# the action-list helper, change callback, scheduler-node setter helper, and
+# the public thread-priority wrappers.
+#
+# Usage:
+#   verify-thread-change-priority.sh                 # default proof
+#   verify-thread-change-priority.sh --gui           # open in GUI
+#   verify-thread-change-priority.sh -wp-prop=foo    # narrow goals
 #
 set -e
 
-WP_FCTS="${WP_FCTS:-_Scheduler_EDF_Yield,_Scheduler_EDF_Get_context,_Scheduler_EDF_Node_downcast}"
-# _Scheduler_EDF_Schedule_body is verified separately by verify-edf-schedule.sh
-# against its body and the EDF-specialized `_RBTree_Minimum` contract. Here
-# the strengthened force_dispatch=true ensures of that function discharge the
-# Yield postcondition.
+WP_FCTS="${WP_FCTS:-_Thread_queue_Do_nothing_priority_actions,_Priority_Actions_add,_Priority_Non_empty_insert,_Priority_Extract_non_empty,_Priority_Changed,_Thread_Priority_add,_Thread_Priority_remove,_Thread_Priority_changed,_Thread_Priority_do_perform_actions,_Thread_Priority_apply,_Thread_Priority_action_change,_Thread_Set_scheduler_node_priority,_Scheduler_Node_set_priority}"
 
 WP_FCT_DEFAULTS="${WP_FCT_DEFAULTS:--wp -wp-fct ${WP_FCTS} -wp-model Typed+Cast -wp-timeout 30}"
 WP_LEMMA_DEFAULTS="${WP_LEMMA_DEFAULTS:--wp -wp-prop=@lemma -wp-model Typed+Cast -wp-timeout 30}"
@@ -39,11 +42,9 @@ RTEMS_PREFIX="${RTEMS_PREFIX:-/opt/rtems5}"
 OVERLAY="${OVERLAY:-/workspace/verification/5.1}"
 RTEMS_BUILD_BSP="${RTEMS_BUILD_BSP:-/workspace/rtems/build/amd64/x86_64-rtems5/c/amd64/include}"
 
-SRC="${OVERLAY}/overlay/cpukit/score/src/scheduleredfyield.c"
-MODEL="${OVERLAY}/models/edf_ready_set.h"
+SRC="${OVERLAY}/overlay/cpukit/score/src/threadchangepriority.c"
 
 [ -f "${SRC}" ] || { echo "missing overlay source: ${SRC}" >&2; exit 1; }
-[ -f "${MODEL}" ] || { echo "missing EDF ready model: ${MODEL}" >&2; exit 1; }
 
 run_fc() {
     local defaults="$1"; shift
@@ -64,8 +65,6 @@ run_fc() {
             -nostdinc" \
         -machdep gcc_x86_64 -cpp-frama-c-compliant "${C_STD_FLAGS[@]}" \
         "${SRC}" \
-        -volatile \
-        -then-on Volatile \
         ${defaults} \
         "$@"
 }
@@ -73,8 +72,8 @@ run_fc() {
 if [ "${GUI}" = "1" ]; then
     run_fc "${WP_FCT_DEFAULTS}" "$@"
 else
-    echo "=== EDF Yield (RTEMS 5.1 active port): function ==="
+    echo "=== Thread Change Priority (RTEMS 5.1): function ==="
     run_fc "${WP_FCT_DEFAULTS}" "$@"
-    echo "=== EDF Yield (RTEMS 5.1 active port): model lemma ==="
+    echo "=== Thread Change Priority (RTEMS 5.1): lemma ==="
     run_fc "${WP_LEMMA_DEFAULTS}" "$@"
 fi

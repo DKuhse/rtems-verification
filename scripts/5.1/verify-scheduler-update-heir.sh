@@ -1,21 +1,16 @@
 #!/bin/bash
 #
-# Verify _Thread_Priority_update() on the active RTEMS 5.1 port.
+# Verify _Scheduler_Update_heir on the RTEMS 5.1 port.
 #
-# This is separate from verify-thread-change-priority.sh: that script checks
-# the priority aggregation helpers and public add/change/remove wrappers, while
-# this one checks the composition step that consumes a queued update and calls
-# the scheduler update-priority operation.
-#
-# Usage:
-#   verify-thread-priority-update.sh                 # default proof
-#   verify-thread-priority-update.sh --gui           # open in GUI
-#   verify-thread-priority-update.sh -wp-prop=foo    # narrow goals
+# 5.1's _Scheduler_Update_heir() is the inline helper in schedulerimpl.h
+# that 6.2 splits into _Scheduler_uniprocessor_Update_heir_if_preemptible
+# + _Scheduler_uniprocessor_Update_heir.  This script mirrors the 6.2
+# verify-scheduleruni-unblock.sh setup: a dedicated harness translation
+# unit so WP can verify the helper's contract against its body.
 #
 set -e
 
-WP_FCTS="${WP_FCTS:-_Thread_Priority_update}"
-WP_FCT_DEFAULTS="${WP_FCT_DEFAULTS:--wp -wp-fct ${WP_FCTS} -wp-model Typed+Cast -wp-timeout 30}"
+WP_DEFAULTS="${WP_DEFAULTS:--wp-model Typed+Cast -wp-timeout 30}"
 
 if command -v opam >/dev/null 2>&1; then
     eval $(opam env)
@@ -37,11 +32,11 @@ RTEMS_PREFIX="${RTEMS_PREFIX:-/opt/rtems5}"
 OVERLAY="${OVERLAY:-/workspace/verification/5.1}"
 RTEMS_BUILD_BSP="${RTEMS_BUILD_BSP:-/workspace/rtems/build/amd64/x86_64-rtems5/c/amd64/include}"
 
-SRC="${OVERLAY}/overlay/cpukit/score/src/threadchangepriority.c"
+SRC="${OVERLAY}/harnesses/scheduler-update-heir-harness.c"
 
-[ -f "${SRC}" ] || { echo "missing overlay source: ${SRC}" >&2; exit 1; }
+[ -f "${SRC}" ] || { echo "missing harness source: ${SRC}" >&2; exit 1; }
 
-echo "=== Thread Priority Update (RTEMS 5.1 active port) ==="
+echo "=== Scheduler Update_heir helper (RTEMS 5.1) ==="
 ${FRAMA_C_CMD} \
     -cpp-command "${RTEMS_PREFIX}/bin/x86_64-rtems5-gcc -C -E \
         -D__FRAMAC__ \
@@ -59,5 +54,9 @@ ${FRAMA_C_CMD} \
         -nostdinc" \
     -machdep gcc_x86_64 -cpp-frama-c-compliant "${C_STD_FLAGS[@]}" \
     "${SRC}" \
-    ${WP_FCT_DEFAULTS} \
+    -volatile \
+    -then-on Volatile \
+    -wp \
+    -wp-fct "_Scheduler_Update_heir,_Thread_Get_CPU" \
+    ${WP_DEFAULTS} \
     "$@"

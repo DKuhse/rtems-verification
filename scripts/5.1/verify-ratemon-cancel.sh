@@ -1,19 +1,23 @@
 #!/bin/bash
 #
-# Verify the generic _Scheduler_Cancel_job inline wrapper on the active
-# RTEMS 5.1 port.
+# Verify the rate-monotonic cancel composition in the RTEMS 5.1
+# ratemoncancel.c overlay.
 #
 # Usage:
-#   verify-scheduler-cancel-job.sh                 # default proof
-#   verify-scheduler-cancel-job.sh --gui           # open in GUI
-#   verify-scheduler-cancel-job.sh -wp-prop=foo    # narrow goals
+#   verify-ratemon-cancel.sh                 # default proof
+#   verify-ratemon-cancel.sh --gui           # open in GUI
+#   verify-ratemon-cancel.sh -wp-prop=foo    # narrow goals
 #
 set -e
 
-WP_FCTS="${WP_FCTS:-_Scheduler_Cancel_job}"
+WP_FCTS="${WP_FCTS:-_Rate_monotonic_Cancel}"
 
 WP_FCT_DEFAULTS="${WP_FCT_DEFAULTS:--wp -wp-fct ${WP_FCTS} -wp-model Typed+Cast -wp-timeout 30}"
-INLINE_CALLS="${INLINE_CALLS:-_Thread_Scheduler_get_home,_Thread_queue_Context_clear_priority_updates}"
+INLINE_CALLS="${INLINE_CALLS:-}"
+INLINE_ARGS=()
+if [ -n "${INLINE_CALLS}" ]; then
+    INLINE_ARGS=(-inline-calls "${INLINE_CALLS}")
+fi
 
 if command -v opam >/dev/null 2>&1; then
     eval $(opam env)
@@ -35,11 +39,16 @@ RTEMS_PREFIX="${RTEMS_PREFIX:-/opt/rtems5}"
 OVERLAY="${OVERLAY:-/workspace/verification/5.1}"
 RTEMS_BUILD_BSP="${RTEMS_BUILD_BSP:-/workspace/rtems/build/amd64/x86_64-rtems5/c/amd64/include}"
 
-SRC="${OVERLAY}/overlay/cpukit/score/src/scheduleredfreleasejob.c"
+SRC="${OVERLAY}/overlay/cpukit/rtems/src/ratemoncancel.c"
+EDF_RELEASE_SRC="${OVERLAY}/overlay/cpukit/score/src/scheduleredfreleasejob.c"
 
 [ -f "${SRC}" ] || { echo "missing overlay source: ${SRC}" >&2; exit 1; }
+[ -f "${EDF_RELEASE_SRC}" ] || {
+    echo "missing EDF release/cancel source: ${EDF_RELEASE_SRC}" >&2
+    exit 1
+}
 
-echo "=== Scheduler Cancel Job Wrapper (RTEMS 5.1 active port) ==="
+echo "=== Rate-monotonic Cancel (RTEMS 5.1) ==="
 ${FRAMA_C_CMD} \
     -cpp-command "${RTEMS_PREFIX}/bin/x86_64-rtems5-gcc -C -E \
         -D__FRAMAC__ \
@@ -56,7 +65,8 @@ ${FRAMA_C_CMD} \
         -I${RTEMS_SRC}/bsps/x86_64/amd64/include \
         -nostdinc" \
     -machdep gcc_x86_64 -cpp-frama-c-compliant "${C_STD_FLAGS[@]}" \
-    -inline-calls "${INLINE_CALLS}" \
+    "${INLINE_ARGS[@]}" \
+    "${EDF_RELEASE_SRC}" \
     "${SRC}" \
     -volatile \
     -then-on Volatile \

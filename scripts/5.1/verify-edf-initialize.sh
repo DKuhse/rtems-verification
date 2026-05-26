@@ -1,16 +1,15 @@
 #!/bin/bash
 #
-# Verify _Scheduler_Update_heir on the active RTEMS 5.1 port.
+# Verify _Scheduler_EDF_Initialize on the RTEMS 5.1 port.
 #
-# 5.1's _Scheduler_Update_heir() is the inline helper in schedulerimpl.h
-# that 6.2 splits into _Scheduler_uniprocessor_Update_heir_if_preemptible
-# + _Scheduler_uniprocessor_Update_heir.  This script mirrors the 6.2
-# verify-scheduleruni-unblock.sh setup: a dedicated harness translation
-# unit so WP can verify the helper's contract against its body.
+# Single WP pass: initialization only empties the EDF ready tree and checks the
+# abstract empty-ready-set contract.
 #
 set -e
 
-WP_DEFAULTS="${WP_DEFAULTS:--wp-model Typed+Cast -wp-timeout 30}"
+WP_FCTS="${WP_FCTS:-_Scheduler_EDF_Initialize,_Scheduler_EDF_Get_context,_Scheduler_Get_context,_RBTree_Initialize_empty}"
+
+WP_FCT_DEFAULTS="${WP_FCT_DEFAULTS:--wp -wp-fct ${WP_FCTS} -wp-model Typed+Cast -wp-timeout 30}"
 
 if command -v opam >/dev/null 2>&1; then
     eval $(opam env)
@@ -32,11 +31,11 @@ RTEMS_PREFIX="${RTEMS_PREFIX:-/opt/rtems5}"
 OVERLAY="${OVERLAY:-/workspace/verification/5.1}"
 RTEMS_BUILD_BSP="${RTEMS_BUILD_BSP:-/workspace/rtems/build/amd64/x86_64-rtems5/c/amd64/include}"
 
-SRC="${OVERLAY}/harnesses/scheduler-update-heir-harness.c"
+SRC="${OVERLAY}/overlay/cpukit/score/src/scheduleredf.c"
 
-[ -f "${SRC}" ] || { echo "missing harness source: ${SRC}" >&2; exit 1; }
+[ -f "${SRC}" ] || { echo "missing overlay source: ${SRC}" >&2; exit 1; }
 
-echo "=== Scheduler Update_heir helper (RTEMS 5.1 active port) ==="
+echo "=== EDF Initialize (RTEMS 5.1) ==="
 ${FRAMA_C_CMD} \
     -cpp-command "${RTEMS_PREFIX}/bin/x86_64-rtems5-gcc -C -E \
         -D__FRAMAC__ \
@@ -54,9 +53,5 @@ ${FRAMA_C_CMD} \
         -nostdinc" \
     -machdep gcc_x86_64 -cpp-frama-c-compliant "${C_STD_FLAGS[@]}" \
     "${SRC}" \
-    -volatile \
-    -then-on Volatile \
-    -wp \
-    -wp-fct "_Scheduler_Update_heir,_Thread_Get_CPU" \
-    ${WP_DEFAULTS} \
+    ${WP_FCT_DEFAULTS} \
     "$@"

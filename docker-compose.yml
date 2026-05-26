@@ -80,15 +80,15 @@ services:
       - ./verification:/workspace/verification
     command: ["/opt/scripts/6.2/verify-edf-unblock.sh"]
 
-  # Active headless verification (RTEMS 5.1 abstract RBTree port) on the
+  # Headless verification (RTEMS 5.1 abstract RBTree port) on the
   # modern Frama-C 32 stack. Overlays verification/5.1/ on top of the
   # pristine 5.1 sources, mirroring the verify-6.2-active-fc32 layout.
   #
   # Override the command to pass WP flags, e.g.:
-  #   docker compose run --rm verify-5.1-active-fc32 \
-  #     /opt/scripts/5.1-active/verify-edf-initialize.sh \
+  #   docker compose run --rm verify-5.1-fc32 \
+  #     /opt/scripts/5.1/verify-edf-initialize.sh \
   #     -wp -wp-fct _Scheduler_EDF_Initialize -wp-model 'Typed+Cast'
-  verify-5.1-active-fc32:
+  verify-5.1-fc32:
     build:
       context: .
       dockerfile: Dockerfile
@@ -100,12 +100,12 @@ services:
       - ./rtems:/workspace/rtems
       - ./scripts:/opt/scripts
       - ./verification:/workspace/verification
-    command: ["/opt/scripts/5.1-active/verify-edf-initialize.sh"]
+    command: ["/opt/scripts/5.1/verify-edf-initialize.sh"]
 
-  # Active 5.1 port on the legacy Frama-C 25 stack (kept-for-reference; the
-  # active scripts default to FC32's -std c11 flag and will fall back to
+  # 5.1 port on the legacy Frama-C 25 stack (kept-for-reference; the
+  # 5.1 scripts default to FC32's -std c11 flag and will fall back to
   # -c11 when they detect FC25 at runtime).
-  verify-5.1-active:
+  verify-5.1:
     build:
       context: .
       dockerfile: Dockerfile
@@ -115,7 +115,7 @@ services:
       - ./rtems:/workspace/rtems
       - ./scripts:/opt/scripts
       - ./verification:/workspace/verification
-    command: ["/opt/scripts/5.1-active/verify-edf-initialize.sh"]
+    command: ["/opt/scripts/5.1/verify-edf-initialize.sh"]
 
   # Headless verification (FreeRTOS EDF). Currently a smoke test that
   # only exercises the toolchain wiring against list.c — annotated targets

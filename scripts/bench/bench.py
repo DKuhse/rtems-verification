@@ -63,7 +63,7 @@ def _62(label, script_base, fct):
 
 def _51(label, script_base, fct):
     return Target("script", label,
-                  script=f"/opt/scripts/5.1-active/{script_base}", fct=fct)
+                  script=f"/opt/scripts/5.1/{script_base}", fct=fct)
 
 def _uni(label, fct):
     return Target("uni_helper", label, fct=fct)

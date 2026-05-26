@@ -1,19 +1,22 @@
 #!/bin/bash
 #
-# Verify the generic _Scheduler_Release_job inline wrapper on the active
+# Verify the generic _Scheduler_Update_priority inline wrapper on the
 # RTEMS 5.1 port.
 #
+# This wrapper lives in schedulerimpl.h, but the EDF change-priority slice is
+# the translation unit that exposes both the static inline wrapper and the
+# concrete _Scheduler_EDF_Update_priority operation contract.
+#
 # Usage:
-#   verify-scheduler-release-job.sh                 # default proof
-#   verify-scheduler-release-job.sh --gui           # open in GUI
-#   verify-scheduler-release-job.sh -wp-prop=foo    # narrow goals
+#   verify-scheduler-update-priority.sh                 # default proof
+#   verify-scheduler-update-priority.sh --gui           # open in GUI
+#   verify-scheduler-update-priority.sh -wp-prop=foo    # narrow goals
 #
 set -e
 
-WP_FCTS="${WP_FCTS:-_Scheduler_Release_job}"
-
+WP_FCTS="${WP_FCTS:-_Scheduler_Update_priority}"
 WP_FCT_DEFAULTS="${WP_FCT_DEFAULTS:--wp -wp-fct ${WP_FCTS} -wp-model Typed+Cast -wp-timeout 30}"
-INLINE_CALLS="${INLINE_CALLS:-_Thread_Scheduler_get_home,_Thread_queue_Context_clear_priority_updates}"
+INLINE_CALLS="${INLINE_CALLS:-_Thread_Scheduler_get_home,_Thread_Scheduler_get_home_node}"
 
 if command -v opam >/dev/null 2>&1; then
     eval $(opam env)
@@ -35,11 +38,11 @@ RTEMS_PREFIX="${RTEMS_PREFIX:-/opt/rtems5}"
 OVERLAY="${OVERLAY:-/workspace/verification/5.1}"
 RTEMS_BUILD_BSP="${RTEMS_BUILD_BSP:-/workspace/rtems/build/amd64/x86_64-rtems5/c/amd64/include}"
 
-SRC="${OVERLAY}/overlay/cpukit/score/src/scheduleredfreleasejob.c"
+SRC="${OVERLAY}/overlay/cpukit/score/src/scheduleredfchangepriority.c"
 
 [ -f "${SRC}" ] || { echo "missing overlay source: ${SRC}" >&2; exit 1; }
 
-echo "=== Scheduler Release Job Wrapper (RTEMS 5.1 active port) ==="
+echo "=== Scheduler Update Priority Wrapper (RTEMS 5.1) ==="
 ${FRAMA_C_CMD} \
     -cpp-command "${RTEMS_PREFIX}/bin/x86_64-rtems5-gcc -C -E \
         -D__FRAMAC__ \

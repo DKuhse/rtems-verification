@@ -1,15 +1,19 @@
 #!/bin/bash
 #
-# Verify _Scheduler_EDF_Initialize on the active RTEMS 5.1 port.
+# Verify the generic _Scheduler_Cancel_job inline wrapper on the
+# RTEMS 5.1 port.
 #
-# Single WP pass: initialization only empties the EDF ready tree and checks the
-# abstract empty-ready-set contract.
+# Usage:
+#   verify-scheduler-cancel-job.sh                 # default proof
+#   verify-scheduler-cancel-job.sh --gui           # open in GUI
+#   verify-scheduler-cancel-job.sh -wp-prop=foo    # narrow goals
 #
 set -e
 
-WP_FCTS="${WP_FCTS:-_Scheduler_EDF_Initialize,_Scheduler_EDF_Get_context,_Scheduler_Get_context,_RBTree_Initialize_empty}"
+WP_FCTS="${WP_FCTS:-_Scheduler_Cancel_job}"
 
 WP_FCT_DEFAULTS="${WP_FCT_DEFAULTS:--wp -wp-fct ${WP_FCTS} -wp-model Typed+Cast -wp-timeout 30}"
+INLINE_CALLS="${INLINE_CALLS:-_Thread_Scheduler_get_home,_Thread_queue_Context_clear_priority_updates}"
 
 if command -v opam >/dev/null 2>&1; then
     eval $(opam env)
@@ -31,11 +35,11 @@ RTEMS_PREFIX="${RTEMS_PREFIX:-/opt/rtems5}"
 OVERLAY="${OVERLAY:-/workspace/verification/5.1}"
 RTEMS_BUILD_BSP="${RTEMS_BUILD_BSP:-/workspace/rtems/build/amd64/x86_64-rtems5/c/amd64/include}"
 
-SRC="${OVERLAY}/overlay/cpukit/score/src/scheduleredf.c"
+SRC="${OVERLAY}/overlay/cpukit/score/src/scheduleredfreleasejob.c"
 
 [ -f "${SRC}" ] || { echo "missing overlay source: ${SRC}" >&2; exit 1; }
 
-echo "=== EDF Initialize (RTEMS 5.1 active port) ==="
+echo "=== Scheduler Cancel Job Wrapper (RTEMS 5.1) ==="
 ${FRAMA_C_CMD} \
     -cpp-command "${RTEMS_PREFIX}/bin/x86_64-rtems5-gcc -C -E \
         -D__FRAMAC__ \
@@ -52,6 +56,9 @@ ${FRAMA_C_CMD} \
         -I${RTEMS_SRC}/bsps/x86_64/amd64/include \
         -nostdinc" \
     -machdep gcc_x86_64 -cpp-frama-c-compliant "${C_STD_FLAGS[@]}" \
+    -inline-calls "${INLINE_CALLS}" \
     "${SRC}" \
+    -volatile \
+    -then-on Volatile \
     ${WP_FCT_DEFAULTS} \
     "$@"

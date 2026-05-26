@@ -1,13 +1,15 @@
 #!/bin/bash
 #
-# Verify _Scheduler_EDF_Node_initialize on the active RTEMS 5.1 port.
+# Verify _Scheduler_EDF_Map_priority and _Scheduler_EDF_Unmap_priority on the
+# RTEMS 5.1 port.
 #
-# Single WP pass: this function doesn't touch the ready set and the EDF
-# property doesn't come into play, so the model lemma isn't needed here.
+# Tiny self-contained slice — these helpers are pure bitwise computation
+# on Priority_Control and don't touch the EDF ready set, so no model lemma
+# is required.
 #
 set -e
 
-WP_FCTS="${WP_FCTS:-_Scheduler_EDF_Node_initialize,_Scheduler_EDF_Node_downcast,_Scheduler_Node_do_initialize,_RBTree_Initialize_node}"
+WP_FCTS="${WP_FCTS:-_Scheduler_EDF_Map_priority,_Scheduler_EDF_Unmap_priority}"
 
 WP_FCT_DEFAULTS="${WP_FCT_DEFAULTS:--wp -wp-fct ${WP_FCTS} -wp-model Typed+Cast -wp-timeout 30}"
 
@@ -31,11 +33,11 @@ RTEMS_PREFIX="${RTEMS_PREFIX:-/opt/rtems5}"
 OVERLAY="${OVERLAY:-/workspace/verification/5.1}"
 RTEMS_BUILD_BSP="${RTEMS_BUILD_BSP:-/workspace/rtems/build/amd64/x86_64-rtems5/c/amd64/include}"
 
-SRC="${OVERLAY}/overlay/cpukit/score/src/scheduleredfnodeinit.c"
+SRC="${OVERLAY}/overlay/cpukit/score/src/scheduleredfreleasejob.c"
 
 [ -f "${SRC}" ] || { echo "missing overlay source: ${SRC}" >&2; exit 1; }
 
-echo "=== EDF Node_initialize (RTEMS 5.1 active port) ==="
+echo "=== EDF Map/Unmap_priority (RTEMS 5.1) ==="
 ${FRAMA_C_CMD} \
     -cpp-command "${RTEMS_PREFIX}/bin/x86_64-rtems5-gcc -C -E \
         -D__FRAMAC__ \

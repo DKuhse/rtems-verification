@@ -1,6 +1,6 @@
 # Notes on Porting verification/6.2/ to verification/5.1/
 
-The active RTEMS 6.2 verification effort (`../6.2/`) is the reference for this
+The reference RTEMS 6.2 verification effort (`../6.2/`) is the reference for this
 port. This document captures the differences that matter when adapting 6.2
 ACSL contracts to the RTEMS 5.1 code shape.
 
@@ -36,7 +36,7 @@ earliest-ready node (deadline threads with smaller priority values may be
 present), so P3.a (`is_preemptible ==> heir owns earliest-ready`) cannot
 hold if the new heir is preemptible.
 
-The 5.1 active contract carves this path out via the precondition
+The 5.1 contract carves this path out via the precondition
 
 ```
 requires SCHEDULER_PRIORITY_PURIFY( node->Priority.value ) !=
@@ -70,7 +70,7 @@ In 5.1:
   finds the EDF-earliest ready node and calls `_Scheduler_Update_heir()`
   with the chosen owner.
 
-The 5.1 active port keeps the contract boundary at:
+The 5.1 port keeps the contract boundary at:
 
 - `_Scheduler_EDF_Schedule_body()` (replaces 6.2's combination of
   `_Scheduler_EDF_Get_highest_ready` + `_Scheduler_uniprocessor_Update_heir`).

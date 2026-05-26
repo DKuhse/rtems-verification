@@ -1,16 +1,14 @@
 #!/bin/bash
 #
-# Verify _Scheduler_EDF_Update_priority on the active RTEMS 5.1 port.
+# Verify _Scheduler_EDF_Block on the RTEMS 5.1 port.
 #
 # Two WP passes:
-#   1. function goals for _Scheduler_EDF_Update_priority + immediate helpers
+#   1. function goals for _Scheduler_EDF_Block + trivially-verifiable helpers
 #   2. the EDF property lemma in the model
 #
 set -e
 
-WP_FCTS="${WP_FCTS:-_Scheduler_EDF_Update_priority,_Scheduler_EDF_Get_context,_Scheduler_EDF_Node_downcast,_Scheduler_Node_get_priority,_Thread_Is_ready}"
-# _Scheduler_EDF_Schedule_body is verified separately by verify-edf-schedule.sh
-# against its body and the EDF-specialized `_RBTree_Minimum` contract.
+WP_FCTS="${WP_FCTS:-_Scheduler_EDF_Block,_Scheduler_EDF_Get_context,_Scheduler_EDF_Node_downcast}"
 
 WP_FCT_DEFAULTS="${WP_FCT_DEFAULTS:--wp -wp-fct ${WP_FCTS} -wp-model Typed+Cast -wp-timeout 30}"
 WP_LEMMA_DEFAULTS="${WP_LEMMA_DEFAULTS:--wp -wp-prop=@lemma -wp-model Typed+Cast -wp-timeout 30}"
@@ -37,7 +35,7 @@ RTEMS_PREFIX="${RTEMS_PREFIX:-/opt/rtems5}"
 OVERLAY="${OVERLAY:-/workspace/verification/5.1}"
 RTEMS_BUILD_BSP="${RTEMS_BUILD_BSP:-/workspace/rtems/build/amd64/x86_64-rtems5/c/amd64/include}"
 
-SRC="${OVERLAY}/overlay/cpukit/score/src/scheduleredfchangepriority.c"
+SRC="${OVERLAY}/overlay/cpukit/score/src/scheduleredfblock.c"
 MODEL="${OVERLAY}/models/edf_ready_set.h"
 
 [ -f "${SRC}" ] || { echo "missing overlay source: ${SRC}" >&2; exit 1; }
@@ -61,6 +59,7 @@ run_fc() {
             -I${RTEMS_SRC}/bsps/x86_64/amd64/include \
             -nostdinc" \
         -machdep gcc_x86_64 -cpp-frama-c-compliant "${C_STD_FLAGS[@]}" \
+        -inline-calls "_Scheduler_Generic_block" \
         "${SRC}" \
         -volatile \
         -then-on Volatile \
@@ -71,8 +70,8 @@ run_fc() {
 if [ "${GUI}" = "1" ]; then
     run_fc "${WP_FCT_DEFAULTS}" "$@"
 else
-    echo "=== EDF Update_priority (RTEMS 5.1 active port): function ==="
+    echo "=== EDF Block (RTEMS 5.1): function ==="
     run_fc "${WP_FCT_DEFAULTS}" "$@"
-    echo "=== EDF Update_priority (RTEMS 5.1 active port): model lemma ==="
+    echo "=== EDF Block (RTEMS 5.1): model lemma ==="
     run_fc "${WP_LEMMA_DEFAULTS}" "$@"
 fi
