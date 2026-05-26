@@ -19,7 +19,7 @@
 #
 set -e
 
-WP_FCTS="${WP_FCTS:-_Thread_queue_Do_nothing_priority_actions,_Thread_Priority_add,_Thread_Priority_remove,_Thread_Priority_changed,_Thread_Priority_do_perform_actions,_Thread_Priority_apply}"
+WP_FCTS="${WP_FCTS:-_Thread_queue_Do_nothing_priority_actions,_Thread_Priority_add,_Thread_Priority_remove,_Thread_Priority_changed,_Thread_Priority_do_perform_actions,_Thread_Priority_apply,_Thread_Priority_action_change,_Thread_Set_scheduler_node_priority}"
 
 WP_FCT_DEFAULTS="${WP_FCT_DEFAULTS:--wp -wp-fct ${WP_FCTS} -wp-model Typed+Cast -wp-timeout 30}"
 WP_LEMMA_DEFAULTS="${WP_LEMMA_DEFAULTS:--wp -wp-prop=@lemma -wp-model Typed+Cast -wp-timeout 30}"
