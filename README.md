@@ -38,10 +38,10 @@ During the execution, you will see an output like:
 ```
 [bench  24/ 97] [#####...................]  24%  [6.2] h_thread_get_priority                     ok    10/10 goals   3.80s  (run 4m58s)
 ```
-The statement `ok` indicates that this test was successful. In case a test fails, usually because of a timeout, the line will contain a `FAIL`. If a timeout occurs, consider increasing the time by setting the `WP_TIMEOUT` environment variable to a higher value. By default, it is set to 120 seconds per proof goal. 
+The statement `ok` indicates that this target was successful. In case a target fails, usually because of a timeout, the line will contain a `FAIL`. If a timeout occurs, consider increasing the time by setting the `WP_TIMEOUT` environment variable to a higher value. By default, it is set to 120 seconds per proof goal. 
 We note that the goal count is for a single function target, while the table groups multiple targets together.
 
-If all tests have finished successfully, the tables should be output in the terminal. Alternatively, please use this command to generate the LaTeX tables directly from the results:
+If all target have finished successfully, the tables should be output in the terminal. Alternatively, please use this command to generate the LaTeX tables directly from the results:
 
 ```bash
 python3 scripts/bench/bench.py render --parallel scripts/bench/results/results-parallel.txt

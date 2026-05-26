@@ -2,14 +2,11 @@
 #
 # Downloads RTEMS 5.1 + 6.2 pristine sources and builds the AMD64 BSP
 # (via Docker) against the 5.1 pristine tree. The BSP build produces the
-# generated headers (cpuopts.h, bspopts.h, ...) that the verify-*.sh
-# scripts pull in via -I${RTEMS_BUILD_BSP}.
+# generated headers (cpuopts.h, bspopts.h, ...) that are part of verification
 #
 # Prerequisites:
 #   - curl, tar (with xz support)
 #   - Docker image built: docker compose build
-#
-# This script is idempotent — it skips steps that are already done.
 #
 set -e
 
