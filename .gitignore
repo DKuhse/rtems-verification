@@ -4,3 +4,4 @@ cache/
 *.glob
 scripts/bench/results/
 .claude
+__pycache__
