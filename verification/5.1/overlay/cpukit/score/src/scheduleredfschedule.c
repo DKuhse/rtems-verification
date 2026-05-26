@@ -53,6 +53,13 @@ struct timeval   sbttotv( int64_t );
   requires \valid( _Thread_Heir );
   requires \valid_read( &_Thread_Heir->is_preemptible );
   requires \valid( &_Thread_Heir->cpu_time_used );
+
+  requires edf_dispatch_set_if_heir_differs(
+    _Per_CPU_Information[ 0 ].per_cpu.executing,
+    _Thread_Heir,
+    _Thread_Dispatch_necessary_ghost );
+
+  
   requires \separated(
     _Thread_Heir + (..),
     (Per_CPU_Control_envelope *) _Per_CPU_Information + (..),
