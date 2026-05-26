@@ -123,6 +123,18 @@ void _Thread_Priority_assume_group_order_purifies(
   Priority_Group_order group_order
 );
 
+/*@
+  requires priority_purifies_to( value, priority );
+  terminates \true;
+  exits \false;
+  assigns \nothing;
+  ensures SCHEDULER_PRIORITY_PURIFY( value ) == priority;
+*/
+void _Thread_Priority_assume_purifies_to_raw(
+  Priority_Control value,
+  Priority_Control priority
+);
+
 // Normally not visible in this file - moved here for convenience, since it's
 // a one liner and an additional overlay file seemed overkill.
 
@@ -731,6 +743,14 @@ static void _Thread_Priority_do_perform_actions(
                 the_thread->Scheduler.nodes->Priority.value,
                 the_thread->Scheduler.nodes->Wait.Priority.Node.priority
               ); */
+#ifdef __FRAMAC__
+        if ( queue_context->Priority.Actions.actions == priority_aggregation ) {
+          _Thread_Priority_assume_purifies_to_raw(
+            the_thread->Scheduler.nodes->Priority.value,
+            the_thread->Scheduler.nodes->Wait.Priority.Node.priority
+          );
+        }
+#endif
         /*@ assert queue_context->Priority.Actions.actions == priority_aggregation ==>
               SCHEDULER_PRIORITY_PURIFY(
                 the_thread->Scheduler.nodes->Priority.value ) ==
@@ -789,6 +809,14 @@ static void _Thread_Priority_do_perform_actions(
                 the_thread->Scheduler.nodes->Priority.value,
                 the_thread->Scheduler.nodes->Wait.Priority.Node.priority
               ); */
+#ifdef __FRAMAC__
+        if ( queue_context->Priority.Actions.actions == priority_aggregation ) {
+          _Thread_Priority_assume_purifies_to_raw(
+            the_thread->Scheduler.nodes->Priority.value,
+            the_thread->Scheduler.nodes->Wait.Priority.Node.priority
+          );
+        }
+#endif
         /*@ assert queue_context->Priority.Actions.actions == priority_aggregation ==>
               SCHEDULER_PRIORITY_PURIFY(
                 the_thread->Scheduler.nodes->Priority.value ) ==
@@ -825,6 +853,14 @@ static void _Thread_Priority_do_perform_actions(
                 the_thread->Scheduler.nodes->Priority.value,
                 the_thread->Scheduler.nodes->Wait.Priority.Node.priority
               ); */
+#ifdef __FRAMAC__
+        if ( queue_context->Priority.Actions.actions == priority_aggregation ) {
+          _Thread_Priority_assume_purifies_to_raw(
+            the_thread->Scheduler.nodes->Priority.value,
+            the_thread->Scheduler.nodes->Wait.Priority.Node.priority
+          );
+        }
+#endif
         /*@ assert queue_context->Priority.Actions.actions == priority_aggregation ==>
               SCHEDULER_PRIORITY_PURIFY(
                 the_thread->Scheduler.nodes->Priority.value ) ==

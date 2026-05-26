@@ -8,9 +8,9 @@
 #   2. ACSL lemmas consumed by the function contracts
 #
 # The priority RBTree/plain operations remain an intentional abstraction
-# boundary for this project. This script targets the public thread-priority
-# change wrappers, the internal apply/do-perform composition layer, and the
-# no-op priority-actions callback used by the EDF thread-priority path.
+# boundary for this project. This script targets the priority combinators plus
+# the action-list helper, change callback, scheduler-node setter helper, and
+# the public thread-priority wrappers.
 #
 # Usage:
 #   verify-thread-change-priority.sh                 # default proof
@@ -19,7 +19,7 @@
 #
 set -e
 
-WP_FCTS="${WP_FCTS:-_Thread_queue_Do_nothing_priority_actions,_Thread_Priority_add,_Thread_Priority_remove,_Thread_Priority_changed,_Thread_Priority_do_perform_actions,_Thread_Priority_apply,_Thread_Priority_action_change,_Thread_Set_scheduler_node_priority,_Scheduler_Node_set_priority}"
+WP_FCTS="${WP_FCTS:-_Thread_queue_Do_nothing_priority_actions,_Priority_Actions_add,_Priority_Non_empty_insert,_Priority_Extract_non_empty,_Priority_Changed,_Thread_Priority_add,_Thread_Priority_remove,_Thread_Priority_changed,_Thread_Priority_do_perform_actions,_Thread_Priority_apply,_Thread_Priority_action_change,_Thread_Set_scheduler_node_priority,_Scheduler_Node_set_priority}"
 
 WP_FCT_DEFAULTS="${WP_FCT_DEFAULTS:--wp -wp-fct ${WP_FCTS} -wp-model Typed+Cast -wp-timeout 30}"
 WP_LEMMA_DEFAULTS="${WP_LEMMA_DEFAULTS:--wp -wp-prop=@lemma -wp-model Typed+Cast -wp-timeout 30}"

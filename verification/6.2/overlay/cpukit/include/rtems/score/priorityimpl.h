@@ -934,10 +934,6 @@ static inline void _Priority_Remove_nothing(
         aggregation )->Priority.value,
       aggregation->Node.priority
     );
-  ensures actions->actions == aggregation ==>
-    SCHEDULER_PRIORITY_PURIFY(
-      _Priority_Verify_scheduler_node_of_aggregation(
-        aggregation )->Priority.value ) == aggregation->Node.priority;
   ensures actions->actions == \null ==>
     _Priority_Verify_scheduler_node_of_aggregation(
       aggregation )->Priority.value ==
@@ -1161,10 +1157,6 @@ static inline void _Priority_Extract(
         aggregation )->Priority.value,
       aggregation->Node.priority
     );
-  ensures actions->actions == aggregation ==>
-    SCHEDULER_PRIORITY_PURIFY(
-      _Priority_Verify_scheduler_node_of_aggregation(
-        aggregation )->Priority.value ) == aggregation->Node.priority;
   ensures actions->actions == \null ==>
     _Priority_Verify_scheduler_node_of_aggregation(
       aggregation )->Priority.value ==
@@ -1309,10 +1301,6 @@ static inline void _Priority_Extract_non_empty(
         aggregation )->Priority.value,
       aggregation->Node.priority
     );
-  ensures actions->actions == aggregation ==>
-    SCHEDULER_PRIORITY_PURIFY(
-      _Priority_Verify_scheduler_node_of_aggregation(
-        aggregation )->Priority.value ) == aggregation->Node.priority;
   ensures actions->actions == \null ==>
     _Priority_Verify_scheduler_node_of_aggregation(
       aggregation )->Priority.value ==

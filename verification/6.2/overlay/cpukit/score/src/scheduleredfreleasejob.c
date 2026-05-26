@@ -828,6 +828,13 @@ void _Scheduler_EDF_Release_job(
           SCHEDULER_PRIORITY_PURIFY(
             the_thread->Scheduler.nodes->Priority.value ) ==
             the_thread->Scheduler.nodes->Wait.Priority.Node.priority;
+  ensures \at( queue_context->Priority.update_count, Pre ) == 0 &&
+          queue_context->Priority.update_count == 0 &&
+          the_thread->current_state == STATES_READY &&
+          \at( edf_ready_node_cache_consistent(
+            (Scheduler_EDF_Node *) the_thread->Scheduler.nodes ), Pre ) ==>
+          edf_ready_node_cache_consistent{Post}(
+            (Scheduler_EDF_Node *) the_thread->Scheduler.nodes );
 
   behavior active:
     assumes priority_node_active{Pre}( priority_node );

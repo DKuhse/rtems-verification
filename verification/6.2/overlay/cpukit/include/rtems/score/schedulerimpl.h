@@ -1435,6 +1435,33 @@ Before_Cancel_job:
         the_thread,
         priority_node,
         queue_context ); */
+  /*@ assert priority_contributors{Here}(
+          &the_thread->Scheduler.nodes->Wait.Priority ) ==
+        priority_contributors{Pre}(
+          &the_thread->Scheduler.nodes->Wait.Priority ); */
+  /*@ assert priority_node_active{Here}( priority_node ) ==>
+        priority_node_active{Pre}( priority_node ); */
+  /*@ assert priority_node_active{Here}( priority_node ) ==>
+        ( \exists Priority_Node *other;
+            other != priority_node &&
+            other \in priority_contributors{Here}(
+              &the_thread->Scheduler.nodes->Wait.Priority ) ); */
+  /*@ assert \forall Priority_Node *other;
+        other != priority_node &&
+        other \in priority_contributors{Here}(
+          &the_thread->Scheduler.nodes->Wait.Priority ) ==>
+        other \in priority_contributors_extract(
+          priority_contributors{Here}(
+            &the_thread->Scheduler.nodes->Wait.Priority ),
+          priority_node
+        ); */
+  /*@ assert priority_node_active{Here}( priority_node ) ==>
+        ( \exists Priority_Node *remaining;
+            remaining \in priority_contributors_extract(
+              priority_contributors{Here}(
+                &the_thread->Scheduler.nodes->Wait.Priority ),
+              priority_node
+            ) ); */
   /*@ assert \separated(
         &_Thread_Heir->is_preemptible,
         &_Thread_Heir->Scheduler.nodes,
