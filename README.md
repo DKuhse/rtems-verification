@@ -64,7 +64,7 @@ python3 scripts/bench/bench.py render --serial scripts/bench/results/results-ser
 ```
 
 ## Structure
-The folder `scripts` contains individual verification scripts that are used to verify individual functions or files one at a time. We note that their goals do not line up with the table groups.
+The folder `scripts` contains individual verification scripts that are used to verify individual functions or files one at a time used during development. We note that their goals do not line up with the table groups. Must be executed in the docker container (verify-6.2-active-fc32, verify-5.1-active-fc32, verify-freertos).
 
 The folder `verification` contains the source code annotated with the proofs. For RTEMS this is an overlay. For FreeRTOS the relevant functions were separated into `reference` for readability.
 
@@ -77,19 +77,19 @@ list_model.h and scheduler_model.h for FreeRTOS.
 ### RTEMS contracts
 For RTEMS, the most readable contracts are the contracts for the entry points of:
 
-- `_Scheduler_EDF_Schedule`
-- `_Scheduler_EDF_Unblock`
-- `_Scheduler_EDF_Yield`
-- `_Scheduler_EDF_Block`
-- `_Scheduler_EDF_Update_priority` (scheduleredfchangepriority.c)
+- `_Scheduler_EDF_Schedule` (verification/6.2/overlay/cpukit/score/src/scheduleredfschedule.c)
+- `_Scheduler_EDF_Unblock` (verification/6.2/overlay/cpukit/score/src/scheduleredfunblock.c)
+- `_Scheduler_EDF_Yield` (verification/6.2/overlay/cpukit/score/src/scheduleredfyield.c)
+- `_Scheduler_EDF_Block` (verification/6.2/overlay/cpukit/score/src/scheduleredfblock.c)
+- `_Scheduler_EDF_Update_priority` (verification/6.2/overlay/cpukit/score/src/scheduleredfchangepriority.c)
 
 The contracts for
 
-- `_Scheduler_EDF_Release_job`
-- `_Scheduler_EDF_Cancel_job`
+- `_Scheduler_EDF_Release_job` (verification/6.2/overlay/cpukit/score/src/scheduleredfreleasejob.c)
+- `_Scheduler_EDF_Cancel_job` (verification/6.2/overlay/cpukit/score/src/scheduleredfcancel.c)
 
 are more advanced since they interface with `_Rate_monotonic_Release_job` and `_Rate_monotonic_Cancel`. 
-These contracts contain many preservation postconditions.
+These contracts contain many separation conditions and preservation postconditions.
 
 ### FreeRTOS contracts
 For FreeRTOS, the contract structure is less complicated.

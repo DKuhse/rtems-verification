@@ -1,112 +1,185 @@
 #!/bin/bash
 #
-# Smoke-test WP run for the FreeRTOS EDF port.
+# Composite runner for the FreeRTOS EDF reference verification scripts.
 #
-# At this stage there are no annotated functions — this script just
-# preprocesses list.c through Frama-C with the MSP430-flavoured toolchain
-# and runs WP, so we can confirm the Docker setup is wired up correctly.
-# Real verification targets get added later, one block per function group.
+# Runs every documented verify-*-reference.sh in this directory in turn,
+# parses each WP pass's "Proved goals: X / Y" summary, and prints a
+# per-script table plus an aggregate total. Exits non-zero if any script
+# left goals unproved (or failed to emit a WP summary at all).
+#
+# The verification targets live in verification/freertos/reference/*.c; each
+# per-target script owns its own function list, soundness probe, and default
+# timeout. This runner just orchestrates them, mirroring scripts/6.2 and
+# scripts/5.1 verify-all.sh.
 #
 # Usage:
-#   verify-wp-all.sh                            # default flags
-#   verify-wp-all.sh -wp-timeout 30             # 30s prover timeout
+#   verify-wp-all.sh                  # run all reference scripts (WP cache on)
+#   verify-wp-all.sh --no-cache       # disable the WP proof cache
+#   verify-wp-all.sh -j 8             # run up to 8 scripts in parallel (default nproc/2)
+#   verify-wp-all.sh -- -wp-timeout 60   # forward extra args to every script
 #
-set -e
-eval $(opam env)
+# Parallelism:
+#   Scripts are launched concurrently up to -j JOBS at a time. Their stdout
+#   is buffered to per-script files and replayed in the original SCRIPTS
+#   order so the report is deterministic. Note that each WP invocation
+#   itself spawns provers in parallel (-wp-par); over-subscribing -j
+#   can thrash the CPU. The default of nproc/2 (min 1) leaves headroom
+#   for WP's own prover parallelism.
+#
+# WP proof cache:
+#   FRAMAC_WP_CACHE / FRAMAC_WP_CACHEDIR control WP's per-goal proof cache.
+#   This script exports both with sensible defaults so the second run of
+#   a script only re-proves goals whose VCs changed. Override either env
+#   var, or pass --no-cache, to opt out.
+#
+set -u
 
-FREERTOS_SRC="${FREERTOS_SRC:-/workspace/source/freertos-edf-msp430}"
-OVERLAY="${OVERLAY:-/workspace/verification/freertos}"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Frama-C has no native MSP430 machdep. gcc_x86_16 is the closest stock
-# match: 16-bit int/short, 32-bit long, signed char — same scalar layout as
-# MSP430 with the large data model (__MSP430X_LARGE__ / __LARGE_DATA_MODEL__),
-# which is what FreeRTOSConfig.h's heap-size branch assumes.
-MACHDEP="gcc_x86_16"
+USE_CACHE=1
+JOBS=$(( $(nproc 2>/dev/null || echo 2) / 2 ))
+[ "${JOBS}" -lt 1 ] && JOBS=1
+EXTRA_ARGS=()
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --no-cache) USE_CACHE=0; shift ;;
+        -j)         JOBS="$2"; shift 2 ;;
+        -j*)        JOBS="${1#-j}"; shift ;;
+        --jobs=*)   JOBS="${1#--jobs=}"; shift ;;
+        --) shift; EXTRA_ARGS=("$@"); break ;;
+        *) EXTRA_ARGS+=("$1"); shift ;;
+    esac
+done
 
-CPP_CMD="gcc -C -E \
-    -D__LARGE_DATA_MODEL__ \
-    -D__FRAMAC__ \
-    -DEDF_SCHEDULER=1 \
-    -I${OVERLAY}/overlay/include \
-    -I${OVERLAY}/stubs \
-    -I${FREERTOS_SRC}/include \
-    -nostdinc \
-    -isystem /usr/include \
-    -isystem /usr/include/x86_64-linux-gnu \
-    -isystem /usr/lib/gcc/x86_64-linux-gnu/11/include"
+if ! [[ "${JOBS}" =~ ^[0-9]+$ ]] || [ "${JOBS}" -lt 1 ]; then
+    echo "verify-wp-all.sh: -j must be a positive integer (got '${JOBS}')" >&2
+    exit 2
+fi
 
-COMMON="-machdep ${MACHDEP} -cpp-frama-c-compliant -std c11"
+if [ "${USE_CACHE}" = "1" ]; then
+    : "${FRAMAC_WP_CACHE:=update}"
+    : "${FRAMAC_WP_CACHEDIR:=${HOME}/.frama-c-wp-cache}"
+    mkdir -p "${FRAMAC_WP_CACHEDIR}"
+    export FRAMAC_WP_CACHE FRAMAC_WP_CACHEDIR
+    echo "WP cache: mode=${FRAMAC_WP_CACHE} dir=${FRAMAC_WP_CACHEDIR}"
+else
+    unset FRAMAC_WP_CACHE FRAMAC_WP_CACHEDIR
+    echo "WP cache: disabled"
+fi
 
-PASS=0
-FAIL=0
+# Documented reference scripts. Keep this list explicit so temporary or
+# exploratory scripts are not pulled into the checkpoint runner by accident.
+SCRIPTS=(
+    verify-reference.sh           # vTaskSwitchContext
+    verify-tick-reference.sh      # xTaskIncrementTick
+    verify-suspend-reference.sh   # vTaskSuspend
+    verify-resume-reference.sh    # vTaskResume
+    verify-delay-reference.sh     # xTaskDelayUntil (+ soundness probe)
+)
 
-run_wp() {
-    local label="$1"
-    local source_path="$2"
-    local fcts="$3"
-    shift 3
+TOTAL_PROVED=0
+TOTAL_GOALS=0
+SCRIPTS_OK=0
+SCRIPTS_BAD=0
+declare -a REPORT_LINES
 
-    [ -f "${source_path}" ] || { echo "  ERROR: missing source ${source_path}"; FAIL=$((FAIL + 1)); return; }
+# Buffer per-script output to a temp dir so parallel jobs don't interleave.
+TMPDIR_RUN="$(mktemp -d "${TMPDIR:-/tmp}/verify-all.XXXXXX")"
+trap 'rm -rf "${TMPDIR_RUN}"' EXIT
 
-    echo "--- ${label} ---"
+echo "Parallelism: -j ${JOBS} (per-script output buffered, printed in order)"
 
-    local fct_flag=""
-    if [ -n "${fcts}" ]; then
-        fct_flag="-wp-fct ${fcts}"
+# Launch jobs with a simple semaphore: keep at most ${JOBS} background
+# children alive at any moment. `wait -n` blocks until one finishes.
+running=0
+for idx in "${!SCRIPTS[@]}"; do
+    script="${SCRIPTS[$idx]}"
+    path="${HERE}/${script}"
+    out="${TMPDIR_RUN}/${idx}.out"
+    rcfile="${TMPDIR_RUN}/${idx}.rc"
+
+    if [ ! -x "${path}" ]; then
+        : > "${out}"
+        echo "MISSING" > "${rcfile}"
+        continue
     fi
 
-    output=$(frama-c \
-        -cpp-command "${CPP_CMD}" \
-        ${COMMON} \
-        -wp ${fct_flag} \
-        "$@" \
-        "${source_path}" 2>&1)
+    while [ "${running}" -ge "${JOBS}" ]; do
+        wait -n
+        running=$((running - 1))
+    done
 
-    summary=$(echo "${output}" | grep '^\[wp\] Proved goals:' || true)
-    if [ -z "${summary}" ]; then
-        # No proof obligations is expected for unannotated code — treat as pass
-        # but flag any hard errors in the output.
-        if echo "${output}" | grep -qE '\[kernel\] (User Error|failure)|\[wp\] failure'; then
-            echo "  ERROR: Frama-C reported failure"
-            echo "${output}" | tail -20
-            FAIL=$((FAIL + 1))
-            return
+    (
+        "${path}" "${EXTRA_ARGS[@]}" >"${out}" 2>&1
+        echo "$?" > "${rcfile}"
+    ) &
+    running=$((running + 1))
+done
+
+wait
+
+for idx in "${!SCRIPTS[@]}"; do
+    script="${SCRIPTS[$idx]}"
+    out="${TMPDIR_RUN}/${idx}.out"
+    rcfile="${TMPDIR_RUN}/${idx}.rc"
+    rc_raw="$(cat "${rcfile}" 2>/dev/null || echo MISSING)"
+
+    if [ "${rc_raw}" = "MISSING" ]; then
+        echo ">>> SKIP ${script} (missing or not executable)"
+        REPORT_LINES+=("$(printf '  %-40s  %s' "${script}" 'SKIPPED (not found)')")
+        SCRIPTS_BAD=$((SCRIPTS_BAD + 1))
+        continue
+    fi
+    rc="${rc_raw}"
+
+    echo
+    echo "============================================================"
+    echo ">>> ${script}"
+    echo "============================================================"
+    cat "${out}"
+
+    # Sum every "[wp] Proved goals: X / Y" line (a script may run
+    # multiple WP passes — e.g. soundness probe + function pass).
+    script_proved=0
+    script_goals=0
+    pass_count=0
+    while IFS= read -r line; do
+        if [[ "${line}" =~ Proved\ goals:[[:space:]]*([0-9]+)[[:space:]]*/[[:space:]]*([0-9]+) ]]; then
+            script_proved=$((script_proved + ${BASH_REMATCH[1]}))
+            script_goals=$((script_goals + ${BASH_REMATCH[2]}))
+            pass_count=$((pass_count + 1))
         fi
-        echo "  no proof obligations (no ACSL contracts yet)"
-        PASS=$((PASS + 1))
-        return
-    fi
+    done < <(grep -E '^\[wp\] Proved goals:' "${out}")
 
-    proved=$(echo "${summary}" | sed 's/.*: *\([0-9]*\) *\/ *\([0-9]*\)/\1/')
-    total=$(echo "${summary}" | sed 's/.*: *\([0-9]*\) *\/ *\([0-9]*\)/\2/')
-    echo "  ${summary}"
-
-    if [ "${proved}" = "${total}" ]; then
-        PASS=$((PASS + 1))
+    if [ "${pass_count}" = "0" ]; then
+        status="NO WP SUMMARY (exit ${rc})"
+        SCRIPTS_BAD=$((SCRIPTS_BAD + 1))
+    elif [ "${script_proved}" = "${script_goals}" ] && [ "${rc}" = "0" ]; then
+        status="OK  ${script_proved}/${script_goals} (${pass_count} pass$([ ${pass_count} -gt 1 ] && echo es))"
+        SCRIPTS_OK=$((SCRIPTS_OK + 1))
     else
-        FAIL=$((FAIL + 1))
-        echo "${output}" | grep -E "Timeout|Unknown|Failed" | head -10
+        status="FAIL ${script_proved}/${script_goals} (exit ${rc})"
+        SCRIPTS_BAD=$((SCRIPTS_BAD + 1))
     fi
-}
 
-EXTRA_ARGS="$@"
+    TOTAL_PROVED=$((TOTAL_PROVED + script_proved))
+    TOTAL_GOALS=$((TOTAL_GOALS + script_goals))
+    REPORT_LINES+=("$(printf '  %-40s  %s' "${script}" "${status}")")
+done
 
-echo "========================================"
-echo " Headless WP Verification (FreeRTOS)"
-echo "========================================"
-echo ""
+echo
+echo "============================================================"
+echo " Composite verification summary"
+echo "============================================================"
+for line in "${REPORT_LINES[@]}"; do
+    echo "${line}"
+done
+echo "------------------------------------------------------------"
+printf '  %-40s  %s\n' "TOTAL" "${TOTAL_PROVED}/${TOTAL_GOALS} goals proved"
+printf '  %-40s  %d ok, %d with problems\n' "scripts" "${SCRIPTS_OK}" "${SCRIPTS_BAD}"
+echo "============================================================"
 
-# ── Tasks (overlay/tasks.c) ──────────────────────────────────────
-echo "== Tasks (overlay/tasks.c) =="
-echo ""
-
-run_wp "vTaskSwitchContext" \
-    "${OVERLAY}/overlay/tasks.c" \
-    "vTaskSwitchContext" \
-    -wp-model "Typed+Cast" ${EXTRA_ARGS}
-
-echo ""
-echo "========================================"
-echo " Summary: ${PASS} passed, ${FAIL} failed"
-echo "========================================"
-exit ${FAIL}
+if [ "${SCRIPTS_BAD}" -gt 0 ] || [ "${TOTAL_PROVED}" != "${TOTAL_GOALS}" ]; then
+    exit 1
+fi
+exit 0

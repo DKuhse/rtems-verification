@@ -676,6 +676,9 @@ void _Scheduler_EDF_Release_job(
     the_thread,
     priority_node,
     queue_context );
+
+  // SEPARATION
+
   requires \separated(
     &_Thread_Heir->is_preemptible,
     &_Thread_Heir->Scheduler.nodes,
@@ -738,6 +741,8 @@ void _Scheduler_EDF_Release_job(
           the_thread->Scheduler.nodes->Wait.Priority,
           the_thread->Scheduler.nodes->Priority.value,
           queue_context->Priority;
+
+  // LOGIC
 
   ensures !priority_node_active{Post}( priority_node );
   ensures priority_node->priority == \at( priority_node->priority, Pre );
