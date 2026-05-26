@@ -380,6 +380,22 @@ RTEMS_INLINE_ROUTINE void _Thread_queue_Context_restore_priority_updates(
  *      array.
  * @param the_thread The thread for the priority update.
  */
+/*@
+  requires queue_context->Priority.update_count < 2;
+
+  assigns queue_context->Priority.update_count,
+          queue_context->Priority.update[
+            \at( queue_context->Priority.update_count, Pre )
+          ] \from queue_context->Priority.update_count, the_thread;
+
+  ensures queue_context->Priority.update_count ==
+    \at( queue_context->Priority.update_count, Pre ) + 1;
+  ensures queue_context->Priority.update[
+    \at( queue_context->Priority.update_count, Pre )
+  ] == the_thread;
+  ensures queue_context->Priority.Actions.actions ==
+    \at( queue_context->Priority.Actions.actions, Pre );
+*/
 RTEMS_INLINE_ROUTINE void _Thread_queue_Context_add_priority_update(
   Thread_queue_Context *queue_context,
   Thread_Control       *the_thread

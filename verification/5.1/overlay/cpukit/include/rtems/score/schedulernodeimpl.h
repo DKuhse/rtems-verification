@@ -63,8 +63,10 @@ extern "C" {
 /**
  * @brief Clears the priority append indicator bit.
  */
+#ifndef SCHEDULER_PRIORITY_PURIFY
 #define SCHEDULER_PRIORITY_PURIFY( priority )  \
   ( ( priority ) & ~( (Priority_Control) SCHEDULER_PRIORITY_APPEND_FLAG ) )
+#endif
 
 /**
  * @brief Returns the priority control with the append indicator bit set.
@@ -200,6 +202,18 @@ RTEMS_INLINE_ROUTINE Priority_Control _Scheduler_Node_get_priority(
     ( new_priority |
       (Priority_Control) ( prepend_it ? 0 : SCHEDULER_PRIORITY_APPEND_FLAG ) );
   ensures node->owner == \at( node->owner, Pre );
+
+  behavior prepend:
+    assumes prepend_it;
+    ensures node->Priority.value == new_priority;
+
+  behavior append:
+    assumes !prepend_it;
+    ensures node->Priority.value ==
+      ( new_priority | (Priority_Control) SCHEDULER_PRIORITY_APPEND_FLAG );
+
+  complete behaviors prepend, append;
+  disjoint behaviors prepend, append;
 */
 RTEMS_INLINE_ROUTINE void _Scheduler_Node_set_priority(
   Scheduler_Node   *node,

@@ -27,15 +27,50 @@
 #include <rtems/score/scheduler.h>
 
 #ifdef __FRAMAC__
-#include <priority_aggregation.h>
-#include <rtems/score/schedulernode.h>
-
 #ifndef SCHEDULER_PRIORITY_APPEND_FLAG
 #define SCHEDULER_PRIORITY_APPEND_FLAG 1
 #endif
 
-static const uintptr_t _Priority_Verify_wait_priority_node_offset =
-  offsetof( Scheduler_Node, Wait.Priority.Node.Node.Chain );
+#ifndef SCHEDULER_PRIORITY_PURIFY
+#define SCHEDULER_PRIORITY_PURIFY( priority ) \
+  ( ( priority ) & ~( (Priority_Control) SCHEDULER_PRIORITY_APPEND_FLAG ) )
+#endif
+
+/*@
+  predicate priority_purifies_to(
+    Priority_Control value,
+    Priority_Control priority
+  ) =
+    SCHEDULER_PRIORITY_PURIFY( value ) == priority;
+
+  predicate priority_is_pure( Priority_Control priority ) =
+    priority_purifies_to( priority, priority );
+
+  lemma priority_purifies_to_unique:
+    \forall Priority_Control value, left, right;
+      priority_purifies_to( value, left ) &&
+      priority_purifies_to( value, right ) ==>
+        left == right;
+
+*/
+
+#include <priority_aggregation.h>
+#include <rtems/score/schedulernode.h>
+
+/*@
+  lemma priority_cached_minimum_is_pure{L}:
+    \forall Priority_Aggregation *aggregation;
+      priority_aggregation_cached_minimum{L}( aggregation ) &&
+      ( \forall Priority_Node *node;
+          node \in priority_contributors{L}( aggregation ) ==>
+            priority_is_pure( \at( node->priority, L ) ) ) ==>
+        priority_is_pure( \at( aggregation->Node.priority, L ) );
+*/
+
+enum {
+  _Priority_Verify_wait_priority_node_offset =
+    offsetof( Scheduler_Node, Wait.Priority.Node.Node.Chain )
+};
 
 #define _Priority_Verify_scheduler_node_of_aggregation( aggregation ) \
   ( (Scheduler_Node *) ( \
@@ -74,6 +109,19 @@ RTEMS_INLINE_ROUTINE void _Priority_Actions_initialize_empty(
  * @param node The action node for the @a actions to be initialized.
  * @param type The action type for the @a actions to be initialized.
  */
+/*@
+  requires \valid( actions );
+  requires \valid( aggregation );
+  requires \valid( node );
+
+  assigns aggregation->Action.node,
+          aggregation->Action.type,
+          actions->actions;
+
+  ensures aggregation->Action.node == node;
+  ensures aggregation->Action.type == type;
+  ensures actions->actions == aggregation;
+*/
 RTEMS_INLINE_ROUTINE void _Priority_Actions_initialize_one(
   Priority_Actions     *actions,
   Priority_Aggregation *aggregation,
@@ -98,6 +146,11 @@ RTEMS_INLINE_ROUTINE void _Priority_Actions_initialize_one(
  * @retval true The priority actions @a actions is empty.
  * @retval false The priority actions @a actions is empty.
  */
+/*@
+  requires \valid_read( actions );
+  assigns \nothing;
+  ensures \result <==> actions->actions == \null;
+*/
 RTEMS_INLINE_ROUTINE bool _Priority_Actions_is_empty(
   const Priority_Actions *actions
 )
@@ -113,6 +166,14 @@ RTEMS_INLINE_ROUTINE bool _Priority_Actions_is_empty(
  * @retval true The @a aggregation is valid.
  * @retval false The @a aggregation is not valid.
  */
+/*@
+  assigns \nothing;
+#if defined(RTEMS_SMP)
+  ensures \result <==> aggregation != \null;
+#else
+  ensures \result == \false;
+#endif
+*/
 RTEMS_INLINE_ROUTINE bool _Priority_Actions_is_valid(
   const Priority_Aggregation *aggregation
 )
@@ -132,6 +193,12 @@ RTEMS_INLINE_ROUTINE bool _Priority_Actions_is_valid(
  *
  * @return The former actions of @a actions that were moved.
  */
+/*@
+  requires \valid( actions );
+  assigns actions->actions;
+  ensures \result == \at( actions->actions, Pre );
+  ensures actions->actions == \null;
+*/
 RTEMS_INLINE_ROUTINE Priority_Aggregation *_Priority_Actions_move(
   Priority_Actions *actions
 )
@@ -459,6 +526,15 @@ RTEMS_INLINE_ROUTINE void _Priority_Set_action(
  * @retval next_action The next action of @a aggregation if RTEMS_SMP is defined.
  * @retval NULL RTEMS_SMP is not defined.
  */
+/*@
+  assigns \nothing;
+#if defined(RTEMS_SMP)
+  requires \valid_read( aggregation );
+  ensures \result == aggregation->Action.next;
+#else
+  ensures \result == \null;
+#endif
+*/
 RTEMS_INLINE_ROUTINE Priority_Aggregation *_Priority_Get_next_action(
   const Priority_Aggregation *aggregation
 )
@@ -657,6 +733,7 @@ typedef void ( *Priority_Remove_handler )(
           priority_aggregation )->Priority.value,
         &priority_actions->actions
       );
+  requires priority_is_pure( priority_aggregation->Node.priority );
   requires \separated(
     &priority_actions->actions,
     &priority_aggregation->Contributors,
@@ -679,6 +756,12 @@ typedef void ( *Priority_Remove_handler )(
     priority_aggregation )->Priority.value ==
       ( priority_aggregation->Node.priority |
         (Priority_Control) ( prepend_it ? 0 : SCHEDULER_PRIORITY_APPEND_FLAG ) );
+  ensures priority_purifies_to(
+    _Priority_Verify_scheduler_node_of_aggregation(
+      priority_aggregation )->Priority.value,
+    priority_aggregation->Node.priority
+  );
+  ensures priority_is_pure( priority_aggregation->Node.priority );
   ensures priority_aggregation->Node.priority ==
     \at( priority_aggregation->Node.priority, Pre );
   ensures priority_contributors{Post}( priority_aggregation ) ==
@@ -765,6 +848,10 @@ RTEMS_INLINE_ROUTINE void _Priority_Remove_nothing(
   requires \valid_read( node );
   requires \valid( actions );
   requires !priority_contributor_member{Pre}( aggregation, node );
+  requires priority_is_pure( node->priority );
+  requires \forall Priority_Node *contributor;
+    contributor \in priority_contributors{Pre}( aggregation ) ==>
+      priority_is_pure( contributor->priority );
   requires \separated( node + (..), &aggregation->Node );
   requires actions->actions == \null;
   requires change == _Thread_Priority_action_change;
@@ -811,13 +898,22 @@ RTEMS_INLINE_ROUTINE void _Priority_Remove_nothing(
     );
   ensures priority_aggregation_well_formed{Post}( aggregation );
   ensures priority_aggregation_cached_minimum{Post}( aggregation );
+  ensures priority_is_pure( aggregation->Node.priority );
   ensures node->priority == \at( node->priority, Pre );
   ensures actions->actions == \null || actions->actions == aggregation;
+  ensures actions->actions == aggregation ==>
+    priority_purifies_to(
+      _Priority_Verify_scheduler_node_of_aggregation(
+        aggregation )->Priority.value,
+      aggregation->Node.priority
+    );
   ensures actions->actions == \null ==>
     _Priority_Verify_scheduler_node_of_aggregation(
       aggregation )->Priority.value ==
         \at( _Priority_Verify_scheduler_node_of_aggregation(
           aggregation )->Priority.value, Pre );
+  ensures actions->actions == \null ==>
+    aggregation->Node.priority == \at( aggregation->Node.priority, Pre );
 */
 #endif
 RTEMS_INLINE_ROUTINE void _Priority_Non_empty_insert(
@@ -844,10 +940,16 @@ RTEMS_INLINE_ROUTINE void _Priority_Non_empty_insert(
           node
         ); */
     aggregation->Node.priority = node->priority;
+    /*@ assert priority_is_pure( aggregation->Node.priority ); */
     /*@ assert priority_aggregation_cached_minimum{Here}( aggregation ); */
     /*@ calls _Thread_Priority_action_change; */
     ( *change )( aggregation, false, actions, arg );
     /*@ assert actions->actions == aggregation; */
+    /*@ assert priority_purifies_to(
+          _Priority_Verify_scheduler_node_of_aggregation(
+            aggregation )->Priority.value,
+          aggregation->Node.priority
+        ); */
     /*@ assert priority_aggregation_cached_minimum{Here}( aggregation ); */
   } else {
     /*@ assert \forall Priority_Node *old_minimum;
@@ -859,10 +961,14 @@ RTEMS_INLINE_ROUTINE void _Priority_Non_empty_insert(
             priority_contributors{Here}( aggregation ),
             old_minimum
           ); */
+    /*@ assert priority_is_pure( aggregation->Node.priority ); */
     /*@ assert priority_aggregation_cached_minimum{Here}( aggregation ); */
   }
 
   /*@ assert actions->actions == \null || actions->actions == aggregation; */
+  /*@ assert actions->actions == \null ==>
+        aggregation->Node.priority == \at( aggregation->Node.priority, Pre ); */
+  /*@ assert priority_is_pure( aggregation->Node.priority ); */
   /*@ assert priority_aggregation_cached_minimum{Here}( aggregation ); */
 }
 
@@ -956,6 +1062,10 @@ RTEMS_INLINE_ROUTINE void _Priority_Extract(
   requires priority_aggregation_cached_minimum{Pre}( aggregation );
   requires priority_contributor_member{Pre}( aggregation, node );
   requires \valid( actions );
+  requires priority_is_pure( node->priority );
+  requires \forall Priority_Node *contributor;
+    contributor \in priority_contributors{Pre}( aggregation ) ==>
+      priority_is_pure( contributor->priority );
   requires \exists Priority_Node *other;
     other != node &&
     other \in priority_contributors{Pre}( aggregation );
@@ -1009,13 +1119,22 @@ RTEMS_INLINE_ROUTINE void _Priority_Extract(
     );
   ensures priority_aggregation_well_formed{Post}( aggregation );
   ensures priority_aggregation_cached_minimum{Post}( aggregation );
+  ensures priority_is_pure( aggregation->Node.priority );
   ensures node->priority == \at( node->priority, Pre );
   ensures actions->actions == \null || actions->actions == aggregation;
+  ensures actions->actions == aggregation ==>
+    priority_purifies_to(
+      _Priority_Verify_scheduler_node_of_aggregation(
+        aggregation )->Priority.value,
+      aggregation->Node.priority
+    );
   ensures actions->actions == \null ==>
     _Priority_Verify_scheduler_node_of_aggregation(
       aggregation )->Priority.value ==
         \at( _Priority_Verify_scheduler_node_of_aggregation(
           aggregation )->Priority.value, Pre );
+  ensures actions->actions == \null ==>
+    aggregation->Node.priority == \at( aggregation->Node.priority, Pre );
 */
 #endif
 RTEMS_INLINE_ROUTINE void _Priority_Extract_non_empty(
@@ -1048,6 +1167,7 @@ RTEMS_INLINE_ROUTINE void _Priority_Extract_non_empty(
   if ( node->priority < min->priority ) {
     aggregation->Node.priority = min->priority;
     /*@ assert aggregation->Node.priority == min->priority; */
+    /*@ assert priority_is_pure( aggregation->Node.priority ); */
     /*@ assert priority_contributors_minimum_node{Here}(
           priority_contributors{Here}( aggregation ),
           min
@@ -1056,14 +1176,24 @@ RTEMS_INLINE_ROUTINE void _Priority_Extract_non_empty(
     /*@ calls _Thread_Priority_action_change; */
     ( *change )( aggregation, true, actions, arg );
     /*@ assert actions->actions == aggregation; */
+    /*@ assert priority_purifies_to(
+          _Priority_Verify_scheduler_node_of_aggregation(
+            aggregation )->Priority.value,
+          aggregation->Node.priority
+        ); */
     /*@ assert priority_aggregation_cached_minimum{Here}( aggregation ); */
   } else {
+    /*@ assert aggregation->Node.priority == min->priority; */
+    /*@ assert priority_is_pure( aggregation->Node.priority ); */
     /*@ assert priority_aggregation_cached_minimum{Here}( aggregation ); */
   }
 
+  /*@ assert priority_aggregation_cached_minimum{Here}( aggregation ); */
+  /*@ assert priority_is_pure( aggregation->Node.priority ); */
   /*@ assert node->priority == \at( node->priority, Pre ); */
   /*@ assert actions->actions == \null || actions->actions == aggregation; */
-  /*@ assert priority_aggregation_cached_minimum{Here}( aggregation ); */
+  /*@ assert actions->actions == \null ==>
+        aggregation->Node.priority == \at( aggregation->Node.priority, Pre ); */
 }
 
 /**
@@ -1085,6 +1215,10 @@ RTEMS_INLINE_ROUTINE void _Priority_Extract_non_empty(
 /*@
   requires priority_aggregation_well_formed{Pre}( aggregation );
   requires priority_contributor_member{Pre}( aggregation, node );
+  requires priority_is_pure( node->priority );
+  requires \forall Priority_Node *contributor;
+    contributor \in priority_contributors{Pre}( aggregation ) ==>
+      priority_is_pure( contributor->priority );
   requires \valid( actions );
   requires actions->actions == \null;
   requires change == _Thread_Priority_action_change;
@@ -1128,13 +1262,22 @@ RTEMS_INLINE_ROUTINE void _Priority_Extract_non_empty(
     priority_contributors{Pre}( aggregation );
   ensures priority_aggregation_well_formed{Post}( aggregation );
   ensures priority_aggregation_cached_minimum{Post}( aggregation );
+  ensures priority_is_pure( aggregation->Node.priority );
   ensures node->priority == \at( node->priority, Pre );
   ensures actions->actions == \null || actions->actions == aggregation;
+  ensures actions->actions == aggregation ==>
+    priority_purifies_to(
+      _Priority_Verify_scheduler_node_of_aggregation(
+        aggregation )->Priority.value,
+      aggregation->Node.priority
+    );
   ensures actions->actions == \null ==>
     _Priority_Verify_scheduler_node_of_aggregation(
       aggregation )->Priority.value ==
         \at( _Priority_Verify_scheduler_node_of_aggregation(
           aggregation )->Priority.value, Pre );
+  ensures actions->actions == \null ==>
+    aggregation->Node.priority == \at( aggregation->Node.priority, Pre );
 */
 #endif
 RTEMS_INLINE_ROUTINE void _Priority_Changed(
@@ -1155,13 +1298,22 @@ RTEMS_INLINE_ROUTINE void _Priority_Changed(
 
   if ( min->priority != aggregation->Node.priority ) {
     aggregation->Node.priority = min->priority;
+    /*@ assert priority_is_pure( aggregation->Node.priority ); */
     /*@ calls _Thread_Priority_action_change; */
     ( *change )( aggregation, prepend_it, actions, arg );
     /*@ assert actions->actions == aggregation; */
+    /*@ assert priority_purifies_to(
+          _Priority_Verify_scheduler_node_of_aggregation(
+            aggregation )->Priority.value,
+          aggregation->Node.priority
+        ); */
   }
 
+  /*@ assert priority_is_pure( aggregation->Node.priority ); */
   /*@ assert node->priority == \at( node->priority, Pre ); */
   /*@ assert actions->actions == \null || actions->actions == aggregation; */
+  /*@ assert actions->actions == \null ==>
+        aggregation->Node.priority == \at( aggregation->Node.priority, Pre ); */
 }
 
 /**
