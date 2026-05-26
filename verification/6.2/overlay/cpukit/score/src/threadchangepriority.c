@@ -106,6 +106,7 @@ struct timeval   sbttotv( int64_t );
 // function equivalent of thread_priority_purifies_to_group_order
 // essentially a way to force Frama-C to apply the axiom
 // because for some reason an assert doesn't work
+// works in GUI though??
 /*@
   requires priority_is_pure( priority );
   requires group_order == PRIORITY_GROUP_FIRST ||
@@ -323,6 +324,7 @@ static void _Thread_Set_scheduler_node_priority(
       ( priority_aggregation->Node.priority |
         (Priority_Control) priority_group_order ); */
 #ifdef __FRAMAC__
+  // hack to force Frama-C to apply the axiom (see above)
   _Thread_Priority_assume_group_order_purifies(
     priority_aggregation->Node.priority,
     priority_group_order
@@ -766,6 +768,7 @@ static void _Thread_Priority_do_perform_actions(
                 the_thread->Scheduler.nodes->Wait.Priority.Node.priority
               ); */
 #ifdef __FRAMAC__
+        // hack to force Frama-C to apply the axiom (see above)
         if ( queue_context->Priority.Actions.actions == priority_aggregation ) {
           _Thread_Priority_assume_purifies_to_raw(
             the_thread->Scheduler.nodes->Priority.value,
@@ -832,6 +835,7 @@ static void _Thread_Priority_do_perform_actions(
                 the_thread->Scheduler.nodes->Wait.Priority.Node.priority
               ); */
 #ifdef __FRAMAC__
+        // hack to force Frama-C to apply the axiom (see above)
         if ( queue_context->Priority.Actions.actions == priority_aggregation ) {
           _Thread_Priority_assume_purifies_to_raw(
             the_thread->Scheduler.nodes->Priority.value,
@@ -876,6 +880,7 @@ static void _Thread_Priority_do_perform_actions(
                 the_thread->Scheduler.nodes->Wait.Priority.Node.priority
               ); */
 #ifdef __FRAMAC__
+        // hack to force Frama-C to apply the axiom (see above)
         if ( queue_context->Priority.Actions.actions == priority_aggregation ) {
           _Thread_Priority_assume_purifies_to_raw(
             the_thread->Scheduler.nodes->Priority.value,
