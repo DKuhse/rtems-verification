@@ -9,26 +9,26 @@ The artifact was tested on a Debian 13.4 x86 host with 8 GB of RAM and an Intel 
 On different platforms, the time measurements will naturally differ but show similar trends.
 
 ## Setup of the artifact environment
-In order to run this artifact, several setup steps are needed. These are noted in the following.
+To run this artifact, several setup steps are needed. These are described below.
 
 ### Prerequisites
 The artifact runs all benchmarks in a docker environment. Therefore, a docker installation is required. Other than that, a python3 interpreter is needed. We tested the scripts with Python 3.13.5.
 
-### Sources setup
-The steps needed to set up the source code and verification environment are outlined in the following:
+### Build and source setup
+The steps needed to set up the source code and verification environment are stated below:
 
-1) The docker image needs to be built
+1) Build the docker image:
 ```bash
 docker compose build toolchain verify-6.2-active-fc32
 ```
 
-2) Download the RTEMS source code. The source code for our FreeRTOS port is included in this repository.
+2) Download the RTEMS source code (the source code for our FreeRTOS port is already included in this repository):
 ```bash
 bash setup.sh
 ```
 
 ## Experiments
-In order to execute the benchmarks that are used to generate the tables in the paper, please run this command:
+To execute the benchmarks that are used to generate the tables in the paper, please run this command:
 
 ```bash
 python3 scripts/bench/bench.py run --pass parallel
@@ -38,7 +38,7 @@ During the execution, you will see an output like:
 ```
 [bench  24/ 97] [#####...................]  24%  [6.2] h_thread_get_priority                     ok    10/10 goals   3.80s  (run 4m58s)
 ```
-The statement `ok` indicates that this test was successful. In case a test fails, usually because of a timeout, the line will contain a `fail`. If a timeout occurs, consider increasing the time by setting the `WP_TIMEOUT` environment variable to a higher setting. By default, it is set to 120 seconds per proof goal.
+The statement `ok` indicates that this test was successful. In case a test fails, usually because of a timeout, the line will contain a `FAIL`. If a timeout occurs, consider increasing the time by setting the `WP_TIMEOUT` environment variable to a higher value. By default, it is set to 120 seconds per proof goal.
 
 If all tests have finished successfully, please use this command to generate the LaTeX tables:
 
@@ -46,10 +46,10 @@ If all tests have finished successfully, please use this command to generate the
 python3 scripts/bench/bench.py render --parallel scripts/bench/results/results-parallel.txt
 ```
 
-The full Frama-C logs of the benchmark runs are saved under `bench/results`.
+The full Frama-C logs of the benchmark runs are saved under `scripts/bench/results`.
 
 
-#### Sequential Execution of Experiments
+### Sequential Execution of Experiments
 Alternatively, we also include a script that will run the benchmarks sequentially. For this, use this command to run the benchmarks:
 
 ```bash
