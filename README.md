@@ -65,11 +65,13 @@ python3 scripts/bench/bench.py render --serial scripts/bench/results/results-ser
 ## Structure
 The folder `scripts` contains individual verification scripts that are used to verify individual functions or files one at a time.
 
-The folder `verification` contains the source code annotated with the proofs. For RTEMS this is an overlay. For FreeRTOS the relevant functions were separated into `references`.
+The folder `verification` contains the source code annotated with the proofs. For RTEMS this is an overlay. For FreeRTOS the relevant functions were separated into `reference`.
 
 For each verification project of RTEMS 5, RTEMS 6, and FreeRTOS, there is a model folder that includes the predicates and lemmas.
+It is helpful to first read the model and subsequently read the contracts.
 
-It is helpful to first read the model and subsequently read the contracts. For RTEMS, the most readable contracts are the contracts for the entry points of:
+### RTEMS contracts
+For RTEMS, the most readable contracts are the contracts for the entry points of:
 
 - `_Scheduler_EDF_Unblock`
 - `_Scheduler_EDF_Yield`
@@ -82,3 +84,7 @@ The contracts for
 - `_Scheduler_EDF_Cancel_job`
 
 are more advanced since they interface with `_Rate_monotonic_Release_job` and `_Rate_monotonic_Cancel`. These contracts contain many preservation postconditions.
+
+### FreeRTOS contracts
+For FreeRTOS, the contract structure is less complicated.
+Please first take a look at the model description and subsequently read the contracts.
