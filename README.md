@@ -1,52 +1,84 @@
-# EDF Scheduler Verification
+# Deductive Verification for Earliest Deadline First Scheduler Implementation - Artifact Evaluation
 
-## Execution
+This repository contains the code used to reproduce the evaluation results from our submission
 
-Build the image:
+_Deductive Verification for Earliest Deadline First Scheduler Implementation_
 
+to RTSS 2026. The code in this repository reproduces the results from Section VII and contains the contracts used for the verification of the EDF schedulers in RTEMS 5, RTEMS 6, and FreeRTOS.
+The artifact was tested on a Debian 13.4 x86 host with 8 GB of RAM and an Intel Core i3-10305T CPU.
+On different platforms, the time measurements will naturally differ but show similar trends.
+
+## Setup of the artifact environment
+In order to run this artifact, several setup steps are needed. These are noted in the following.
+
+### Prerequisites
+The artifact runs all benchmarks in a docker environment. Therefore, a docker installation is required. Other than that, a python3 interpreter is needed. We tested the scripts with Python 3.13.5.
+
+### Sources setup
+The steps needed to set up the source code and verification environment are outlined in the following:
+
+1) The docker image needs to be built
 ```bash
 docker compose build toolchain verify-6.2-active-fc32
 ```
 
-Obtain RTEMS source code (FreeRTOS is included in this repo)
-
+2) Download the RTEMS source code. The source code for our FreeRTOS port is included in this repository.
 ```bash
 bash setup.sh
 ```
 
-To generate the tables for the benchmarks, execute the following commands:
+## Experiments
+In order to execute the benchmarks that are used to generate the tables in the paper, please run this command:
 
 ```bash
-python3 scripts/bench/bench.py run --pass serial # run serial benchmarks
-python3 scripts/bench/bench.py run --pass parallel # run parallel benchmarks
-python3 scripts/bench/bench.py render \
-    --parallel scripts/bench/results/results-parallel.txt \ # print table for parallel execution
-    --serial   scripts/bench/results/results-serial.txt # print table for serial execution
+python3 scripts/bench/bench.py run --pass parallel
 ```
 
-Full Frama-C logs are in bench/results.
+During the execution, you will see an output like:
+```
+[bench  24/ 97] [#####...................]  24%  [6.2] h_thread_get_priority                     ok    10/10 goals   3.80s  (run 4m58s)
+```
+The statement `ok` indicates that this test was successful. In case a test fails, usually because of a timeout, the line will contain a `fail`. If a timeout occurs, consider increasing the time by setting the `WP_TIMEOUT` environment variable to a higher setting. By default, it is set to 120 seconds per proof goal.
 
-If something times out on your machine, consider upping the timeouts, potentially drastically.
+If all tests have finished successfully, please use this command to generate the LaTeX tables:
 
-
-Verification scripts used in development:
 ```bash
-docker compose run --rm verify-5.1-fc32 /opt/scripts/5.1/verify-all.sh
-docker compose run --rm verify-6.2-active-fc32 /opt/scripts/6.2/verify-all.sh
-docker compose run --rm verify-freertos /opt/scripts/freertos/verify-wp-all.sh
+python3 scripts/bench/bench.py render --parallel scripts/bench/results/results-parallel.txt
 ```
-These don't suppress the Frama-C output, so it is very noisy, but at the end a summary table is printed.
 
-Further scripts are in scripts/verify, covering individual functions/files.
+The full Frama-C logs of the benchmark runs are saved under `bench/results`.
+
+
+#### Sequential Execution of Experiments
+Alternatively, we also include a script that will run the benchmarks sequentially. For this, use this command to run the benchmarks:
+
+```bash
+python3 scripts/bench/bench.py run --pass serial
+```
+
+To generate the LaTeX table, after the benchmark script has run, please use this command:
+
+```bash
+python3 scripts/bench/bench.py render --serial scripts/bench/results/results-serial.txt
+```
 
 ## Structure
+The folder `scripts` contains individual verification scripts that are used to verify individual functions or files one at a time.
 
-scripts/ has scripts to verify individual functions/files.
-verification/ includes the source code with proofs. For RTEMS this is an overlay. For FreeRTOS the relevant functions were isolated into references/.
+The folder `verification` contains the source code annotated with the proofs. For RTEMS this is an overlay. For FreeRTOS the relevant functions were separated into `references`.
 
-In each verification project, there is a model folder, that includes the predicates and lemmas.
-For RTEMS, my recommendation is to start with the model and then look at the contracts of the entry points edf unblock, edf yield, edf block and edf change priority. edf release and cancel are particularly nasty because they interface with RM release/cancel, so lots of preservation postconditions were needed because the assigns did not suffice.
+For each verification project of RTEMS 5, RTEMS 6, and FreeRTOS, there is a model folder that includes the predicates and lemmas.
 
-Note: 
-Contracts are at times extremely verbose, as we state all preservations explicitly instead of trying to derive them from the assigns at the caller (which did not work well). 
-There's also lots of debug proof-cuts ('asserts') left in. Ideally the unnecessary ones would be removed, but they are harmless and finding out which ones are unnecessary is quite tedious.
+It is helpful to first read the model and subsequently read the contracts. For RTEMS, the most readable contracts are the contracts for the entry points of:
+
+- `_Scheduler_EDF_Unblock`
+- `_Scheduler_EDF_Yield`
+- `_Scheduler_EDF_Block`
+- `_Scheduler_EDF_Update_priority`
+
+The contracts for
+
+- `_Scheduler_EDF_Release_job`
+- `_Scheduler_EDF_Cancel_job`
+
+are more advanced since they interface with `_Rate_monotonic_Release_job` and `_Rate_monotonic_Cancel`. These contracts contain many preservation postconditions.
